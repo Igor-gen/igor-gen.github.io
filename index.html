@@ -10,6 +10,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <!-- jsPDF pre dlaždicový export do PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- sql.js pre prácu so SQLite v prehliadači -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.min.js"></script>
   <!-- Phosphor Icons pre symboly UI -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script>
@@ -60,19 +62,27 @@
       </div>
       <div class="space-y-1 text-center">
         <p class="text-base sm:text-lg font-semibold text-slate-200" data-i18n="dropZoneText">Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber</p>
-        <p class="text-[10px] sm:text-xs text-slate-400" data-i18n="dropZoneSub">Podporované formáty: GEDZIP (.gdz), .zip a štandardný .ged súbor</p>
+        <p class="text-[10px] sm:text-xs text-slate-400" data-i18n="dropZoneSub">Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite zložky</p>
       </div>
-      <button type="button" onclick="document.getElementById('fileInput').click()" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg transition-transform active:scale-95 text-sm flex items-center justify-center gap-2">
-        <i class="ph ph-folder-open text-base"></i> <span data-i18n="btnSelectFile">Vybrať súbor z počítača</span>
-      </button>
+      <div class="flex gap-2 justify-center w-full mt-2">
+        <button type="button" onclick="document.getElementById('fileInput').click()" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg transition-transform active:scale-95 text-sm flex items-center justify-center gap-2">
+          <i class="ph ph-folder-open text-base"></i> <span data-i18n="btnLoadGed">GDZ / GEDCOM</span>
+        </button>
+        <button type="button" onclick="openSqliteDirectory()" class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg transition-transform active:scale-95 text-sm flex items-center justify-center gap-2">
+          <i class="ph ph-database text-base"></i> <span data-i18n="btnLoadSqlite">Zložka SQLite</span>
+        </button>
+      </div>
     </div>
 
-    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2">
+    <div class="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-3 sm:gap-4 pt-2">
       <button onclick="loadSampleTree()" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 transition">
         <i class="ph-bold ph-sparkle text-amber-400"></i> <span data-i18n="btnSample">Načítať ukážkový rodokmeň</span>
       </button>
       <button onclick="createNewTree()" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 transition">
         <i class="ph-bold ph-plus-circle text-emerald-400"></i> <span data-i18n="btnNew">Vytvoriť nový rodokmeň</span>
+      </button>
+      <button onclick="openDbModal('load')" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 transition">
+        <i class="ph-bold ph-plugs-connected text-violet-400"></i> <span data-i18n="btnConnectDb">Pripojiť databázu na serveri</span>
       </button>
     </div>
 
@@ -111,6 +121,10 @@
           <i class="ph ph-file-archive text-indigo-500"></i>
           <span id="sidebarFileName" class="truncate font-mono">rodokmen.gdz</span>
         </div>
+        <div id="sidebarDbStatus" class="hidden mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 font-medium truncate max-w-[210px]">
+          <i class="ph-bold ph-plugs-connected"></i>
+          <span id="sidebarDbHost" class="truncate font-mono"></span>
+        </div>
       </div>
       <div class="flex items-center gap-1">
         <button onclick="toggleLeftSidebar()" class="md:hidden text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 bg-slate-50">
@@ -122,12 +136,31 @@
       </div>
     </div>
 
+    <!-- NOVÁ ČASŤ - OTVORIŤ (NAČÍTAŤ) SÚBOR -->
+    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex flex-col gap-2">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 pl-0.5" data-i18n="lblImportSidebar">Otvoriť iný súbor</div>
+      <div class="flex gap-2">
+        <button onclick="document.getElementById('fileInput').click()" class="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 shadow-sm text-[10px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 transition">
+          <i class="ph-bold ph-file-archive text-indigo-600 text-sm"></i> <span data-i18n="btnLoadGed">GDZ Archív</span>
+        </button>
+        <button onclick="openSqliteDirectory()" class="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 shadow-sm text-[10px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 transition">
+          <i class="ph-bold ph-folder-open text-blue-600 text-sm"></i> <span data-i18n="btnLoadSqlite">SQLite Zložka</span>
+        </button>
+      </div>
+    </div>
+
     <div class="p-3.5 space-y-2 border-b border-slate-100">
       <button onclick="openPersonEditor(null)" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-user-plus text-sm"></i> <span data-i18n="btnAddPerson">1. Pridať osobu</span>
       </button>
       <button onclick="saveGedzipTree()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-floppy-disk text-sm"></i> <span data-i18n="btnSaveGdz">2. Uložiť rodokmeň (.gdz)</span>
+      </button>
+      <button onclick="saveSqliteTree()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
+        <i class="ph-bold ph-database text-sm"></i> <span data-i18n="btnSaveSqlite">3. Uložiť zložku SQLite</span>
+      </button>
+      <button onclick="saveToServer()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
+        <i class="ph-bold ph-cloud-arrow-up text-sm"></i> <span data-i18n="btnSaveServer">4. Zapísať na server (SQL)</span>
       </button>
       <div class="grid grid-cols-2 gap-1.5 pt-1">
         <button onclick="autoLayoutTree(true)" class="py-1.5 px-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] sm:text-[11px] font-semibold flex items-center justify-center gap-1 border border-indigo-200 transition text-center leading-tight">
@@ -248,6 +281,12 @@
       </div>
       <div class="bg-slate-50 rounded-2xl p-2.5 sm:p-3 border border-slate-100">
         <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <i class="ph-bold ph-briefcase text-emerald-600"></i> <span data-i18n="sectOccupations">Povolanie</span>
+        </div>
+        <div id="detailOccupationsInfo" class="space-y-2 text-[11px] sm:text-xs text-slate-700"></div>
+      </div>
+      <div class="bg-slate-50 rounded-2xl p-2.5 sm:p-3 border border-slate-100">
+        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
           <i class="ph-bold ph-calendar-blank text-teal-600"></i> <span data-i18n="sectEvents">Ďalšie udalosti</span>
         </div>
         <div id="detailEventsInfo" class="space-y-2 text-[11px] sm:text-xs text-slate-700"></div>
@@ -336,6 +375,8 @@
           <button type="button" id="tabBtnEvents" onclick="switchEditTab('events')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-calendar-blank mr-1 hidden sm:inline"></i><span data-i18n="tabEvents">Udalosti</span></button>
           <button type="button" id="tabBtnSources" onclick="switchEditTab('sources')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-link mr-1 hidden sm:inline"></i><span data-i18n="tabSources">Zdroje</span></button>
           <button type="button" id="tabBtnAddresses" onclick="switchEditTab('addresses')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-map-pin mr-1 hidden sm:inline"></i><span data-i18n="tabAddresses">Adresy</span></button>
+          <button type="button" id="tabBtnOccupations" onclick="switchEditTab('occupations')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-briefcase mr-1 hidden sm:inline"></i><span data-i18n="tabOccupations">Povolanie</span></button>
+          <button type="button" id="tabBtnNotes" onclick="switchEditTab('notes')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-text-aa mr-1 hidden sm:inline"></i><span data-i18n="tabNotes">Poznámky</span></button>
         </div>
 
         <div class="p-4 sm:p-6 bg-slate-50 min-h-[220px]">
@@ -383,6 +424,24 @@
             <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabAddressesDesc">Zadajte aktuálne alebo minulé adresy pobytu s dátumom od-do.</p>
             <div id="addressesContainer" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
           </div>
+          <!-- OCCUPATIONS -->
+          <div id="editTabOccupationsContent" class="space-y-3 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+              <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabOccupationsTitle">Povolania</h4>
+              <button type="button" onclick="addOccupationRow()" class="self-start sm:self-auto px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-300 flex items-center gap-1.5 shadow-sm text-xs"><i class="ph-bold ph-plus"></i> <span data-i18n="btnAddOccupation">Pridať povolanie</span></button>
+            </div>
+            <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabOccupationsDesc">Zadajte povolanie, mesto a obdobie.</p>
+            <div id="occupationsContainer" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
+          </div>
+          <!-- NOTES -->
+          <div id="editTabNotesContent" class="space-y-3 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+              <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabNotesTitle">Osobné poznámky</h4>
+              <button type="button" onclick="addNoteRow()" class="self-start sm:self-auto px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-300 flex items-center gap-1.5 shadow-sm text-xs"><i class="ph-bold ph-plus"></i> <span data-i18n="btnAddNote">Pridať poznámku</span></button>
+            </div>
+            <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabNotesDesc">Pridajte doplňujúce poznámky k osobe (max 250 znakov). Nezobrazujú sa na verejnej karte.</p>
+            <div id="notesContainer" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
+          </div>
         </div>
       </div>
       <div class="p-3 sm:p-4 border-t border-slate-200 flex items-center justify-between bg-white flex-wrap gap-2">
@@ -412,6 +471,37 @@
       <button type="button" id="btnConfirmCancel" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition" data-i18n="btnCancel">Zrušiť</button>
       <button type="button" id="btnConfirmOk" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition shadow-sm" data-i18n="btnDelete">Odstrániť</button>
     </div>
+  </div>
+</div>
+
+<!-- DB CONNECT MODAL -->
+<div id="dbConnectModal" class="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white"><i class="ph-bold ph-database text-lg"></i></div>
+        <h3 id="dbModalTitle" class="text-base sm:text-lg font-bold text-slate-800"></h3>
+      </div>
+      <button type="button" onclick="closeDbModal()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200"><i class="ph-bold ph-x text-lg"></i></button>
+    </div>
+    <form onsubmit="submitDbForm(event)" autocomplete="on" class="p-5 space-y-4 text-xs sm:text-sm">
+      <p id="dbHint" class="text-[11px] sm:text-xs text-slate-500"></p>
+      <div>
+        <label for="dbUserInput" class="block font-medium text-slate-600 mb-1" data-i18n="lblDbUser">Používateľ</label>
+        <input type="text" id="dbUserInput" autocomplete="username" autocapitalize="off" spellcheck="false" data-i18n-ph="phDbUser" placeholder="Meno používateľa" class="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-violet-500 focus:outline-none">
+      </div>
+      <div>
+        <label for="dbPasswordInput" class="block font-medium text-slate-600 mb-1" data-i18n="lblDbPassword">Heslo</label>
+        <input type="password" id="dbPasswordInput" autocomplete="current-password" data-i18n-ph="phDbPassword" placeholder="Heslo" class="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-violet-500 focus:outline-none">
+      </div>
+      <div id="dbError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs"></div>
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button type="button" onclick="closeDbModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm" data-i18n="btnCancel">Zrušiť</button>
+        <button type="submit" id="dbSubmitBtn" class="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold flex items-center gap-1.5 shadow-sm text-sm">
+          <i id="dbSubmitIcon" class="ph-bold ph-plugs-connected"></i> <span id="dbSubmitLabel"></span>
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -448,6 +538,12 @@
 </div>
 
 <script>
+// --- INICIALIZACIA SQLITE.JS ---
+let SQL = null;
+initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(sql){
+    SQL = sql;
+});
+
 // --- MOBILNÉ TOGGLE FUNKCIE ---
 function toggleLeftSidebar() { document.getElementById('leftSidebar').classList.toggle('-translate-x-full'); }
 function openPersonPanelMobile() { document.getElementById('personDetailPanel').classList.remove('translate-x-full'); }
@@ -479,7 +575,7 @@ document.getElementById('btnConfirmOk').addEventListener('click', () => {
 // --- I18N DICTIONARY ---
 const i18n = {
   sk: {
-    appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip a štandardný .ged súbor",
+    appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite zložky",
     btnSelectFile: "Vybrať súbor z počítača", btnSample: "Načítať ukážkový rodokmeň", btnNew: "Vytvoriť nový rodokmeň", footerText: "Genealogy HTML5 Single-File • Žiadne dáta neopúšťajú váš prehliadač",
     btnAddPerson: "1. Pridať osobu", btnSaveGdz: "2. Uložiť rodokmeň (.gdz)", btnLayout: "Preusporiadať", btnExportPdf: "Export do PDF",
     zoomView: "Lupa & Pohľad:", searchPlaceholder: "Hľadať osobu podľa mena...", recentEdited: "Posledne editované", statPersons: "Celkovo osôb:", statFamilies: "Rodín:",
@@ -490,33 +586,38 @@ const i18n = {
     modFamily: "Prepojenia rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Pridať partnera", btnAddChild: "Pridať dieťa",
     tabMedia: "Médiá a Docs", tabEvents: "Udalosti", tabSources: "Zdroje", tabMediaTitle: "Priložené fotografie a dokumenty", btnUploadPhoto: "Nahrať foto", btnUploadDoc: "Nahrať dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonom titulnú fotku)", tabEventsTitle: "Životné udalosti (Školy, Krst, iné)", btnAddEvent: "Pridať udalosť", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Pridať zdroj", tabSourcesDesc: "Pridajte max. 25 internetových odkazov na matriky, archívy alebo iné zdroje (skryté pred verejným náhľadom).",
     btnDeletePerson: "Vymazať osobu", btnCancel: "Zrušiť", btnSavePerson: "Uložiť osobu", btnMosaic: "Zobraziť mozaiku", btnSlide: "Zobraziť prezentáciu",
-    tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Pridať adresu", tabAddressesDesc: "Zadajte aktuálne alebo minulé adresy pobytu s dátumom od-do.", optAddrCurrent: "Aktuálne trvalé bydlisko", optAddrPerm: "Trvalé bydlisko", optAddrTemp: "Dočasná adresa", phAddress: "Ulica, Mesto, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žiadne evidované adresy",
+    tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Pridať adresu", tabAddressesDesc: "Zadajte aktuálne alebo minulé adresy pobytu s dátumom od-do.", optAddrCurrent: "Aktuálne trvalé bydlisko", optAddrPerm: "Trvalé bydlisko", optAddrTemp: "Dočasná adresa", phAddress: "Ulica, Mesto, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žiadne evidované adresy", tabOccupations: "Povolanie", tabOccupationsTitle: "Povolania a zamestnanie", btnAddOccupation: "Pridať povolanie", tabOccupationsDesc: "Zadajte povolanie, mesto a obdobie (od – do). Ďalšie povolanie pridáte tlačidlom plus.", phOccupation: "Povolanie", phOccCity: "Mesto", phOccFrom: "Dátum od", phOccTo: "Dátum do", sectOccupations: "Povolanie", tNoOccupations: "Žiadne evidované povolania", tabNotes: "Poznámky", tabNotesTitle: "Osobné poznámky", btnAddNote: "Pridať poznámku", tabNotesDesc: "Pridajte doplňujúce poznámky k osobe (max 250 znakov). Nezobrazujú sa na verejnej karte.", phNoteText: "Zadajte text poznámky...",
     tUnknown: "Neznáme", tBorn: "Narodenie:", tDied: "Úmrtie:", tLives: "Žije", tPlace: "Miesto:", tNoSpouse: "Žiadny evidovaný zväzok", tNoChildren: "Žiadne evidované deti", tNoParents: "Neznámi rodičia", tNoEvents: "Žiadne ďalšie evidované udalosti", tFather: "Otec", tMother: "Matka", tMarr: "Sobáš:", tEvBaptism: "Krst", tEvBasic: "Základná škola", tEvHigh: "Stredná škola", tEvUni: "Vysoká škola", tEvOther: "Iná udalosť", tNoRecent: "Zatiaľ žiadne nedávne úpravy.", tNoSearch: "Nenašla sa žiadna zodpovedajúca osoba", tNewPerson: "Pridať novú osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otca / Neznámy --", tOptNoMother: "-- Bez matky / Neznáma --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvoľte dieťa --", tPhDateMarr: "Dátum sobáša", tPhEventName: "Názov udalosti", tPhEventDate: "Dátum/Rok", tPhEventPlace: "Miesto konania", tMainPhoto: "Hlavná foto", tDoc: "Dokument", tNoFiles: "Zatiaľ žiadne priložené súbory.", tMaxSources: "Maximálny počet zdrojov (25) bol dosiahnutý.", tMaxSpouses: "Maximálny povolený počet partnerov (4) bol dosiahnutý.", tFileBanned: "je spustiteľný a nemôže byť priložený.", tNoPhotoDisplay: "K tejto osobe zatiaľ neboli priložené žiadne fotografie.", tMainPhLbl: "(Hlavná fotografia)", tNoDocsDisplay: "K tejto osobe nie sú priložené žiadne dokumenty.", tSafeDoc: "Bezpečný priložený rodinný záznam", tDownload: "Stiahnuť",
     msgLoaded: "Ukážkový rodokmeň bol načítaný s prísnym hierarchickým prepojením.", msgNew: "Nový rodokmeň bol vytvorený.", msgProcess: "Spracovávam súbor:", msgErrZip: "Archív neobsahuje hlavný súbor .ged (GEDCOM 7.0).", msgReadErr: "Chyba pri čítaní súboru:", msgReadOk: "Načítaných {X} osôb.", msgSaveOk: "Osoba bola úspešne uložená.", msgDelOk: "Osoba bola vymazaná.", msgPrepGdz: "Pripravujem GDZ archív (GEDCOM 7.0)...", msgGdzOk: "GDZ archív bol úspešne uložený.", msgGdzErr: "Chyba pri ukladaní GDZ:", msgPrepPdf: "Generujem viacstranové PDF...", msgPdfOk: "PDF bolo úspešne vygenerované!", msgPdfErr: "Chyba pri generovaní PDF:", msgPdfEmpty: "Rodokmeň je prázdny, nie je čo exportovať.",
-    confirmTitle: "Potvrdenie akcie", confirmDelPerson: "Naozaj chcete trvalo vymazať túto osobu z rodokmeňa?", confirmDelFile: "Naozaj chcete odstrániť tento súbor?", btnDelete: "Odstrániť"
+    confirmTitle: "Potvrdenie akcie", confirmDelPerson: "Naozaj chcete trvalo vymazať túto osobu z rodokmeňa?", confirmDelFile: "Naozaj chcete odstrániť tento súbor?", btnDelete: "Odstrániť",
+    btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "4. Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "3. Uložiť zložku SQLite"
   },
   cs: {
-    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip a standardní .ged soubor", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Hledat osobu podle jména...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Detail • 2x klik = Úprava", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 internetových odkazů na matriky, archivy nebo jiné zdroje (skryté před veřejným náhledem).", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
-    tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy",
+    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite složky", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Hledat osobu podle jména...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Detail • 2x klik = Úprava", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 internetových odkazů na matriky, archivy nebo jiné zdroje (skryté před veřejným náhledem).", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
+    tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Přidejte doplňující poznámky k osobě (max 250 znaků). Nezobrazují se na veřejné kartě.", phNoteText: "Zadejte text poznámky...",
     tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.",
-    confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit"
+    confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit",
+    btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "4. Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "3. Uložit složku SQLite"
   },
   en: {
-    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, and standard .ged files", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Search person by name...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Detail • 2x click = Edit", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 web links to registries, archives, or other sources (hidden from public view).", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
-    tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded",
+    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged and SQLite folders", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Search person by name...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Detail • 2x click = Edit", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 web links to registries, archives, or other sources (hidden from public view).", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
+    tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Add supplementary notes for this person (max 250 chars). Hidden from public card.", phNoteText: "Enter note text...",
     tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.",
-    confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete"
+    confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete",
+    btnConnectDb: "Connect to database on server", btnSaveServer: "4. Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "3. Save SQLite Folder"
   },
   de: {
-    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip und Standard .ged Dateien", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Person nach Namen suchen...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Details • 2x Klick = Bearbeiten", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Weblinks zu Registern, Archiven oder anderen Quellen hinzu (für die Öffentlichkeit verborgen).", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
-    tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst",
+    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged und SQLite Ordner", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Person nach Namen suchen...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Details • 2x Klick = Bearbeiten", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Weblinks zu Registern, Archiven oder anderen Quellen hinzu (für die Öffentlichkeit verborgen).", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
+    tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Zusätzliche Notizen hinzufügen (max 250 Zeichen). Auf der öffentlichen Karte ausgeblendet.", phNoteText: "Notiztext eingeben...",
     tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.",
-    confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen"
+    confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen",
+    btnConnectDb: "Mit Datenbank auf dem Server verbinden", btnSaveServer: "4. Auf Server schreiben (SQL)", dbModalTitleLoad: "Mit Serverdatenbank verbinden", dbModalTitleSave: "In Serverdatenbank schreiben", lblDbUser: "Benutzer", lblDbPassword: "Passwort", phDbUser: "Benutzername", phDbPassword: "Passwort", msgDbErrCreds: "Benutzername oder Passwort ist falsch.", msgDbSessionExpired: "Die Sitzung ist abgelaufen, bitte melden Sie sich erneut an.", msgDbErrForbidden: "Der Server hat die Anfrage abgelehnt (ungültiges Verifizierungs-Token der Anwendung).", msgDbErrRate: "Zu viele Versuche, bitte später erneut versuchen.", msgDbTooLarge: "Der Stammbaum ist für einen einzelnen Schreibvorgang zu groß (Serverlimit 4,5 MB). Verkleinern oder entfernen Sie einige Fotos und Dokumente.", msgDbNotConfigured: "Die App ist nicht konfiguriert (Backend-Adresse oder Verifizierungs-Token fehlt).", dbHintLoad: "Melden Sie sich mit Benutzername und Passwort an. Nach der Überprüfung werden die Daten aus der Datenbank geladen und die App wird geöffnet.", dbHintSave: "Melden Sie sich mit Benutzername und Passwort an. Die Daten werden in die Serverdatenbank geschrieben und ersetzen alle vorhandenen Daten in der Datenbank.", btnDbConnect: "Verbinden", btnDbSave: "Schreiben", dbConnectedLbl: "Mit Server verbunden", msgDbFill: "Geben Sie Benutzername und Passwort ein.", msgDbBadUrl: "Die Datenbankadresse ist ungültig.", msgDbErrNet: "Der Server ist nicht erreichbar. Prüfen Sie Adresse, Verbindung und CORS (liegt die App auf https, muss auch der Server auf https liegen).", msgDbErrTimeout: "Der Server hat nicht rechtzeitig geantwortet.", msgDbErrAuth: "Ungültiger Schlüssel.", msgDbErrServer: "Serverfehler", msgDbErrData: "Der Server hat ungültige Daten geliefert.", msgDbLoaded: "{X} Personen aus der Datenbank geladen.", msgDbEmpty: "Die Datenbank ist leer – ein neuer Stammbaum wurde erstellt. Speichern Sie ihn mit „Auf Server schreiben“.", msgDbSaving: "Schreibe Daten in die Datenbank...", msgDbSaved: "Daten in der Datenbank gespeichert.", msgDbEmptyTree: "Der Stammbaum ist leer; Schreiben würde die Daten in der Datenbank löschen.", lblImportSidebar: "Andere Datei öffnen", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Ordner", btnSaveSqlite: "3. SQLite Ordner speichern"
   }
 };
 
 let currentLang = 'sk';
 function t(key) { return i18n[currentLang][key] || key; }
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
 function setLanguage(lang) {
   currentLang = lang;
@@ -541,13 +642,13 @@ function setLanguage(lang) {
   });
   
   updateCountsUI(); updateRecentListUI();
-  if(currentSelectedPersonId) selectPerson(currentSelectedPersonId);
+  if(currentSelectedPersonId) selectPerson(currentSelectedPersonId, false);
   if(!document.getElementById('personEditModal').classList.contains('hidden')) openPersonEditor(document.getElementById('editPersonId').value);
   if(!document.getElementById('mediaModal').classList.contains('hidden')) openMediaLightbox(currentMediaTab);
 }
 
 // --- GLOBAL LAYOUT SETTINGS ---
-const LAYOUT = { bw: 200, bh: 72, gapX: 30, gapY: 48, spouseGap: 110 }; // spouseGap = 110 (200/2 + 110 + 200/2 = 310, minus 200 = 110px edge-to-edge)
+const LAYOUT = { bw: 200, bh: 72, gapX: 30, gapY: 48, spouseGap: 110 }; 
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
 let recentEditedIds = []; let currentSelectedPersonId = null;
@@ -555,7 +656,7 @@ let recentEditedIds = []; let currentSelectedPersonId = null;
 // Canvas states
 let canvas, ctx; let scale = 1.0; let panX = 100; let panY = 100;
 let isDragging = false; let dragStartX = 0; let dragStartY = 0; let draggedPersonId = null;
-let lastPinchDist = null;
+let lastPinchDist = null; let canvasReady = false; let dbConnection = null; let dbModalMode = 'load'; let dbBusy = false;
 const cachedImages = {};
 
 // Media Viewer
@@ -577,6 +678,7 @@ function showToast(message, type = 'info') {
 function loadSampleTree() {
   const p1 = createPersonObj("@I1@", "Ing.", "Ján", "Kováč", "M", "15.03.1948", "Košice", "Slovensko", "12.01.2015", "Košice");
   p1.addresses.push({ id: generateId("A"), type: "PERM", address: "Kováčska 15, Košice", dateFrom: "1980", dateTo: "2015" });
+  p1.occupations.push({ id: generateId("O"), title: "Strojný inžinier", city: "Košice", dateFrom: "1972", dateTo: "2008" });
   
   const p2 = createPersonObj("@I2@", "MUDr.", "Mária", "Kováčová", "F", "22.07.1952", "Prešov", "Slovensko", "", ""); p2.birthName = "Nováková";
   const p3 = createPersonObj("@I3@", "Mgr.", "Peter", "Kováč", "M", "10.09.1976", "Košice", "Slovensko", "", ""); p3.middleName = "Pavol";
@@ -605,7 +707,7 @@ function createNewTree() {
 }
 
 function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, bCountry, dDate, dPlace) {
-  return { id: id || generateId("I"), title: title || "", firstName: firstName || "", middleName: "", lastName: lastName || "", birthName: "", gender: gender || "M", birthDate: bDate || "", birthPlace: bPlace || "", birthCountry: bCountry || "Slovensko", deathDate: dDate || "", deathPlace: dPlace || "", fams: [], famc: null, events: [], sources: [], addresses: [], photos: [], documents: [], x: 0, y: 0 };
+  return { id: id || generateId("I"), title: title || "", firstName: firstName || "", middleName: "", lastName: lastName || "", birthName: "", gender: gender || "M", birthDate: bDate || "", birthPlace: bPlace || "", birthCountry: bCountry || "Slovensko", deathDate: dDate || "", deathPlace: dPlace || "", fams: [], famc: null, events: [], sources: [], addresses: [], occupations: [], notes: [], photos: [], documents: [], x: 0, y: 0 };
 }
 
 function generateId(prefix) { return `@${prefix}${Math.floor(Math.random() * 899999 + 100000)}@`; }
@@ -618,17 +720,21 @@ dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classLis
 function handleFileSelect(e) { if (e.target.files.length) processFile(e.target.files[0]); }
 
 async function processFile(file) {
-  const fileName = file.name; const isZip = fileName.endsWith('.gdz') || fileName.endsWith('.gedzip') || fileName.endsWith('.zip');
+  const fileName = file.name;
+  const ext = fileName.split('.').pop().toLowerCase();
+  
+  const isZip = ext === 'gdz' || ext === 'gedzip' || ext === 'zip';
   showToast(t('msgProcess') + " " + fileName, "info");
+  
   try {
     if (isZip) {
       const zip = new JSZip(); const loadedZip = await zip.loadAsync(file);
       let gedcomContent = ""; const attachedFiles = {}; const entries = Object.keys(loadedZip.files);
       for (const entryName of entries) {
         const zipEntry = loadedZip.files[entryName]; if (zipEntry.dir) continue;
-        const ext = entryName.split('.').pop().toLowerCase(); if (BANNED_EXTENSIONS.includes(ext)) continue;
+        const eExt = entryName.split('.').pop().toLowerCase(); if (BANNED_EXTENSIONS.includes(eExt)) continue;
         if (entryName.endsWith('.ged') || entryName.toLowerCase().includes('gedcom')) { gedcomContent = await zipEntry.async("string"); } 
-        else { const base64Data = await zipEntry.async("base64"); const mime = getMimeTypeFromExt(ext); attachedFiles[entryName] = { name: entryName, data: `data:${mime};base64,${base64Data}`, ext: ext }; }
+        else { const base64Data = await zipEntry.async("base64"); const mime = getMimeTypeFromExt(eExt); attachedFiles[entryName] = { name: entryName, data: `data:${mime};base64,${base64Data}`, ext: eExt }; }
       }
       if (!gedcomContent) throw new Error(t('msgErrZip'));
       parseGedcomString(gedcomContent, fileName, attachedFiles);
@@ -636,10 +742,112 @@ async function processFile(file) {
   } catch (err) { showToast(t('msgReadErr') + " " + err.message, "error"); }
 }
 
+async function openSqliteDirectory() {
+  if (!SQL) { showToast("Knižnica SQLite sa ešte načítava...", "error"); return; }
+  if (!('showDirectoryPicker' in window)) { showToast("Váš prehliadač nepodporuje výber priečinka.", "error"); return; }
+  
+  try {
+      const dirHandle = await window.showDirectoryPicker();
+      let dbFileHandle = null;
+      let loadedFileName = "rodokmen.sqlite";
+      
+      for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file' && (entry.name.endsWith('.sqlite') || entry.name.endsWith('.db'))) {
+              dbFileHandle = entry;
+              loadedFileName = entry.name;
+              break;
+          }
+      }
+      
+      if (!dbFileHandle) { showToast("V zvolenom priečinku sa nenašiel žiadny .sqlite súbor.", "error"); return; }
+      showToast(t('msgProcess') + " " + loadedFileName, "info");
+      
+      const file = await dbFileHandle.getFile();
+      const arrayBuffer = await file.arrayBuffer();
+      const db = new SQL.Database(new Uint8Array(arrayBuffer));
+      
+      const newPersons = {};
+      const newFamilies = {};
+      
+      try {
+        const resMeta = db.exec("SELECT key, value FROM metadata");
+        if (resMeta.length > 0) { resMeta[0].values.forEach(row => { if (row[0] === 'fileName') loadedFileName = row[1]; }); }
+      } catch(e) {}
+
+      const resPersons = db.exec("SELECT * FROM persons");
+      if (resPersons.length > 0) {
+        const cols = resPersons[0].columns;
+        resPersons[0].values.forEach(row => {
+          const p = {}; cols.forEach((col, idx) => p[col] = row[idx]);
+          const dataJson = p.data_json ? JSON.parse(p.data_json) : {};
+          
+          const newP = createPersonObj(p.id, p.title, p.firstName, p.lastName, p.gender, p.birthDate, p.birthPlace, p.birthCountry, p.deathDate, p.deathPlace);
+          newP.middleName = p.middleName || ""; newP.birthName = p.birthName || ""; newP.famc = p.famc || null;
+          newP.fams = dataJson.fams || []; newP.events = dataJson.events || []; newP.sources = dataJson.sources || [];
+          newP.addresses = dataJson.addresses || []; newP.occupations = dataJson.occupations || []; newP.notes = dataJson.notes || [];
+          newP.photos = dataJson.photos || []; newP.documents = dataJson.documents || [];
+          newP.x = dataJson.x || 0; newP.y = dataJson.y || 0;
+          newPersons[newP.id] = newP;
+        });
+      }
+
+      const resFam = db.exec("SELECT * FROM families");
+      if (resFam.length > 0) {
+        const cols = resFam[0].columns;
+        resFam[0].values.forEach(row => {
+          const f = {}; cols.forEach((col, idx) => f[col] = row[idx]);
+          const dataJson = f.data_json ? JSON.parse(f.data_json) : {};
+          newFamilies[f.id] = { id: f.id, husbandId: f.husbandId || null, wifeId: f.wifeId || null, marrDate: f.marrDate || "", children: dataJson.children || [] };
+        });
+      }
+
+      // Prečitame base64 späť do pamäte z priečinkov
+      let mediaDir = null; let docsDir = null;
+      try { mediaDir = await dirHandle.getDirectoryHandle('media'); } catch(e){}
+      try { docsDir = await dirHandle.getDirectoryHandle('docs'); } catch(e){}
+
+      async function readFileAsBase64(dHandle, filename) {
+          if (!dHandle) return null;
+          try {
+              const fHandle = await dHandle.getFileHandle(filename);
+              const f = await fHandle.getFile();
+              return new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = (e) => resolve(e.target.result);
+                  reader.readAsDataURL(f);
+              });
+          } catch(e) { return null; }
+      }
+
+      for (const p of Object.values(newPersons)) {
+          for (const ph of p.photos) {
+              if (ph.savedPath && ph.savedPath.startsWith('media/')) {
+                  const b64 = await readFileAsBase64(mediaDir, ph.savedPath.replace('media/', ''));
+                  if (b64) ph.data = b64;
+              }
+          }
+          for (const doc of p.documents) {
+              if (doc.savedPath && doc.savedPath.startsWith('docs/')) {
+                  const b64 = await readFileAsBase64(docsDir, doc.savedPath.replace('docs/', ''));
+                  if (b64) doc.data = b64;
+              }
+          }
+      }
+
+      treeData = { fileName: loadedFileName, persons: newPersons, families: newFamilies, files: {} };
+      recentEditedIds = Object.keys(newPersons).slice(0, 5); 
+      launchWorkspace(); 
+      if (Object.values(newPersons).every(pp => pp.x || pp.y)) fitTreeToView(); else autoLayoutTree(true);
+      showToast(t('msgReadOk').replace('{X}', Object.keys(newPersons).length), "success");
+  } catch(e) {
+      if (e.name !== 'AbortError') showToast("Chyba pri načítaní SQLite priečinku: " + e.message, "error");
+  }
+}
+
 function getMimeTypeFromExt(ext) { switch (ext) { case 'jpg': case 'jpeg': return 'image/jpeg'; case 'png': return 'image/png'; case 'webp': return 'image/webp'; case 'pdf': return 'application/pdf'; case 'doc': return 'application/msword'; case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; case 'txt': return 'text/plain'; default: return 'application/octet-stream'; } }
 
 function parseGedcomString(text, fileName, attachedFiles) {
-  const lines = text.split(/\r?\n/); const persons = {}; const families = {};
+  text = String(text).replace(/^\uFEFF/, ''); const lines = text.split(/\r?\n/); const persons = {}; const families = {};
   let currentEntity = null; let currentSubTag = "";
   for (let rawLine of lines) {
     const line = rawLine.trim(); if (!line) continue;
@@ -651,21 +859,31 @@ function parseGedcomString(text, fileName, attachedFiles) {
       else { currentEntity = null; currentSubTag = ""; }
     } else if (currentEntity) {
       if (currentEntity.gender !== undefined) {
-        currentEntity.sources = currentEntity.sources || []; currentEntity.addresses = currentEntity.addresses || [];
+        currentEntity.sources = currentEntity.sources || []; currentEntity.addresses = currentEntity.addresses || []; currentEntity.notes = currentEntity.notes || [];
         if (level === 1) {
           currentSubTag = tagOrId;
           if (tagOrId === "NAME") {
             const isSecondName = currentEntity.firstName !== ""; const nameParts = value.split('/'); const given = (nameParts[0] || "").trim().split(' ');
             if (isSecondName) { currentEntity.birthName = nameParts[1] ? nameParts[1].trim() : ""; } 
             else { currentEntity.firstName = given[0] || ""; if (given.length > 1) currentEntity.middleName = given.slice(1).join(' '); if (nameParts[1]) currentEntity.lastName = nameParts[1].trim(); }
-          } else if (tagOrId === "SEX") { currentEntity.gender = (value.toUpperCase().startsWith("F")) ? "F" : "M"; } 
+          } else if (tagOrId === "SEX") { const sv = value.toUpperCase(); currentEntity.gender = sv.startsWith("F") ? "F" : (sv.startsWith("M") ? "M" : "U"); } 
           else if (tagOrId === "TITL") { currentEntity.title = value; } else if (tagOrId === "FAMS") { if (!currentEntity.fams.includes(value)) currentEntity.fams.push(value); } else if (tagOrId === "FAMC") { currentEntity.famc = value; } 
           else if (tagOrId === "BAPM" || tagOrId === "EDUC" || tagOrId === "EVEN") { currentEntity.events.push({ id: generateId("E"), _gedTag: tagOrId, type: tagOrId === "BAPM" ? "BAPM" : (tagOrId === "EVEN" ? "EVEN" : "EDUC_ZS"), title: "", date: "", place: "" }); } 
           else if (tagOrId === "SOUR" || tagOrId === "WWW") { if (value) currentEntity.sources.push(value); }
+          else if (tagOrId === "OCCU") { currentEntity.occupations = currentEntity.occupations || []; currentEntity.occupations.push({ id: generateId("O"), title: value, city: "", dateFrom: "", dateTo: "" }); }
           else if (tagOrId === "RESI") { currentEntity.addresses.push({ id: generateId("A"), type: "PERM", address: "", dateFrom: "", dateTo: "" }); }
+          else if (tagOrId === "NOTE") { currentEntity.notes.push(value); }
+          else if (tagOrId === "OBJE") { currentEntity._obje = currentEntity._obje || []; currentEntity._obje.push({ file: "", main: false }); }
         } else if (level === 2) {
-          if (currentSubTag === "BIRT") { if (tagOrId === "DATE") currentEntity.birthDate = value; if (tagOrId === "PLAC") currentEntity.birthPlace = value; } 
+          if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); }
+          else if (currentSubTag === "NOTE" && (tagOrId === "CONT" || tagOrId === "CONC") && currentEntity.notes.length) { currentEntity.notes[currentEntity.notes.length - 1] += (tagOrId === "CONT" ? "\n" : "") + value; }
+          else if (currentSubTag === "BIRT") { if (tagOrId === "DATE") currentEntity.birthDate = value; if (tagOrId === "PLAC") currentEntity.birthPlace = value; } 
           else if (currentSubTag === "DEAT") { if (tagOrId === "DATE") currentEntity.deathDate = value; if (tagOrId === "PLAC") currentEntity.deathPlace = value; } 
+          else if (currentSubTag === "OCCU" && currentEntity.occupations && currentEntity.occupations.length) {
+            const lastOc = currentEntity.occupations[currentEntity.occupations.length - 1];
+            if (tagOrId === "PLAC") lastOc.city = value;
+            if (tagOrId === "DATE") { let d = value.toUpperCase(); let fMatch = d.match(/FROM\s+(.+?)(?:\s+TO|$)/); let tMatch = d.match(/TO\s+(.+?)$/); if (fMatch) lastOc.dateFrom = fMatch[1].trim(); if (tMatch) lastOc.dateTo = tMatch[1].trim(); if (!fMatch && !tMatch) lastOc.dateFrom = value; }
+          }
           else if (currentSubTag === "RESI" && currentEntity.addresses.length > 0) {
             const lastAddr = currentEntity.addresses[currentEntity.addresses.length - 1];
             if (tagOrId === "ADDR") lastAddr.address = value;
@@ -687,13 +905,18 @@ function parseGedcomString(text, fileName, attachedFiles) {
     }
   }
 
-  Object.keys(attachedFiles).forEach((fname, idx) => {
-    const fObj = attachedFiles[fname]; const pKeys = Object.keys(persons);
-    if (pKeys.length > 0) {
-      const assignedPerson = persons[pKeys[idx % pKeys.length]]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext);
-      if (isImg) { assignedPerson.photos.push({ id: 'media_' + Date.now() + '_' + idx, name: fObj.name, data: fObj.data, isMain: assignedPerson.photos.length === 0 }); } 
-      else { assignedPerson.documents.push({ id: 'doc_' + Date.now() + '_' + idx, name: fObj.name, data: fObj.data, type: fObj.ext }); }
-    }
+  Object.values(persons).forEach(per => {
+    const refs = per._obje || []; delete per._obje;
+    refs.forEach(ref => {
+      const key = Object.keys(attachedFiles).find(k => k === ref.file || k.replace(/\\/g, '/') === ref.file);
+      if (!key) return;
+      const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext);
+      const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
+      const uid = Math.random().toString(36).slice(2, 9);
+      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main });
+      else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext });
+    });
+    if (per.photos.length && !per.photos.some(ph => ph.isMain)) per.photos[0].isMain = true;
   });
 
   treeData = { fileName: fileName, persons: persons, families: families, files: attachedFiles };
@@ -701,10 +924,12 @@ function parseGedcomString(text, fileName, attachedFiles) {
 }
 
 function launchWorkspace() {
+  dbConnection = null; updateDbStatusUI();
   document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = treeData.fileName || "rodokmen.gdz";
-  initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0]);
+  initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0], false);
 }
-function closeCurrentTree() { document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
+function closeCurrentTree() {
+  dbConnection = null; updateDbStatusUI(); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
 function updateCountsUI() { document.getElementById('statPersonsCount').innerText = Object.keys(treeData.persons).length; document.getElementById('statFamiliesCount').innerText = Object.keys(treeData.families).length; }
 
 function autoLayoutTree(andFitToView = true) {
@@ -752,7 +977,7 @@ function autoLayoutTree(andFitToView = true) {
     const tierY = 120 + d * (LAYOUT.bh + LAYOUT.gapY); 
     const groups = {}; const noGroup = [];
     
-    tier.forEach(pId => { const p = treeData.persons[pId]; if (p.famc) { if (!groups[p.famc]) groups[p.famc] = []; groups[p.famc].push(pId); } else { noGroup.push(pId); } });
+    tier.forEach(pId => { const p = treeData.persons[pId]; if (p.famc && treeData.families[p.famc]) { if (!groups[p.famc]) groups[p.famc] = []; groups[p.famc].push(pId); } else { noGroup.push(pId); } });
     
     const sortedFamc = Object.keys(groups).sort((f1, f2) => {
         const getHubX = (famId) => {
@@ -821,10 +1046,12 @@ function fitTreeToView() {
 }
 
 function zoomCanvas(factor) { scale = Math.min(Math.max(0.25, scale * factor), 2.5); drawTree(); }
-function centerOnPerson(personId) { const p = treeData.persons[personId]; if (!p || !canvas) return; scale = Math.max(scale, 0.95); panX = (canvas.width / 2) - (p.x * scale); panY = (canvas.height / 2) - (p.y * scale); selectPerson(personId); drawTree(); }
+function centerOnPerson(personId) { const p = treeData.persons[personId]; if (!p || !canvas) return; scale = Math.max(scale, 0.95); panX = (canvas.width / 2) - (p.x * scale); panY = (canvas.height / 2) - (p.y * scale); selectPerson(personId, false); drawTree(); }
 
 function initCanvas() {
   canvas = document.getElementById('familyCanvas'); ctx = canvas.getContext('2d');
+  if (canvasReady) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; return; }
+  canvasReady = true;
   function resize() { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; drawTree(); }
   window.addEventListener('resize', resize); resize();
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); zoomCanvas(e.deltaY < 0 ? 1.08 : 0.92); }, { passive: false });
@@ -965,7 +1192,7 @@ function drawPersonBubble(p) {
 
 function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidth) return str; let s = str; while (s.length > 0 && ctx.measureText(s + '...').width > maxWidth) s = s.slice(0, -1); return s + '...'; }
 
-function selectPerson(personId) {
+function selectPerson(personId, openPanel = true) {
   currentSelectedPersonId = personId; const p = treeData.persons[personId]; if (!p) return;
   if (!recentEditedIds.includes(personId)) { recentEditedIds.unshift(personId); if (recentEditedIds.length > 5) recentEditedIds.pop(); updateRecentListUI(); }
   const isMale = (p.gender === 'M'); const badge = document.getElementById('detailGenderBadge');
@@ -973,8 +1200,8 @@ function selectPerson(personId) {
   badge.className = isMale ? "inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold mb-1 bg-blue-100 text-blue-800" : "inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold mb-1 bg-pink-100 text-pink-800";
 
   let fn = p.firstName; if (p.middleName) fn += ' ' + p.middleName; fn += ' ' + p.lastName;
-  document.getElementById('detailFullName').innerText = `${p.title ? p.title + ' ' : ''}${fn}`;
-  let birthNameStr = p.birthName ? `<br><span class="text-xs text-slate-500 font-normal"><span data-i18n="lblBirthName">${t('lblBirthName')}</span>: ${p.birthName}</span>` : '';
+  document.getElementById('detailFullName').innerHTML = esc(`${p.title ? p.title + ' ' : ''}${fn}`);
+  let birthNameStr = p.birthName ? `<br><span class="text-xs text-slate-500 font-normal"><span data-i18n="lblBirthName">${t('lblBirthName')}</span>: ${esc(p.birthName)}</span>` : '';
   document.getElementById('detailFullName').innerHTML += birthNameStr;
 
   document.getElementById('detailDates').innerText = `${t('tBorn')} ${p.birthDate || '?'} ${p.deathDate ? ' • ' + t('tDied') + ' ' + p.deathDate : ' (' + t('tLives') + ')'}`;
@@ -991,7 +1218,7 @@ function selectPerson(personId) {
       const isLast = (idx === spouses.length - 1);
       spouseInfoEl.innerHTML += `
         <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
-          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${isLast ? 'bg-emerald-500' : 'bg-slate-300'}"></span><div><p class="font-semibold text-slate-800">${sp.person.firstName} ${sp.person.lastName}</p><p class="text-[10px] text-slate-400">${t('tMarr')} ${sp.marrDate || '?'}</p></div></div>
+          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${isLast ? 'bg-emerald-500' : 'bg-slate-300'}"></span><div><p class="font-semibold text-slate-800">${esc(sp.person.firstName)} ${esc(sp.person.lastName)}</p><p class="text-[10px] text-slate-400">${t('tMarr')} ${sp.marrDate || '?'}</p></div></div>
           <div class="flex items-center gap-1"><button onclick="centerOnPerson('${sp.person.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded"><i class="ph-bold ph-crosshair"></i></button><button onclick="selectPerson('${sp.person.id}')" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-medium"><i class="ph-bold ph-arrow-right"></i></button></div>
         </div>`;
     });
@@ -1002,7 +1229,7 @@ function selectPerson(personId) {
     children.forEach(c => {
       childrenListEl.innerHTML += `
         <div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition cursor-pointer" onclick="selectPerson('${c.id}')">
-          <div class="flex items-center gap-2"><i class="ph-bold ${c.gender === 'M' ? 'ph-gender-male text-blue-500' : 'ph-gender-female text-pink-500'}"></i><span class="font-medium text-slate-700">${c.firstName} ${c.lastName}</span></div>
+          <div class="flex items-center gap-2"><i class="ph-bold ${c.gender === 'M' ? 'ph-gender-male text-blue-500' : 'ph-gender-female text-pink-500'}"></i><span class="font-medium text-slate-700">${esc(c.firstName)} ${esc(c.lastName)}</span></div>
           <div class="flex items-center gap-2"><span class="text-[10px] text-slate-400">${c.birthDate || '?'}</span><button onclick="event.stopPropagation(); centerOnPerson('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>
         </div>`;
     });
@@ -1010,30 +1237,37 @@ function selectPerson(personId) {
 
   const parentsEl = document.getElementById('detailParentsInfo'); parentsEl.innerHTML = ""; const parents = getParentsOf(p.id);
   if (!parents.father && !parents.mother) { parentsEl.innerHTML = `<span class="text-slate-400 italic">${t('tNoParents')}</span>`; } else {
-    if (parents.father) parentsEl.innerHTML += `<div class="flex items-center justify-between py-0.5"><span class="cursor-pointer hover:text-indigo-600" onclick="selectPerson('${parents.father.id}')"><b>${t('tFather')}:</b> ${parents.father.firstName} ${parents.father.lastName}</span><button onclick="centerOnPerson('${parents.father.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>`;
-    if (parents.mother) parentsEl.innerHTML += `<div class="flex items-center justify-between py-0.5"><span class="cursor-pointer hover:text-indigo-600" onclick="selectPerson('${parents.mother.id}')"><b>${t('tMother')}:</b> ${parents.mother.firstName} ${parents.mother.lastName}</span><button onclick="centerOnPerson('${parents.mother.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>`;
+    if (parents.father) parentsEl.innerHTML += `<div class="flex items-center justify-between py-0.5"><span class="cursor-pointer hover:text-indigo-600" onclick="selectPerson('${parents.father.id}')"><b>${t('tFather')}:</b> ${esc(parents.father.firstName)} ${esc(parents.father.lastName)}</span><button onclick="centerOnPerson('${parents.father.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>`;
+    if (parents.mother) parentsEl.innerHTML += `<div class="flex items-center justify-between py-0.5"><span class="cursor-pointer hover:text-indigo-600" onclick="selectPerson('${parents.mother.id}')"><b>${t('tMother')}:</b> ${esc(parents.mother.firstName)} ${esc(parents.mother.lastName)}</span><button onclick="centerOnPerson('${parents.mother.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>`;
   }
 
   const addrEl = document.getElementById('detailAddressesInfo'); addrEl.innerHTML = "";
   if (!p.addresses || p.addresses.length === 0) { addrEl.innerHTML = `<span class="text-slate-400 italic">${t('tNoAddresses')}</span>`; } else {
     p.addresses.forEach(addr => {
       let lbl = t('optAddrCurrent'); if (addr.type === 'PERM') lbl = t('optAddrPerm'); if (addr.type === 'TEMP') lbl = t('optAddrTemp');
-      let dateStr = ""; if (addr.dateFrom || addr.dateTo) dateStr = `<span class="text-[10px] text-slate-400">${addr.dateFrom || '?'} - ${addr.dateTo || '?'}</span>`;
-      addrEl.innerHTML += `<div class="flex justify-between border-b border-slate-200/50 py-1.5 last:border-0"><span class="font-medium text-slate-600">${lbl}:</span><span class="text-right">${addr.address || '?'}<br>${dateStr}</span></div>`;
+      let dateStr = ""; if (addr.dateFrom || addr.dateTo) dateStr = `<span class="text-[10px] text-slate-400">${esc(addr.dateFrom || '?')} - ${esc(addr.dateTo || '?')}</span>`;
+      addrEl.innerHTML += `<div class="flex justify-between border-b border-slate-200/50 py-1.5 last:border-0"><span class="font-medium text-slate-600">${lbl}:</span><span class="text-right">${esc(addr.address || '?')}<br>${dateStr}</span></div>`;
     });
   }
 
+  const occEl = document.getElementById('detailOccupationsInfo'); occEl.innerHTML = "";
+  if (!p.occupations || p.occupations.length === 0) { occEl.innerHTML = `<span class="text-slate-400 italic">${t('tNoOccupations')}</span>`; } else {
+    p.occupations.forEach(oc => {
+      const per = (oc.dateFrom || oc.dateTo) ? `${esc(oc.dateFrom || '?')} - ${esc(oc.dateTo || '')}` : '';
+      occEl.innerHTML += `<div class="flex justify-between gap-2 border-b border-slate-200/50 py-1.5 last:border-0"><span class="font-medium text-slate-600">${esc(oc.title || '?')}${oc.city ? `<br><span class="text-[10px] text-slate-400 font-normal">${esc(oc.city)}</span>` : ''}</span><span class="text-right text-[10px] text-slate-500">${per}</span></div>`;
+    });
+  }
   const eventsEl = document.getElementById('detailEventsInfo'); eventsEl.innerHTML = "";
   if (!p.events || p.events.length === 0) { eventsEl.innerHTML = `<span class="text-slate-400 italic">${t('tNoEvents')}</span>`; } else {
     p.events.forEach(ev => {
       let lbl = t('tEvOther');
-      if (ev.type === 'BAPM') lbl = t('tEvBaptism'); if (ev.type === 'EDUC_ZS') lbl = t('tEvBasic'); if (ev.type === 'EDUC_SS') lbl = t('tEvHigh'); if (ev.type === 'EDUC_VS') lbl = t('tEvUni'); if (ev.type === 'EVEN') lbl = ev.title || t('tEvOther');
-      eventsEl.innerHTML += `<div class="flex justify-between border-b border-slate-200/50 py-1.5 last:border-0"><span class="font-medium text-slate-600">${lbl}:</span><span class="text-right">${ev.date ? ev.date : '?'}<br><span class="text-[10px] text-slate-400">${ev.place || ''}</span></span></div>`;
+      if (ev.type === 'BAPM') lbl = t('tEvBaptism'); if (ev.type === 'EDUC_ZS') lbl = t('tEvBasic'); if (ev.type === 'EDUC_SS') lbl = t('tEvHigh'); if (ev.type === 'EDUC_VS') lbl = t('tEvUni'); if (ev.type === 'EVEN') lbl = esc(ev.title) || t('tEvOther');
+      eventsEl.innerHTML += `<div class="flex justify-between border-b border-slate-200/50 py-1.5 last:border-0"><span class="font-medium text-slate-600">${lbl}:</span><span class="text-right">${esc(ev.date ? ev.date : '?')}<br><span class="text-[10px] text-slate-400">${esc(ev.place || '')}</span></span></div>`;
     });
   }
 
   document.getElementById('detailPhotoCount').innerText = p.photos.length; document.getElementById('detailDocCount').innerText = p.documents.length; drawTree();
-  openPersonPanelMobile();
+  if (openPanel) openPersonPanelMobile();
 }
 
 function getParentsOf(personId) { const p = treeData.persons[personId]; if (!p || !p.famc) return { father: null, mother: null }; const fam = treeData.families[p.famc]; if (!fam) return { father: null, mother: null }; return { father: treeData.persons[fam.husbandId] || null, mother: treeData.persons[fam.wifeId] || null }; }
@@ -1046,7 +1280,7 @@ function handleSearch(query) {
   clearBtn.classList.remove('hidden'); resultsBox.classList.remove('hidden');
   const matches = Object.values(treeData.persons).filter(p => { const nameStr = `${p.title} ${p.firstName} ${p.middleName} ${p.lastName} ${p.birthName} ${p.birthDate} ${p.birthPlace}`.toLowerCase(); return nameStr.includes(cleanQ); });
   if (matches.length === 0) { resultsBox.innerHTML = `<p class="text-[11px] text-slate-400 p-2 text-center italic">${t('tNoSearch')}</p>`; return; }
-  resultsBox.innerHTML = matches.slice(0, 10).map(p => `<div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition text-xs border border-transparent hover:border-slate-200"><div class="truncate cursor-pointer flex-1" onclick="selectPerson('${p.id}'); centerOnPerson('${p.id}')"><p class="font-semibold text-slate-800 truncate">${p.firstName} ${p.lastName}</p><p class="text-[10px] text-slate-400">${p.birthDate ? '* ' + p.birthDate : ''}</p></div><button onclick="centerOnPerson('${p.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><i class="ph-bold ph-crosshair text-sm"></i></button></div>`).join("");
+  resultsBox.innerHTML = matches.slice(0, 10).map(p => `<div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition text-xs border border-transparent hover:border-slate-200"><div class="truncate cursor-pointer flex-1" onclick="selectPerson('${p.id}'); centerOnPerson('${p.id}')"><p class="font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[10px] text-slate-400">${p.birthDate ? '* ' + p.birthDate : ''}</p></div><button onclick="centerOnPerson('${p.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><i class="ph-bold ph-crosshair text-sm"></i></button></div>`).join("");
 }
 function clearSearch() { document.getElementById('searchInput').value = ""; handleSearch(""); }
 
@@ -1057,14 +1291,14 @@ function updateRecentListUI() {
     const p = treeData.persons[id];
     if (p) {
       const isMale = p.gender === 'M';
-      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${p.firstName} ${p.lastName}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || 'b.d.'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
+      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || 'b.d.'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
     }
   });
 }
 
 let tempAttachedFiles = [];
 function switchEditTab(tab) {
-  const tabs = ['media', 'events', 'sources', 'addresses'];
+  const tabs = ['media', 'events', 'sources', 'addresses', 'occupations', 'notes'];
   tabs.forEach(t2 => {
     const btn = document.getElementById('tabBtn' + t2.charAt(0).toUpperCase() + t2.slice(1)); const content = document.getElementById('editTab' + t2.charAt(0).toUpperCase() + t2.slice(1) + 'Content');
     if (t2 === tab) { content.style.display = 'block'; btn.classList.add('border-indigo-600', 'text-indigo-600'); btn.classList.remove('border-transparent', 'text-slate-500'); } 
@@ -1085,6 +1319,8 @@ function openPersonEditor(personId) {
   document.getElementById('eventsContainer').innerHTML = ""; (p.events || []).forEach(ev => addEventRow(ev.type, ev.title, ev.date, ev.place));
   document.getElementById('sourcesContainer').innerHTML = ""; (p.sources || []).forEach(src => addSourceRow(src));
   document.getElementById('addressesContainer').innerHTML = ""; (p.addresses || []).forEach(addr => addAddressRow(addr.type, addr.address, addr.dateFrom, addr.dateTo));
+  document.getElementById('notesContainer').innerHTML = ""; (p.notes || []).forEach(note => addNoteRow(note));
+  document.getElementById('occupationsContainer').innerHTML = ""; if ((p.occupations || []).length) p.occupations.forEach(oc => addOccupationRow(oc.title, oc.city, oc.dateFrom, oc.dateTo)); else addOccupationRow();
   
   tempAttachedFiles = [
       ...(p.photos || []).map(f => ({...f, isTargetType: 'photo'})),
@@ -1100,7 +1336,7 @@ function closePersonEditor() { document.getElementById('personEditModal').classL
 function addEventRow(type = 'BAPM', title = '', date = '', place = '') {
   const container = document.getElementById('eventsContainer'); const row = document.createElement('div');
   row.className = "event-row flex flex-wrap md:flex-nowrap items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm w-full";
-  row.innerHTML = `<select class="event-type p-2 rounded-xl border border-slate-300 bg-slate-50 w-full md:w-auto md:flex-none focus:ring-2 focus:ring-indigo-500 outline-none" onchange="toggleEventTitle(this)"><option value="BAPM" ${type === 'BAPM' ? 'selected' : ''}>${t('tEvBaptism')}</option><option value="EDUC_ZS" ${type === 'EDUC_ZS' ? 'selected' : ''}>${t('tEvBasic')}</option><option value="EDUC_SS" ${type === 'EDUC_SS' ? 'selected' : ''}>${t('tEvHigh')}</option><option value="EDUC_VS" ${type === 'EDUC_VS' ? 'selected' : ''}>${t('tEvUni')}</option><option value="EVEN" ${type === 'EVEN' ? 'selected' : ''}>${t('tEvOther')}...</option></select><input type="text" class="event-title p-2 rounded-xl border border-slate-300 bg-white flex-1 w-full md:w-auto min-w-0 ${type === 'EVEN' ? '' : 'hidden'} focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('tPhEventName')}" value="${title}"><div class="flex items-center gap-2 w-full md:w-auto md:flex-none"><input type="text" class="event-date p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-24 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('tPhEventDate')}" value="${date}"><input type="text" class="event-place p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-32 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('tPhEventPlace')}" value="${place}"><button type="button" onclick="this.closest('.event-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex-none"><i class="ph-bold ph-trash text-base"></i></button></div>`;
+  row.innerHTML = `<select class="event-type p-2 rounded-xl border border-slate-300 bg-slate-50 w-full md:w-auto md:flex-none focus:ring-2 focus:ring-indigo-500 outline-none" onchange="toggleEventTitle(this)"><option value="BAPM" ${type === 'BAPM' ? 'selected' : ''}>${t('tEvBaptism')}</option><option value="EDUC_ZS" ${type === 'EDUC_ZS' ? 'selected' : ''}>${t('tEvBasic')}</option><option value="EDUC_SS" ${type === 'EDUC_SS' ? 'selected' : ''}>${t('tEvHigh')}</option><option value="EDUC_VS" ${type === 'EDUC_VS' ? 'selected' : ''}>${t('tEvUni')}</option><option value="EVEN" ${type === 'EVEN' ? 'selected' : ''}>${t('tEvOther')}...</option></select><input type="text" class="event-title p-2 rounded-xl border border-slate-300 bg-white flex-1 w-full md:w-auto min-w-0 ${type === 'EVEN' ? '' : 'hidden'} focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('tPhEventName')}" value="${esc(title)}"><div class="flex items-center gap-2 w-full md:w-auto md:flex-none"><input type="text" class="event-date p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-24 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('tPhEventDate')}" value="${esc(date)}"><input type="text" class="event-place p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-32 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('tPhEventPlace')}" value="${esc(place)}"><button type="button" onclick="this.closest('.event-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex-none"><i class="ph-bold ph-trash text-base"></i></button></div>`;
   container.appendChild(row);
 }
 function toggleEventTitle(selectEl) { const titleInput = selectEl.closest('.event-row').querySelector('.event-title'); if (selectEl.value === 'EVEN') titleInput.classList.remove('hidden'); else titleInput.classList.add('hidden'); }
@@ -1108,14 +1344,28 @@ function toggleEventTitle(selectEl) { const titleInput = selectEl.closest('.even
 function addSourceRow(url = '') {
   const container = document.getElementById('sourcesContainer'); if (container.children.length >= 25) { showToast(t('tMaxSources'), "error"); return; }
   const row = document.createElement('div'); row.className = "source-row flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm";
-  row.innerHTML = `<i class="ph-bold ph-link text-slate-400 pl-1"></i><input type="url" class="source-input p-2 rounded-xl border border-slate-300 bg-slate-50 flex-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." value="${url}"><button type="button" onclick="this.closest('.source-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`;
+  row.innerHTML = `<i class="ph-bold ph-link text-slate-400 pl-1"></i><input type="url" class="source-input p-2 rounded-xl border border-slate-300 bg-slate-50 flex-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." value="${esc(url)}"><button type="button" onclick="this.closest('.source-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`;
   container.appendChild(row);
 }
 
 function addAddressRow(type = 'CURRENT', address = '', dateFrom = '', dateTo = '') {
   const container = document.getElementById('addressesContainer'); const row = document.createElement('div');
   row.className = "address-row flex flex-wrap md:flex-nowrap items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm w-full";
-  row.innerHTML = `<select class="address-type p-2 rounded-xl border border-slate-300 bg-slate-50 w-full md:w-auto md:flex-none focus:ring-2 focus:ring-indigo-500 outline-none"><option value="CURRENT" ${type==='CURRENT'?'selected':''}>${t('optAddrCurrent')}</option><option value="PERM" ${type==='PERM'?'selected':''}>${t('optAddrPerm')}</option><option value="TEMP" ${type==='TEMP'?'selected':''}>${t('optAddrTemp')}</option></select><input type="text" class="address-text p-2 rounded-xl border border-slate-300 bg-white flex-1 w-full md:w-auto min-w-0 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('phAddress')}" value="${address}"><div class="flex items-center gap-2 w-full md:w-auto md:flex-none"><input type="text" class="address-from p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-20 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phDateFrom')}" value="${dateFrom}"><input type="text" class="address-to p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-20 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phDateTo')}" value="${dateTo}"><button type="button" onclick="this.closest('.address-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex-none"><i class="ph-bold ph-trash text-base"></i></button></div>`;
+  row.innerHTML = `<select class="address-type p-2 rounded-xl border border-slate-300 bg-slate-50 w-full md:w-auto md:flex-none focus:ring-2 focus:ring-indigo-500 outline-none"><option value="CURRENT" ${type==='CURRENT'?'selected':''}>${t('optAddrCurrent')}</option><option value="PERM" ${type==='PERM'?'selected':''}>${t('optAddrPerm')}</option><option value="TEMP" ${type==='TEMP'?'selected':''}>${t('optAddrTemp')}</option></select><input type="text" class="address-text p-2 rounded-xl border border-slate-300 bg-white flex-1 w-full md:w-auto min-w-0 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('phAddress')}" value="${esc(address)}"><div class="flex items-center gap-2 w-full md:w-auto md:flex-none"><input type="text" class="address-from p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-20 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phDateFrom')}" value="${esc(dateFrom)}"><input type="text" class="address-to p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-20 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phDateTo')}" value="${esc(dateTo)}"><button type="button" onclick="this.closest('.address-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex-none"><i class="ph-bold ph-trash text-base"></i></button></div>`;
+  container.appendChild(row);
+}
+
+function addNoteRow(text = '') {
+  const container = document.getElementById('notesContainer'); const row = document.createElement('div');
+  row.className = "note-row flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm w-full";
+  row.innerHTML = `<textarea class="note-input p-2 rounded-xl border border-slate-300 bg-slate-50 flex-1 focus:ring-2 focus:ring-indigo-500 outline-none text-xs resize-none" rows="2" maxlength="250" placeholder="${t('phNoteText')}">${esc(text)}</textarea><button type="button" onclick="this.closest('.note-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl mt-1 flex-none"><i class="ph-bold ph-trash text-base"></i></button>`;
+  container.appendChild(row);
+}
+
+function addOccupationRow(title = '', city = '', dateFrom = '', dateTo = '') {
+  const container = document.getElementById('occupationsContainer'); const row = document.createElement('div');
+  row.className = "occupation-row flex flex-wrap md:flex-nowrap items-center gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm w-full";
+  row.innerHTML = `<input type="text" class="occupation-title p-2 rounded-xl border border-slate-300 bg-white flex-1 w-full md:w-auto min-w-0 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('phOccupation')}" value="${esc(title)}"><input type="text" class="occupation-city p-2 rounded-xl border border-slate-300 bg-white w-full md:w-32 md:flex-none min-w-0 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="${t('phOccCity')}" value="${esc(city)}"><div class="flex items-center gap-2 w-full md:w-auto md:flex-none"><input type="text" class="occupation-from p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-24 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phOccFrom')}" value="${esc(dateFrom)}"><input type="text" class="occupation-to p-2 rounded-xl border border-slate-300 bg-white flex-1 md:w-24 focus:ring-2 focus:ring-indigo-500 outline-none min-w-0" placeholder="${t('phOccTo')}" value="${esc(dateTo)}"><button type="button" onclick="this.closest('.occupation-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl flex-none"><i class="ph-bold ph-trash text-base"></i></button></div>`;
   container.appendChild(row);
 }
 
@@ -1124,7 +1374,7 @@ function populateParentSelects(currentId, person) {
   fatherSelect.innerHTML = `<option value="">${t('tOptNoFather')}</option>`; motherSelect.innerHTML = `<option value="">${t('tOptNoMother')}</option>`;
   const parents = currentId ? getParentsOf(currentId) : { father: null, mother: null };
   Object.values(treeData.persons).forEach(other => {
-    if (other.id === currentId) return; const opt = `<option value="${other.id}">${other.firstName} ${other.lastName} (${other.birthDate || '?'})</option>`;
+    if (other.id === currentId) return; const opt = `<option value="${other.id}">${esc(other.firstName)} ${esc(other.lastName)} (${esc(other.birthDate || '?')})</option>`;
     if (other.gender === 'M') fatherSelect.innerHTML += opt; else if (other.gender === 'F') motherSelect.innerHTML += opt;
   });
   if (parents.father) fatherSelect.value = parents.father.id; if (parents.mother) motherSelect.value = parents.mother.id;
@@ -1135,8 +1385,8 @@ function addSpouseFieldRow(selectedSpouseId = "", marrDate = "") {
   const container = document.getElementById('spousesContainer'); if (container.children.length >= 4) { showToast(t('tMaxSpouses'), "error"); return; }
   const row = document.createElement('div'); row.className = "spouse-row flex flex-col sm:flex-row items-center gap-3 p-3 rounded-2xl bg-white shadow-sm border border-slate-200";
   let optionsHtml = `<option value="">${t('tOptSelSpouse')}</option>`; const currId = document.getElementById('editPersonId').value;
-  Object.values(treeData.persons).forEach(p => { if (p.id !== currId) optionsHtml += `<option value="${p.id}" ${p.id === selectedSpouseId ? 'selected' : ''}>${p.firstName} ${p.lastName} (${p.birthDate || '?'})</option>`; });
-  row.innerHTML = `<div class="spouse-avatar-preview w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0 border border-slate-300"><i class="ph-bold ph-user text-slate-400"></i></div><div class="flex-1 w-full"><select class="spouse-select w-full p-2 rounded-xl border border-slate-300 bg-white" onchange="updateSpouseRowAvatar(this)">${optionsHtml}</select></div><div class="w-full sm:w-44"><input type="text" value="${marrDate || ''}" placeholder="${t('tPhDateMarr')}" class="spouse-date w-full p-2 rounded-xl border border-slate-300 bg-white"></div><button type="button" onclick="this.closest('.spouse-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`;
+  Object.values(treeData.persons).forEach(p => { if (p.id !== currId) optionsHtml += `<option value="${p.id}" ${p.id === selectedSpouseId ? 'selected' : ''}>${esc(p.firstName)} ${esc(p.lastName)} (${esc(p.birthDate || '?')})</option>`; });
+  row.innerHTML = `<div class="spouse-avatar-preview w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0 border border-slate-300"><i class="ph-bold ph-user text-slate-400"></i></div><div class="flex-1 w-full"><select class="spouse-select w-full p-2 rounded-xl border border-slate-300 bg-white" onchange="updateSpouseRowAvatar(this)">${optionsHtml}</select></div><div class="w-full sm:w-44"><input type="text" value="${esc(marrDate || '')}" placeholder="${t('tPhDateMarr')}" class="spouse-date w-full p-2 rounded-xl border border-slate-300 bg-white"></div><button type="button" onclick="this.closest('.spouse-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`;
   container.appendChild(row); updateSpouseRowAvatar(row.querySelector('.spouse-select'));
 }
 function updateSpouseRowAvatar(selectEl) {
@@ -1150,7 +1400,7 @@ function populateChildrenEditor(currentId, person) { const container = document.
 function addChildFieldRow(selectedChildId = "") {
   const container = document.getElementById('childrenContainer'); const row = document.createElement('div'); row.className = "child-row flex items-center gap-2 p-2 rounded-xl bg-white shadow-sm border border-slate-200";
   let optionsHtml = `<option value="">${t('tOptSelChild')}</option>`; const currId = document.getElementById('editPersonId').value;
-  Object.values(treeData.persons).forEach(p => { if (p.id !== currId) optionsHtml += `<option value="${p.id}" ${p.id === selectedChildId ? 'selected' : ''}>${p.firstName} ${p.lastName} (${p.birthDate || '?'})</option>`; });
+  Object.values(treeData.persons).forEach(p => { if (p.id !== currId) optionsHtml += `<option value="${p.id}" ${p.id === selectedChildId ? 'selected' : ''}>${esc(p.firstName)} ${esc(p.lastName)} (${esc(p.birthDate || '?')})</option>`; });
   row.innerHTML = `<select class="child-select flex-1 p-2 rounded-xl border border-slate-300 bg-white">${optionsHtml}</select><button type="button" onclick="this.closest('.child-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`; container.appendChild(row);
 }
 
@@ -1183,7 +1433,7 @@ function renderAttachedFilesList() {
   if (tempAttachedFiles.length === 0) { list.innerHTML = `<span class="text-slate-400 italic text-[11px] col-span-2 p-2">${t('tNoFiles')}</span>`; return; }
   tempAttachedFiles.forEach(file => {
     const isPhoto = (file.isTargetType === 'photo' || file.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(file.type));
-    list.innerHTML += `<div class="flex items-center justify-between p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs"><div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${file.type}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${file.name}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div><button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="ph-bold ph-trash"></i></button></div>`;
+    list.innerHTML += `<div class="flex items-center justify-between p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs"><div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${file.type}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${esc(file.name)}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div><button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="ph-bold ph-trash"></i></button></div>`;
   });
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
@@ -1196,6 +1446,114 @@ function removeTempFile(fileId) {
   });
 }
 
+async function saveSqliteTree() {
+  if (!SQL) { showToast("Knižnica SQLite sa ešte načítava...", "error"); return; }
+  if (!('showDirectoryPicker' in window)) { showToast("Váš prehliadač nepodporuje priamy zápis do priečinkov (napr. Firefox). Použite prosím Chrome/Edge alebo uloženie do .gdz", "error"); return; }
+
+  try {
+    const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    showToast("Pripravujem SQLite databázu a priečinky...", "info");
+
+    const db = new SQL.Database();
+    db.run(`CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT)`);
+    db.run(`CREATE TABLE persons (id TEXT PRIMARY KEY, title TEXT, firstName TEXT, middleName TEXT, lastName TEXT, birthName TEXT, gender TEXT, birthDate TEXT, birthPlace TEXT, birthCountry TEXT, deathDate TEXT, deathPlace TEXT, famc TEXT, data_json TEXT)`);
+    db.run(`CREATE TABLE families (id TEXT PRIMARY KEY, husbandId TEXT, wifeId TEXT, marrDate TEXT, data_json TEXT)`);
+    db.run(`CREATE TABLE files (id TEXT PRIMARY KEY, name TEXT, ext TEXT, type TEXT, path TEXT)`); 
+
+    const stmtMeta = db.prepare(`INSERT INTO metadata VALUES (?, ?)`);
+    stmtMeta.run(["fileName", treeData.fileName || "rodokmen.sqlite"]);
+    stmtMeta.free();
+
+    const mediaDir = await dirHandle.getDirectoryHandle('media', { create: true });
+    const docsDir = await dirHandle.getDirectoryHandle('docs', { create: true });
+
+    async function writeBase64ToFile(dHandle, filename, b64Data) {
+        try {
+            const fileHandle = await dHandle.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            const response = await fetch(b64Data);
+            const blob = await response.blob();
+            await writable.write(blob);
+            await writable.close();
+        } catch(e) { console.error("Chyba zapisu suboru", filename, e); }
+    }
+
+    const stmtFile = db.prepare(`INSERT INTO files VALUES (?, ?, ?, ?, ?)`);
+    const stmtPerson = db.prepare(`INSERT INTO persons VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+
+    for (const p of Object.values(treeData.persons)) {
+        let pCopy = JSON.parse(JSON.stringify(p)); 
+        
+        for (let i = 0; i < pCopy.photos.length; i++) {
+            const ph = pCopy.photos[i];
+            if (ph.data && ph.data.startsWith('data:')) {
+                const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const filename = `${p.id.replace(/@/g, '')}_photo_${i}_${cleanName}`;
+                await writeBase64ToFile(mediaDir, filename, ph.data);
+                stmtFile.run([ph.id, ph.name, ph.type || 'jpg', 'photo', `media/${filename}`]);
+                p.photos[i].savedPath = `media/${filename}`; ph.savedPath = `media/${filename}`; 
+                delete ph.data; 
+            } else if (p.photos[i].savedPath) {
+                 stmtFile.run([ph.id, ph.name, ph.type || 'jpg', 'photo', p.photos[i].savedPath]);
+                 delete ph.data;
+            }
+        }
+        
+        for (let i = 0; i < pCopy.documents.length; i++) {
+            const doc = pCopy.documents[i];
+            if (doc.data && doc.data.startsWith('data:')) {
+                const cleanName = doc.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                const filename = `${p.id.replace(/@/g, '')}_doc_${i}_${cleanName}`;
+                await writeBase64ToFile(docsDir, filename, doc.data);
+                stmtFile.run([doc.id, doc.name, doc.type || 'pdf', 'doc', `docs/${filename}`]);
+                p.documents[i].savedPath = `docs/${filename}`; doc.savedPath = `docs/${filename}`;
+                delete doc.data;
+            } else if (p.documents[i].savedPath) {
+                 stmtFile.run([doc.id, doc.name, doc.type || 'pdf', 'doc', p.documents[i].savedPath]);
+                 delete doc.data;
+            }
+        }
+
+        const dataJson = JSON.stringify({
+            fams: pCopy.fams, events: pCopy.events, sources: pCopy.sources,
+            addresses: pCopy.addresses, occupations: pCopy.occupations || [], notes: pCopy.notes,
+            photos: pCopy.photos, documents: pCopy.documents,
+            x: pCopy.x, y: pCopy.y
+        });
+
+        stmtPerson.run([
+            p.id, p.title || "", p.firstName || "", p.middleName || "", p.lastName || "", p.birthName || "",
+            p.gender || "U", p.birthDate || "", p.birthPlace || "", p.birthCountry || "",
+            p.deathDate || "", p.deathPlace || "", p.famc || "", dataJson
+        ]);
+    }
+    stmtPerson.free();
+    stmtFile.free();
+
+    const stmtFam = db.prepare(`INSERT INTO families VALUES (?, ?, ?, ?, ?)`);
+    Object.values(treeData.families).forEach(f => {
+        stmtFam.run([ f.id, f.husbandId || "", f.wifeId || "", f.marrDate || "", JSON.stringify({ children: f.children }) ]);
+    });
+    stmtFam.free();
+
+    const dbData = db.export();
+    const dbBlob = new Blob([dbData], { type: 'application/x-sqlite3' });
+    
+    let targetDbName = treeData.fileName || "rodokmen.sqlite";
+    if (!targetDbName.endsWith('.sqlite')) targetDbName = targetDbName.replace(/\.[^/.]+$/, "") + ".sqlite";
+    
+    const dbFileHandle = await dirHandle.getFileHandle(targetDbName, { create: true });
+    const writableDb = await dbFileHandle.createWritable();
+    await writableDb.write(dbBlob);
+    await writableDb.close();
+
+    showToast("Projekt bol úspešne uložený do vybranej zložky.", "success");
+  } catch(e) {
+      console.error(e);
+      if (e.name !== 'AbortError') showToast("Chyba pri ukladaní SQLite zložky: " + e.message, "error");
+  }
+}
+
 function savePersonForm(e) {
   e.preventDefault(); const personId = document.getElementById('editPersonId').value; const isNew = !personId;
   const id = isNew ? generateId("I") : personId; const p = isNew ? createPersonObj(id) : treeData.persons[id];
@@ -1205,17 +1563,69 @@ function savePersonForm(e) {
   p.events = []; document.querySelectorAll('.event-row').forEach(row => { p.events.push({ id: generateId("E"), type: row.querySelector('.event-type').value, title: row.querySelector('.event-title').value.trim(), date: row.querySelector('.event-date').value.trim(), place: row.querySelector('.event-place').value.trim() }); });
   p.sources = []; document.querySelectorAll('.source-row .source-input').forEach(input => { const val = input.value.trim(); if (val) p.sources.push(val); });
   p.addresses = []; document.querySelectorAll('.address-row').forEach(row => { p.addresses.push({ id: generateId("A"), type: row.querySelector('.address-type').value, address: row.querySelector('.address-text').value.trim(), dateFrom: row.querySelector('.address-from').value.trim(), dateTo: row.querySelector('.address-to').value.trim() }); });
+  p.notes = []; document.querySelectorAll('.note-row .note-input').forEach(input => { const val = input.value.trim(); if (val) p.notes.push(val); });
+  p.occupations = []; document.querySelectorAll('.occupation-row').forEach(row => { const oc = { id: generateId("O"), title: row.querySelector('.occupation-title').value.trim(), city: row.querySelector('.occupation-city').value.trim(), dateFrom: row.querySelector('.occupation-from').value.trim(), dateTo: row.querySelector('.occupation-to').value.trim() }; if (oc.title || oc.city || oc.dateFrom || oc.dateTo) p.occupations.push(oc); });
 
   p.photos = tempAttachedFiles.filter(f => f.isTargetType === 'photo' || f.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(f.type)); 
   p.documents = tempAttachedFiles.filter(f => f.isTargetType === 'doc' || (!p.photos.includes(f)));
   if (isNew) { p.x = 400 + Math.random() * 150; p.y = 250 + Math.random() * 100; treeData.persons[id] = p; }
 
-  const fatherId = document.getElementById('editFatherSelect').value; const motherId = document.getElementById('editMotherSelect').value;
-  if (fatherId || motherId) { let famId = p.famc; let fam = famId ? treeData.families[famId] : null; if (!fam) { famId = generateId("F"); fam = { id: famId, husbandId: fatherId || null, wifeId: motherId || null, marrDate: "", children: [p.id] }; treeData.families[famId] = fam; p.famc = famId; } else { fam.husbandId = fatherId || null; fam.wifeId = motherId || null; if (!fam.children.includes(p.id)) fam.children.push(p.id); } } else if (p.famc) { const oldFam = treeData.families[p.famc]; if (oldFam) oldFam.children = oldFam.children.filter(c => c !== p.id); p.famc = null; }
+  const fatherId = document.getElementById('editFatherSelect').value || ""; const motherId = document.getElementById('editMotherSelect').value || "";
+  p.fams = p.fams || [];
+  const linkFam = (fam) => { [fam.husbandId, fam.wifeId].forEach(sid => { const sp = sid && treeData.persons[sid]; if (sp) { sp.fams = sp.fams || []; if (!sp.fams.includes(fam.id)) sp.fams.push(fam.id); } }); };
+  const dropFamIfEmpty = (famId) => { const f = treeData.families[famId]; if (!f) return; if ((f.children || []).length === 0 && !(f.husbandId && f.wifeId)) { [f.husbandId, f.wifeId].forEach(sid => { const sp = sid && treeData.persons[sid]; if (sp) sp.fams = (sp.fams || []).filter(x => x !== famId); }); delete treeData.families[famId]; } };
 
-  const spouseRows = document.querySelectorAll('.spouse-row'); spouseRows.forEach(row => { const spSelect = row.querySelector('.spouse-select'); const spDateInput = row.querySelector('.spouse-date'); const spId = spSelect.value; const spDate = spDateInput.value.trim(); if (spId) { let fam = (p.fams || []).map(fId => treeData.families[fId]).find(f => f && (f.husbandId === spId || f.wifeId === spId)); if (!fam) { const newFamId = generateId("F"); fam = { id: newFamId, husbandId: (p.gender === 'M') ? p.id : spId, wifeId: (p.gender === 'M') ? spId : p.id, marrDate: spDate, children: [] }; treeData.families[newFamId] = fam; if (!p.fams.includes(newFamId)) p.fams.push(newFamId); const spouseObj = treeData.persons[spId]; if (spouseObj && !spouseObj.fams.includes(newFamId)) spouseObj.fams.push(newFamId); } else fam.marrDate = spDate; } });
+  // Rodičia
+  const oldFamId = p.famc;
+  if (fatherId || motherId) {
+    let fam = Object.values(treeData.families).find(f => (f.husbandId || "") === fatherId && (f.wifeId || "") === motherId);
+    if (!fam) { fam = { id: generateId("F"), husbandId: fatherId || null, wifeId: motherId || null, marrDate: "", children: [] }; treeData.families[fam.id] = fam; }
+    if (oldFamId && oldFamId !== fam.id && treeData.families[oldFamId]) treeData.families[oldFamId].children = treeData.families[oldFamId].children.filter(c => c !== p.id);
+    if (!fam.children.includes(p.id)) fam.children.push(p.id);
+    p.famc = fam.id; linkFam(fam);
+    if (oldFamId && oldFamId !== fam.id) dropFamIfEmpty(oldFamId);
+  } else if (oldFamId) {
+    if (treeData.families[oldFamId]) treeData.families[oldFamId].children = treeData.families[oldFamId].children.filter(c => c !== p.id);
+    p.famc = null; dropFamIfEmpty(oldFamId);
+  }
 
-  const childRows = document.querySelectorAll('.child-row'); childRows.forEach(row => { const cId = row.querySelector('.child-select').value; if (cId && treeData.persons[cId]) { const childObj = treeData.persons[cId]; let primaryFamId = p.fams[0]; if (!primaryFamId) { primaryFamId = generateId("F"); treeData.families[primaryFamId] = { id: primaryFamId, husbandId: (p.gender === 'M') ? p.id : null, wifeId: (p.gender === 'F') ? p.id : null, marrDate: "", children: [cId] }; p.fams.push(primaryFamId); } else { const fam = treeData.families[primaryFamId]; if (!fam.children.includes(cId)) fam.children.push(cId); } childObj.famc = primaryFamId; } });
+  // Partneri
+  const chosenSpouses = {};
+  document.querySelectorAll('.spouse-row').forEach(row => { const spId = row.querySelector('.spouse-select').value; const spDate = row.querySelector('.spouse-date').value.trim(); if (spId && spId !== p.id && treeData.persons[spId]) chosenSpouses[spId] = spDate; });
+  [...p.fams].forEach(fId => {
+    const f = treeData.families[fId]; if (!f) { p.fams = p.fams.filter(x => x !== fId); return; }
+    const other = f.husbandId === p.id ? f.wifeId : f.husbandId;
+    if (other && !(other in chosenSpouses)) {
+      if (f.husbandId === p.id) f.wifeId = null; else f.husbandId = null;
+      const o = treeData.persons[other]; if (o) o.fams = (o.fams || []).filter(x => x !== fId);
+    }
+  });
+  Object.keys(chosenSpouses).forEach(spId => {
+    const myFams = () => p.fams.map(fId => treeData.families[fId]).filter(Boolean);
+    let fam = myFams().find(f => f.husbandId === spId || f.wifeId === spId);
+    if (!fam) {
+      fam = myFams().find(f => !(f.husbandId && f.wifeId));
+      if (fam) { if (fam.husbandId === p.id) fam.wifeId = spId; else fam.husbandId = spId; }
+      else { fam = { id: generateId("F"), husbandId: (p.gender === 'M') ? p.id : spId, wifeId: (p.gender === 'M') ? spId : p.id, marrDate: "", children: [] }; treeData.families[fam.id] = fam; }
+    }
+    fam.marrDate = chosenSpouses[spId]; linkFam(fam);
+  });
+
+  // Deti
+  const chosenChildren = [];
+  document.querySelectorAll('.child-row .child-select').forEach(s => { if (s.value && s.value !== p.id && treeData.persons[s.value] && !chosenChildren.includes(s.value)) chosenChildren.push(s.value); });
+  p.fams.forEach(fId => { const f = treeData.families[fId]; if (!f) return; f.children = (f.children || []).filter(cId => { if (chosenChildren.includes(cId)) return true; const c = treeData.persons[cId]; if (c && c.famc === fId) c.famc = null; return false; }); });
+  chosenChildren.forEach(cId => {
+    const child = treeData.persons[cId];
+    if (child.famc && p.fams.includes(child.famc) && treeData.families[child.famc]) return;
+    let target = p.fams.map(fId => treeData.families[fId]).find(Boolean);
+    if (!target) { target = { id: generateId("F"), husbandId: (p.gender === 'M') ? p.id : null, wifeId: (p.gender === 'M') ? null : p.id, marrDate: "", children: [] }; treeData.families[target.id] = target; p.fams.push(target.id); }
+    const prev = child.famc;
+    if (prev && prev !== target.id && treeData.families[prev]) treeData.families[prev].children = treeData.families[prev].children.filter(c => c !== cId);
+    target.children.push(cId); child.famc = target.id;
+    if (prev && prev !== target.id) dropFamIfEmpty(prev);
+  });
+  [...p.fams].forEach(dropFamIfEmpty); p.fams = p.fams.filter(fId => treeData.families[fId]);
 
   closePersonEditor(); selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success");
 }
@@ -1260,13 +1670,13 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${ph.name}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>`; });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${esc(ph.name)}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${doc.name}</h4><p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p></div></div><a href="${doc.data}" download="${doc.name}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${esc(doc.name)}</h4><p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
@@ -1283,7 +1693,7 @@ async function saveGedzipTree() {
     const idMap = {}; orderedPersonIds.forEach((oldId, index) => { idMap[oldId] = `@I${index + 1}@`; });
     const famIdMap = {}; Object.keys(treeData.families).forEach((oldFamId, index) => { famIdMap[oldFamId] = `@F${index + 1}@`; });
 
-    let ged = "0 HEAD\n1 GEDC\n2 VERS 7.0\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n1 SOUR GenealogyApp\n2 VERS 1.0\n";
+    let ged = "0 HEAD\n1 GEDC\n2 VERS 7.0\n1 SOUR GenealogyApp\n2 VERS 1.0\n";
     orderedPersonIds.forEach(oldId => {
       const p = treeData.persons[oldId]; const newId = idMap[oldId];
       let fullN = p.firstName; if (p.middleName) fullN += ' ' + p.middleName;
@@ -1309,12 +1719,19 @@ async function saveGedzipTree() {
           let dateStr = ""; if (addr.dateFrom && addr.dateTo) dateStr = `FROM ${addr.dateFrom} TO ${addr.dateTo}`; else if (addr.dateFrom) dateStr = `FROM ${addr.dateFrom}`; else if (addr.dateTo) dateStr = `TO ${addr.dateTo}`;
           if (dateStr) ged += `2 DATE ${dateStr}\n`;
       });
+      (p.occupations || []).forEach(oc => {
+          ged += oc.title ? `1 OCCU ${oc.title}\n` : `1 OCCU\n`;
+          if (oc.city) ged += `2 PLAC ${oc.city}\n`;
+          let ods = ""; if (oc.dateFrom && oc.dateTo) ods = `FROM ${oc.dateFrom} TO ${oc.dateTo}`; else if (oc.dateFrom) ods = `FROM ${oc.dateFrom}`; else if (oc.dateTo) ods = `TO ${oc.dateTo}`;
+          if (ods) ged += `2 DATE ${ods}\n`;
+      });
+      if (p.notes && p.notes.length > 0) { p.notes.forEach(note => { const nl = String(note).split(/\r?\n/); ged += `1 NOTE ${nl[0]}\n`; nl.slice(1).forEach(l => { ged += `2 CONT ${l}\n`; }); }); }
 
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
 
-      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${cleanName.split('.').pop()}\n`; const base64Data = ph.data.split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
-      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${dc.type}\n`; const base64Data = dc.data.split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
     });
 
     Object.keys(treeData.families).forEach(oldFamId => {
@@ -1360,9 +1777,9 @@ function exportToPdfTiled() {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (pageNumber > 1) pdf.addPage('a4', 'landscape');
-        const offCanvas = document.createElement('canvas'); offCanvas.width = 1600; offCanvas.height = 1130; const offCtx = offCanvas.getContext('2d');
+        const offCanvas = document.createElement('canvas'); offCanvas.width = 1662; offCanvas.height = 1110; const offCtx = offCanvas.getContext('2d');
         offCtx.fillStyle = '#ffffff'; offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
-        offCtx.save(); offCtx.scale(offCanvas.width / tileW, offCanvas.height / tileH); offCtx.translate(-(minX + c * tileW), -(minY + r * tileH));
+        offCtx.save(); const sc = Math.min(offCanvas.width / tileW, offCanvas.height / tileH); offCtx.translate((offCanvas.width - tileW * sc) / 2, (offCanvas.height - tileH * sc) / 2); offCtx.scale(sc, sc); offCtx.translate(-(minX + c * tileW), -(minY + r * tileH));
 
         Object.values(treeData.families).forEach(fam => {
           const husband = treeData.persons[fam.husbandId]; const wife = treeData.persons[fam.wifeId]; const children = (fam.children || []).map(id => treeData.persons[id]).filter(Boolean);
@@ -1397,11 +1814,166 @@ function exportToPdfTiled() {
           offCtx.fillText(`${p.title ? p.title + ' ' : ''}${fn}`, bx + 20, by + 28); offCtx.font = '12px sans-serif'; offCtx.fillStyle = '#475569'; offCtx.fillText(`${p.birthDate || '?'} - ${p.deathDate || ''}`, bx + 20, by + 50);
         });
         offCtx.restore();
-        pdf.addImage(offCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, 277, 185); pdf.setFontSize(10); pdf.setTextColor(100, 116, 139); pdf.text(`Genealogy | P. ${pageNumber} / ${totalPages} ([R-${r + 1}, S-${c + 1}])`, 12, 8); pdf.setFontSize(9); pdf.setTextColor(225, 29, 72); if (c < cols - 1) pdf.text(`--> P. ${pageNumber + 1}`, 222, 105); if (c > 0) pdf.text(`<-- P. ${pageNumber - 1}`, 12, 105); if (r < rows - 1) pdf.text(`▼ Pokračovanie na stranu ${pageNumber + cols}`, 113.5, 203); pageNumber++;
+        pdf.addImage(offCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, 277, 185); pdf.setFontSize(10); pdf.setTextColor(100, 116, 139); pdf.text(`Genealogy | P. ${pageNumber} / ${totalPages} ([R-${r + 1}, S-${c + 1}])`, 12, 8); pdf.setFontSize(9); pdf.setTextColor(225, 29, 72); if (c < cols - 1) pdf.text(`--> P. ${pageNumber + 1}`, 222, 105); if (c > 0) pdf.text(`<-- P. ${pageNumber - 1}`, 12, 105); if (r < rows - 1) pdf.text(`v Pokracovanie na strane ${pageNumber + cols}`, 113.5, 203); pageNumber++;
       }
     }
     pdf.save("Rodokmen_Tlac.pdf"); showToast(t('msgPdfOk'), "success");
   } catch (err) { showToast(t('msgPdfErr') + " " + err.message, "error"); }
+}
+
+// --- PRIHLÁSENIE A PRIPOJENIE NA DATABÁZU (Vercel backend -> Turso) ---
+// Tieto dve hodnoty sa pri nasadení na GitHub Pages nahradia automaticky (.github/workflows/pages.yml).
+// POZOR: obsah stránky je verejný – overovací token aplikácie je v nasadenej stránke viditeľný každému.
+// Skutočnú ochranu zabezpečuje meno + heslo overované na backende.
+const BACKEND_URL = "__BACKEND_URL__";
+const USER_VERIFICATION_TOKEN = "__USER_VERIFICATION_TOKEN__";
+const MAX_PAYLOAD_BYTES = 4300000; // Vercel Functions: najviac 4,5 MB na telo požiadavky
+
+function isBackendConfigured() {
+  return /^(https:\/\/|http:\/\/localhost[:\/])/.test(BACKEND_URL) && USER_VERIFICATION_TOKEN.length >= 16 && !USER_VERIFICATION_TOKEN.startsWith('__');
+}
+
+function updateDbStatusUI() {
+  const box = document.getElementById('sidebarDbStatus'); if (!box) return;
+  if (dbConnection) {
+    let host = BACKEND_URL; try { host = new URL(BACKEND_URL).host; } catch (e) {}
+    document.getElementById('sidebarDbHost').innerText = `${dbConnection.username} @ ${host}`;
+    box.title = t('dbConnectedLbl') + ': ' + host;
+    box.classList.remove('hidden');
+  } else { box.classList.add('hidden'); }
+}
+
+function openDbModal(mode) {
+  dbModalMode = mode; hideDbError(); setDbBusy(false);
+  document.getElementById('dbModalTitle').innerText = t(mode === 'save' ? 'dbModalTitleSave' : 'dbModalTitleLoad');
+  document.getElementById('dbHint').innerText = t(mode === 'save' ? 'dbHintSave' : 'dbHintLoad');
+  document.getElementById('dbSubmitLabel').innerText = t(mode === 'save' ? 'btnDbSave' : 'btnDbConnect');
+  document.getElementById('dbSubmitIcon').className = 'ph-bold ' + (mode === 'save' ? 'ph-cloud-arrow-up' : 'ph-plugs-connected');
+  document.getElementById('dbPasswordInput').value = '';
+  document.getElementById('dbConnectModal').classList.remove('hidden');
+  if (!isBackendConfigured()) showDbError(t('msgDbNotConfigured'));
+  setTimeout(() => document.getElementById('dbUserInput').focus(), 50);
+}
+function closeDbModal() {
+  if (dbBusy) return;
+  document.getElementById('dbConnectModal').classList.add('hidden');
+  document.getElementById('dbPasswordInput').value = '';
+}
+function showDbError(msg) { const el = document.getElementById('dbError'); el.innerText = msg; el.classList.remove('hidden'); }
+function hideDbError() { document.getElementById('dbError').classList.add('hidden'); }
+function setDbBusy(b) {
+  dbBusy = b; document.getElementById('dbSubmitBtn').disabled = b;
+  if (b) document.getElementById('dbSubmitIcon').className = 'ph-bold ph-circle-notch animate-spin';
+  else document.getElementById('dbSubmitIcon').className = 'ph-bold ' + (dbModalMode === 'save' ? 'ph-cloud-arrow-up' : 'ph-plugs-connected');
+}
+
+async function backendFetch(path, method, opts = {}) {
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), opts.timeout || 30000);
+  try {
+    return await fetch(BACKEND_URL.replace(/\/+$/, '') + path, { method, headers: opts.headers || {}, body: opts.body, signal: ctrl.signal, cache: 'no-store' });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? t('msgDbErrTimeout') : t('msgDbErrNet'));
+  } finally { clearTimeout(timer); }
+}
+
+async function backendError(res, authMsgKey) {
+  let err;
+  if (res.status === 401) err = new Error(t(authMsgKey));
+  else if (res.status === 403) err = new Error(t('msgDbErrForbidden'));
+  else if (res.status === 429) err = new Error(t('msgDbErrRate'));
+  else if (res.status === 413) err = new Error(t('msgDbTooLarge'));
+  else {
+    let detail = ''; try { const j = await res.json(); detail = j.error || ''; } catch (e) {}
+    err = new Error(`${t('msgDbErrServer')} (${res.status})${detail ? ': ' + detail : ''}`);
+  }
+  err.status = res.status; return err;
+}
+
+// 1) Prihlásenie: backend overí USER_VERIFICATION_TOKEN aplikácie a potom meno + heslo (hash v Turso)
+async function loginToBackend(username, password) {
+  const res = await backendFetch('/api/login', 'POST', {
+    headers: { 'Content-Type': 'application/json', 'X-User-Verification-Token': USER_VERIFICATION_TOKEN },
+    body: JSON.stringify({ username, password })
+  });
+  if (!res.ok) throw await backendError(res, 'msgDbErrCreds');
+  let data; try { data = await res.json(); } catch (e) { throw new Error(t('msgDbErrData')); }
+  if (!data || typeof data.token !== 'string' || !data.token) throw new Error(t('msgDbErrData'));
+  return { token: data.token, username: username };
+}
+
+// 2) Čítanie a zápis rodokmeňa s tokenom relácie
+async function fetchTreeData(session) {
+  const res = await backendFetch('/api/tree', 'GET', { headers: { 'Authorization': 'Bearer ' + session.token }, timeout: 60000 });
+  if (!res.ok) { const err = await backendError(res, 'msgDbSessionExpired'); if (res.status === 401) err.sessionExpired = true; throw err; }
+  let data; try { data = await res.json(); } catch (e) { throw new Error(t('msgDbErrData')); }
+  if (!data || !Array.isArray(data.persons)) throw new Error(t('msgDbErrData'));
+  return data;
+}
+
+async function putTreeData(session) {
+  const persons = Object.values(treeData.persons);
+  if (persons.length === 0) throw new Error(t('msgDbEmptyTree'));
+  const body = JSON.stringify({ fileName: treeData.fileName || 'rodokmen', persons: persons, families: Object.values(treeData.families) });
+  if (new Blob([body]).size > MAX_PAYLOAD_BYTES) throw new Error(t('msgDbTooLarge'));
+  const res = await backendFetch('/api/tree', 'PUT', { headers: { 'Authorization': 'Bearer ' + session.token, 'Content-Type': 'application/json' }, body, timeout: 120000 });
+  if (!res.ok) { const err = await backendError(res, 'msgDbSessionExpired'); if (res.status === 401) err.sessionExpired = true; throw err; }
+}
+
+async function saveToServer() {
+  if (!dbConnection) { openDbModal('save'); return; }
+  if (dbBusy) return;
+  dbBusy = true; showToast(t('msgDbSaving'), 'info');
+  try { await putTreeData(dbConnection); showToast(t('msgDbSaved'), 'success'); }
+  catch (err) {
+    if (err.sessionExpired) { dbConnection = null; updateDbStatusUI(); openDbModal('save'); showDbError(err.message); }
+    else showToast(err.message, 'error');
+  }
+  finally { dbBusy = false; }
+}
+
+function loadTreeFromServer(data, session) {
+  const persons = {};
+  (data.persons || []).forEach(raw => {
+    if (!raw || !raw.id) return;
+    const p = Object.assign(createPersonObj(raw.id), raw);
+    ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
+    p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
+    persons[p.id] = p;
+  });
+  const families = {};
+  (data.families || []).forEach(raw => {
+    if (!raw || !raw.id) return;
+    families[raw.id] = { id: raw.id, husbandId: raw.husbandId || null, wifeId: raw.wifeId || null, marrDate: raw.marrDate || "", children: Array.isArray(raw.children) ? raw.children : [] };
+  });
+  if (Object.keys(persons).length === 0) {
+    createNewTree(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
+  }
+  treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
+  recentEditedIds = Object.keys(persons).slice(0, 5);
+  launchWorkspace();
+  if (Object.values(persons).every(pp => pp.x || pp.y)) fitTreeToView(); else autoLayoutTree(true);
+  dbConnection = session; updateDbStatusUI();
+  showToast(t('msgDbLoaded').replace('{X}', Object.keys(persons).length), 'success');
+}
+
+async function submitDbForm(e) {
+  e.preventDefault(); if (dbBusy) return;
+  if (!isBackendConfigured()) { showDbError(t('msgDbNotConfigured')); return; }
+  const username = document.getElementById('dbUserInput').value.trim();
+  const password = document.getElementById('dbPasswordInput').value;
+  if (!username || !password) { showDbError(t('msgDbFill')); return; }
+  hideDbError(); setDbBusy(true);
+  try {
+    const session = await loginToBackend(username, password);
+    if (dbModalMode === 'load') {
+      const data = await fetchTreeData(session);
+      setDbBusy(false); closeDbModal(); loadTreeFromServer(data, session);
+    } else {
+      await putTreeData(session);
+      dbConnection = session; updateDbStatusUI();
+      setDbBusy(false); closeDbModal(); showToast(t('msgDbSaved'), 'success');
+    }
+  } catch (err) { setDbBusy(false); showDbError(err.message); }
 }
 
 // Initial init
