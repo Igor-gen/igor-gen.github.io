@@ -1872,7 +1872,7 @@ async function backendFetch(path, method, opts = {}) {
   try {
     return await fetch(BACKEND_URL.replace(/\/+$/, '') + path, { method, headers: opts.headers || {}, body: opts.body, signal: ctrl.signal, cache: 'no-store' });
   } catch (e) {
-    throw new Error(e.name === 'AbortError' ? t('msgDbErrTimeout') : t('msgDbErrNet'));
+    throw new Error((e.name === 'AbortError' ? t('msgDbErrTimeout') : t('msgDbErrNet')) + ' [' + BACKEND_URL.replace(/\/+$/, '') + path + ']');
   } finally { clearTimeout(timer); }
 }
 
