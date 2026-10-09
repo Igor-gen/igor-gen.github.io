@@ -23,21 +23,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Do verejného repozitára sa token NEZAPISUJE. Do index.html sa vloží až tu, pri nasadení.
       - name: Inject backend configuration into index.html
         env:
           BACKEND_URL: ${{ vars.BACKEND_URL }}
-          USER_VERIFICATION_TOKEN: ${{ secrets.USER_VERIFICATION_TOKEN }}
         run: |
           test -n "$BACKEND_URL" || { echo "::error::Chýba repository variable BACKEND_URL"; exit 1; }
-          test -n "$USER_VERIFICATION_TOKEN" || { echo "::error::Chýba repository secret USER_VERIFICATION_TOKEN"; exit 1; }
           mkdir site
           python3 - <<'PY'
           import os
           html = open('index.html', encoding='utf-8').read()
-          for placeholder, name in (('__BACKEND_URL__', 'BACKEND_URL'), ('__USER_VERIFICATION_TOKEN__', 'USER_VERIFICATION_TOKEN')):
-              assert placeholder in html, placeholder + ' sa v index.html nenašiel'
-              html = html.replace(placeholder, os.environ[name].strip())
+          placeholder = '__BACKEND_URL__'
+          assert placeholder in html, placeholder + ' sa v index.html nenašiel'
+          html = html.replace(placeholder, os.environ['BACKEND_URL'].strip())
           open('site/index.html', 'w', encoding='utf-8').write(html)
           PY
 
