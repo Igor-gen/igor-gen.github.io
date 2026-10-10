@@ -2590,7 +2590,7 @@ function drawFanChartWithRoot(root) {
   const generations = buildFanGenerations(root, persons);
 
   /*
-   * Každá generácia sa teraz zmení z jednotlivcov
+   * Každá generácia sa zmení z jednotlivcov
    * na rodinné skupiny.
    */
   const familyGenerations = generations.map(generation =>
@@ -2601,6 +2601,7 @@ function drawFanChartWithRoot(root) {
   const cy = H - 30;
 
   const maxRadius = Math.min(W * 0.47, H * 0.9);
+
   const ringGap =
     maxRadius / Math.max(familyGenerations.length, 1);
 
@@ -2658,7 +2659,7 @@ function drawFanChartWithRoot(root) {
       ctx.stroke();
 
       /*
-       * Text rodinnej skupiny.
+       * Mená rodinnej skupiny.
        */
       const names = group.people.map(person => {
         const name =
@@ -2668,11 +2669,11 @@ function drawFanChartWithRoot(root) {
         return name || 'Neznámy';
       });
 
-      const text =
-        names.length === 2
-          ? `${names[0]}  ♥  ${names[1]}`
-          : names[0];
+      const isCouple = names.length === 2;
 
+      /*
+       * Stred textu rodinného poľa.
+       */
       const tx =
         Math.cos(middleAngle) *
         ((innerRadius + outerRadius) / 2);
@@ -2690,17 +2691,34 @@ function drawFanChartWithRoot(root) {
       );
 
       ctx.fillStyle = '#4b3520';
-      ctx.font = 'bold 13px Georgia, serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      ctx.fillText(text, 0, 0);
+      /*
+       * Manželia:
+       *
+       * Ján Šklenčar
+       *       ♥
+       * Eva Šklenčárová
+       */
+      if (isCouple) {
+        ctx.font = 'bold 13px Georgia, serif';
+        ctx.fillText(names[0], 0, -9);
+
+        ctx.font = '12px Georgia, serif';
+        ctx.fillText('♥', 0, 2);
+
+        ctx.font = 'bold 13px Georgia, serif';
+        ctx.fillText(names[1], 0, 13);
+      } else {
+        ctx.font = 'bold 13px Georgia, serif';
+        ctx.fillText(names[0], 0, 0);
+      }
 
       ctx.restore();
 
       /*
        * Klikateľné je celé spoločné pole.
-       * Ako koreň použijeme prvého človeka skupiny.
        */
       group._fanChartArea = {
         startAngle,
