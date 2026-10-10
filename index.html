@@ -2225,6 +2225,13 @@ function toggleFanChartMenu() {
   menu.classList.toggle('hidden');
 }
 
+  function fanChartGoBack() {
+  if (!fanChartHistory.length) return;
+
+  fanChartCurrentRoot = fanChartHistory.pop();
+  drawFanChartWithRoot(fanChartCurrentRoot);
+}
+
 function drawFanChart() {
   const canvas = document.getElementById('fanChartCanvas');
   if (!canvas) return;
