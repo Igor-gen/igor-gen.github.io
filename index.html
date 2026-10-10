@@ -2163,19 +2163,39 @@ function findOldestFanRoot() {
   const persons = Object.values(treeData.persons || {});
   if (!persons.length) return null;
 
-  // Najstaršia generácia = osoby, ktoré nemajú rodičovskú rodinu.
-  const roots = persons.filter(p => {
-    return !p.famc || !treeData.families[p.famc];
-  });
+  function parseBirthDate(value) {
+    if (!value) return null;
 
-  if (!roots.length) return persons[0];
+    const parts = String(value).split('.');
+    if (parts.length !== 3) return null;
 
-  // Ak je medzi najstaršou generáciou žena s manželom,
+    const day = Number(parts[0]);
+    const month = Number(parts[1]);
+    const year = Number(parts[2]);
+
+    if (!day || !month || !year) return null;
+
+    return new Date(year, month - 1, day);
+  }
+
+  const datedPersons = persons
+    .map(person => ({
+      person,
+      date: parseBirthDate(person.birthDate)
+    }))
+    .filter(item => item.date);
+
+  if (!datedPersons.length) return persons[0];
+
+  // Najstarší človek podľa dátumu narodenia.
+  datedPersons.sort((a, b) => a.date - b.date);
+
+  const oldest = datedPersons[0].person;
+
+  // Ak je najstaršia žena a má manžela,
   // začneme graf u jej manžela.
-  for (const person of roots) {
-    if (person.gender !== 'F') continue;
-
-    for (const famId of (person.fams || [])) {
+  if (oldest.gender === 'F') {
+    for (const famId of (oldest.fams || [])) {
       const fam = treeData.families[famId];
       if (!fam) continue;
 
@@ -2185,9 +2205,7 @@ function findOldestFanRoot() {
     }
   }
 
-  // Ak najstaršia generácia nemá takýto pár,
-  // použijeme prvú osobu z najstaršej generácie.
-  return roots[0];
+  return oldest;
 }
 
 let fanChartHistory = [];
