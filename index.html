@@ -2539,11 +2539,6 @@ function drawFanChartWithRoot(root) {
   ctx.fillStyle = '#ead9b8';
   ctx.fillRect(0, 0, W, H);
 
-  /*
-   * Vytvoríme rodinné polia.
-   * Každé pole = manželský pár.
-   * Osamelý človek = samostatné pole.
-   */
   function buildFamilyGroups(generation) {
     const groups = [];
     const used = new Set();
@@ -2570,14 +2565,16 @@ function drawFanChartWithRoot(root) {
 
       if (spouse && generation.some(p => p.id === spouse.id)) {
         groups.push({
-          people: [person, spouse]
+          people: [person, spouse],
+          familyIds: person.fams || []
         });
 
         used.add(person.id);
         used.add(spouse.id);
       } else {
         groups.push({
-          people: [person]
+          people: [person],
+          familyIds: person.fams || []
         });
 
         used.add(person.id);
@@ -2589,10 +2586,6 @@ function drawFanChartWithRoot(root) {
 
   const generations = buildFanGenerations(root, persons);
 
-  /*
-   * Každá generácia sa zmení z jednotlivcov
-   * na rodinné skupiny.
-   */
   const familyGenerations = generations.map(generation =>
     buildFamilyGroups(generation)
   );
@@ -2605,9 +2598,11 @@ function drawFanChartWithRoot(root) {
   const ringGap =
     maxRadius / Math.max(familyGenerations.length, 1);
 
-  ctx.save();
-  ctx.translate(cx, cy);
-
+  /*
+   * Najprv si pripravíme všetky polia.
+   * Potrebujeme ich pozície poznať ešte pred kreslením
+   * spojovacích čiar medzi rodičmi a deťmi.
+   */
   familyGenerations.forEach((generation, generationIndex) => {
     const innerRadius = generationIndex * ringGap;
     const outerRadius = (generationIndex + 1) * ringGap;
@@ -2623,8 +2618,162 @@ function drawFanChartWithRoot(root) {
       const middleAngle =
         (startAngle + endAngle) / 2;
 
+      group._fanChartArea = {
+        startAngle,
+        endAngle,
+        innerRadius,
+        outerRadius,
+        middleAngle,
+        rootPerson: group.people[0]
+      };
+    });
+  });
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  /*
+   * SPOJOVACIE ČIARY
+   *
+   * Každé rodinné pole spojíme s poľami jeho detí.
+   */
+  for (
+    let generationIndex = 0;
+    generationIndex < familyGenerations.length - 1;
+    generationIndex++
+  ) {
+    const parentGeneration = familyGenerations[generationIndex];
+    const childGeneration = familyGenerations[generationIndex + 1];
+
+    parentGeneration.forEach(parentGroup => {
+      const parentPersonIds =
+        parentGroup.people.map(person => person.id);
+
+      const parentFamilyIds = new Set();
+
+      parentGroup.people.forEach(person => {
+        (person.fams || []).forEach(famId => {
+          parentFamilyIds.add(famId);
+        });
+      });
+
       /*
-       * Jedno spoločné pole pre manželov.
+       * Nájdeme deti patriace k tomuto páru.
+       */
+      const childGroups = [];
+
+      childGeneration.forEach(childGroup => {
+        const childPerson = childGroup.people[0];
+
+        let belongsToParent = false;
+
+        for (const famId of parentFamilyIds) {
+          const fam = treeData.families[famId];
+          if (!fam) continue;
+
+          if ((fam.children || []).includes(childPerson.id)) {
+            belongsToParent = true;
+            break;
+          }
+        }
+
+        if (belongsToParent) {
+          childGroups.push(childGroup);
+        }
+      });
+
+      if (!childGroups.length) return;
+
+      /*
+       * Bod na vonkajšom okraji rodičovského poľa.
+       */
+      const parentArea = parentGroup._fanChartArea;
+
+      const parentX =
+        Math.cos(parentArea.middleAngle) *
+        parentArea.outerRadius;
+
+      const parentY =
+        Math.sin(parentArea.middleAngle) *
+        parentArea.outerRadius;
+
+      /*
+       * Vytvoríme spoločný bod pre všetky deti.
+       */
+      const childPoints = childGroups.map(childGroup => {
+        const area = childGroup._fanChartArea;
+
+        return {
+          x:
+            Math.cos(area.middleAngle) *
+            area.innerRadius,
+
+          y:
+            Math.sin(area.middleAngle) *
+            area.innerRadius
+        };
+      });
+
+      const averageX =
+        childPoints.reduce((sum, p) => sum + p.x, 0) /
+        childPoints.length;
+
+      const averageY =
+        childPoints.reduce((sum, p) => sum + p.y, 0) /
+        childPoints.length;
+
+      /*
+       * Hlavná línia od rodičov k spoločnému bodu detí.
+       */
+      ctx.beginPath();
+      ctx.moveTo(parentX, parentY);
+      ctx.lineTo(averageX, averageY);
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#8b6b43';
+      ctx.stroke();
+
+      /*
+       * Rozvetvenie ku každému dieťaťu.
+       */
+      childPoints.forEach(point => {
+        ctx.beginPath();
+        ctx.moveTo(averageX, averageY);
+        ctx.lineTo(point.x, point.y);
+
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#8b6b43';
+        ctx.stroke();
+      });
+
+      /*
+       * Malý bod v mieste rozvetvenia.
+       */
+      ctx.beginPath();
+      ctx.arc(averageX, averageY, 3, 0, Math.PI * 2);
+
+      ctx.fillStyle = '#8b6b43';
+      ctx.fill();
+    });
+  }
+
+  /*
+   * KRESLENIE RODINNÝCH POLÍ
+   */
+  familyGenerations.forEach((generation, generationIndex) => {
+    generation.forEach(group => {
+      const area = group._fanChartArea;
+
+      const {
+        startAngle,
+        endAngle,
+        innerRadius,
+        outerRadius,
+        middleAngle
+      } = area;
+
+      /*
+       * Samotné pole.
        */
       ctx.beginPath();
 
@@ -2659,7 +2808,7 @@ function drawFanChartWithRoot(root) {
       ctx.stroke();
 
       /*
-       * Mená rodinnej skupiny.
+       * Mená.
        */
       const names = group.people.map(person => {
         const name =
@@ -2671,9 +2820,6 @@ function drawFanChartWithRoot(root) {
 
       const isCouple = names.length === 2;
 
-      /*
-       * Stred textu rodinného poľa.
-       */
       const tx =
         Math.cos(middleAngle) *
         ((innerRadius + outerRadius) / 2);
@@ -2716,24 +2862,13 @@ function drawFanChartWithRoot(root) {
       }
 
       ctx.restore();
-
-      /*
-       * Klikateľné je celé spoločné pole.
-       */
-      group._fanChartArea = {
-        startAngle,
-        endAngle,
-        innerRadius,
-        outerRadius,
-        rootPerson: group.people[0]
-      };
     });
   });
 
   ctx.restore();
 
   /*
-   * Kliknutie na rodinné pole.
+   * KLIKNUTIE NA RODINNÉ POLE
    */
   canvas.onclick = function(event) {
     const r = canvas.getBoundingClientRect();
