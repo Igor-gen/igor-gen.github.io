@@ -2451,7 +2451,7 @@ function drawFanChart() {
   };
 }
 
-  function saveFanChartPdf() {
+  async function saveFanChartPdf() {
   const canvas = document.getElementById('fanChartCanvas');
 
   if (!canvas) {
@@ -2459,24 +2459,52 @@ function drawFanChart() {
     return;
   }
 
-  canvas.toBlob(function(blob) {
-    if (!blob) {
-      alert('Graf sa nepodarilo pripraviť.');
-      return;
-    }
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert('PDF knižnica sa nenačítala.');
+    return;
+  }
 
-    const url = URL.createObjectURL(blob);
+  const { jsPDF } = window.jspdf;
 
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'vejary-graf.png';
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
 
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+  const margin = 5;
+
+  const maxWidth = pageWidth - margin * 2;
+  const maxHeight = pageHeight - margin * 2;
+
+  const imageRatio = canvas.width / canvas.height;
+
+  let imageWidth = maxWidth;
+  let imageHeight = imageWidth / imageRatio;
+
+  if (imageHeight > maxHeight) {
+    imageHeight = maxHeight;
+    imageWidth = imageHeight * imageRatio;
+  }
+
+  const x = (pageWidth - imageWidth) / 2;
+  const y = (pageHeight - imageHeight) / 2;
+
+  const imageData = canvas.toDataURL('image/png');
+
+  pdf.addImage(
+    imageData,
+    'PNG',
+    x,
+    y,
+    imageWidth,
+    imageHeight
+  );
+
+  pdf.save('vejary-graf.pdf');
 }
 
 function buildFanGenerations(root, persons) {
