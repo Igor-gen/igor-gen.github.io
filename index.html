@@ -1198,12 +1198,18 @@ const w = Math.max(220, Math.min(500, contentWidth + 82));
   } else { ctx.fillStyle = isMale ? '#dbeafe' : '#fce7f3'; ctx.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); ctx.fillStyle = borderColor; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(isMale ? '♂' : '♀', avatarCenterX, avatarCenterY); }
   ctx.restore();
   ctx.beginPath(); ctx.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); ctx.lineWidth = 1.5; ctx.strokeStyle = borderColor; ctx.stroke();
-  const textLeft = x + 66; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.fillStyle = '#0f172a';
-  let fullN = p.firstName; if(p.middleName) fullN += ' ' + p.middleName; fullN += ' ' + p.lastName; const fullNameStr = `${p.title ? p.title + ' ' : ''}${fullN}`;
-  ctx.fillText(truncateText(fullNameStr, 125), textLeft, y + 14);
-  ctx.font = '500 11px system-ui, sans-serif'; ctx.fillStyle = '#475569'; const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?'; const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
-  ctx.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
-  if (p.birthPlace) { ctx.font = '10px system-ui, sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.fillText(truncateText(p.birthPlace, 125), textLeft, y + 50); }
+ const textLeft = x + 66;
+
+ctx.textAlign = 'left';
+ctx.textBaseline = 'top';
+
+ctx.font = 'bold 13px system-ui, sans-serif';
+ctx.fillStyle = '#0f172a';
+ctx.fillText(fullNameStr, textLeft, y + 14);
+
+ctx.font = '500 11px system-ui, sans-serif';
+ctx.fillStyle = '#475569';
+ctx.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
 }
 
 function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidth) return str; let s = str; while (s.length > 0 && ctx.measureText(s + '...').width > maxWidth) s = s.slice(0, -1); return s + '...'; }
