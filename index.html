@@ -2166,7 +2166,11 @@ function openFanChartModal() {
   modal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
 
-  drawFanChart();
+  // Pri otvorení vždy začneme od najstaršieho člena rodokmeňa.
+  fanChartHistory = [];
+  fanChartCurrentRoot = findOldestFanRoot();
+
+  drawFanChartWithRoot(fanChartCurrentRoot);
 }
 
 function closeFanChartModal() {
