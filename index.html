@@ -2444,11 +2444,15 @@ function buildFanGenerations(root, persons) {
 
 function drawFanChartFromPerson(person) {
   const canvas = document.getElementById('fanChartCanvas');
-  if (!canvas) return;
+  if (!canvas || !person) return;
 
+  if (fanChartCurrentRoot && fanChartCurrentRoot.id !== person.id) {
+    fanChartHistory.push(fanChartCurrentRoot);
+  }
+
+  fanChartCurrentRoot = person;
   canvas._fanRootPerson = person;
 
-  // Dočasne nastavíme vybranú osobu ako koreň
   drawFanChartWithRoot(person);
 }
 
