@@ -2613,14 +2613,19 @@ setLanguage('sk');
 
     <!-- Hamburger menu -->
     <div id="fanChartMenu" class="hidden absolute top-14 left-4 z-30 w-56 bg-[#f1e2c2] border-2 border-[#8b6b43] rounded-xl shadow-xl p-2">
-      <button onclick="saveFanChartPdf()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] font-semibold flex items-center gap-3">
-        <i class="ph-bold ph-file-pdf text-lg"></i>
-        Uložiť PDF
-      </button>
+
       <button onclick="fanChartGoBack()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] font-semibold flex items-center gap-3">
   <i class="ph-bold ph-arrow-left text-lg"></i>
   Späť o jeden krok
 </button>
+      <button onclick="fanChartShowWholeTree()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] font-semibold flex items-center gap-3">
+  <i class="ph-bold ph-tree-structure text-lg"></i>
+  Celý rodokmeň
+</button>
+            <button onclick="saveFanChartPdf()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] font-semibold flex items-center gap-3">
+        <i class="ph-bold ph-file-pdf text-lg"></i>
+        Uložiť PDF
+      </button>
     </div>
 
     <!-- Plocha grafu -->
