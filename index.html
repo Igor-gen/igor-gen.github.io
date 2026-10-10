@@ -2446,30 +2446,48 @@ function buildFanGenerations(root, persons) {
   let current = [root];
 
   while (current.length && generations.length < 8) {
-    generations.push(current);
+    // Do aktuálnej generácie pridáme aj manželov/manželky.
+    const generation = [];
 
-    current.forEach(p => visited.add(p.id));
+    current.forEach(person => {
+      if (!person || visited.has(person.id)) return;
 
-    const next = [];
+      generation.push(person);
+      visited.add(person.id);
 
-    current.forEach(parent => {
-      (parent.fams || []).forEach(fId => {
+      (person.fams || []).forEach(fId => {
         const fam = treeData.families[fId];
         if (!fam) return;
 
-        // Pridáme manželku/manžela do rovnakej generácie.
         const spouseId =
-          fam.husbandId === parent.id
+          fam.husbandId === person.id
             ? fam.wifeId
             : fam.husbandId;
 
-        if (spouseId && treeData.persons[spouseId] && !visited.has(spouseId)) {
-          next.push(treeData.persons[spouseId]);
-        }
+        if (spouseId && treeData.persons[spouseId]) {
+          const spouse = treeData.persons[spouseId];
 
-        // Potom pridáme deti do ďalšej generácie.
+          if (!visited.has(spouse.id)) {
+            generation.push(spouse);
+            visited.add(spouse.id);
+          }
+        }
+      });
+    });
+
+    generations.push(generation);
+
+    // Deti patria až do ďalšej generácie.
+    const next = [];
+
+    generation.forEach(person => {
+      (person.fams || []).forEach(fId => {
+        const fam = treeData.families[fId];
+        if (!fam) return;
+
         (fam.children || []).forEach(childId => {
           const child = treeData.persons[childId];
+
           if (!child || visited.has(child.id)) return;
 
           next.push(child);
