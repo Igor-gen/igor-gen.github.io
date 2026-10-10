@@ -2190,7 +2190,8 @@ function findOldestFanRoot() {
   return roots[0];
 }
 
-
+let fanChartHistory = [];
+let fanChartCurrentRoot = null;
 
 function openFanChartModal() {
   const modal = document.getElementById('fanChartModal');
