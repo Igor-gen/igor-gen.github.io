@@ -2556,9 +2556,52 @@ function drawFanChartWithRoot(root) {
   const cy = H - 30;
 
   const maxGenerations = 8;
- const maxRadius =
+
+const maxRadius =
   Math.min(W * 0.47, H * 0.9) * fanChartZoom;
-  const ringGap = maxRadius / maxGenerations;
+
+/*
+ * Najprv zistíme, koľko generácií
+ * tento konkrétny graf skutočne potrebuje.
+ */
+function countGenerations(person, depth = 1, visited = new Set()) {
+  if (!person || depth > 8) return depth - 1;
+
+  if (visited.has(person.id)) {
+    return depth - 1;
+  }
+
+  visited.add(person.id);
+
+  let maxDepth = depth;
+
+  for (const famId of (person.fams || [])) {
+    const fam = treeData.families[famId];
+    if (!fam) continue;
+
+    for (const childId of (fam.children || [])) {
+      const child = treeData.persons[childId];
+      if (!child) continue;
+
+      maxDepth = Math.max(
+        maxDepth,
+        countGenerations(
+          child,
+          depth + 1,
+          new Set(visited)
+        )
+      );
+    }
+  }
+
+  return maxDepth;
+}
+
+const actualGenerations =
+  Math.max(1, countGenerations(root));
+
+const ringGap =
+  maxRadius / actualGenerations;
 
   /*
    * Nájde manžela/manželku.
