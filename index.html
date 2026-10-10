@@ -87,6 +87,9 @@
       <button onclick="openDbModal('load')" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 transition">
         <i class="ph-bold ph-plugs-connected text-violet-400"></i> <span data-i18n="btnConnectDb">Pripojiť databázu na serveri</span>
       </button>
+      <button onclick="inviteGenealogyUser()" class="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-700 hover:bg-emerald-600 border border-emerald-500 text-white text-sm font-semibold flex items-center justify-center gap-2 transition">
+        <i class="ph-bold ph-envelope-simple text-emerald-200"></i> <span>Pozvať používateľa</span>
+      </button>
     </div>
 
     <!-- LANGUAGE SELECTOR -->
@@ -1817,6 +1820,7 @@ function exportToPdfTiled() {
 // Publishable key je určený pre frontend. Secret key zostáva iba vo Vercel Environment Variables.
 const BACKEND_URL = "__BACKEND_URL__";
 const CLERK_PUBLISHABLE_KEY = "pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ";
+const GENEALOGY_APP_URL = "https://igor-gen.github.io/";
 const MAX_PAYLOAD_BYTES = 4300000; // Vercel Functions: najviac 4,5 MB na telo požiadavky
 let clerkLoadPromise = null;
 let clerkListenerAdded = false;
@@ -1828,7 +1832,13 @@ function isBackendConfigured() {
 
 async function ensureClerkReady() {
   if (!window.Clerk) throw new Error('Prihlasovanie Clerk sa nepodarilo načítať. Obnov stránku a skús znova.');
-  if (!clerkLoadPromise) clerkLoadPromise = window.Clerk.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
+  if (!clerkLoadPromise) clerkLoadPromise = window.Clerk.load({
+    ui: { ClerkUI: window.__internal_ClerkUICtor },
+    signInFallbackRedirectUrl: GENEALOGY_APP_URL,
+    signUpFallbackRedirectUrl: GENEALOGY_APP_URL,
+    signInForceRedirectUrl: GENEALOGY_APP_URL,
+    signUpForceRedirectUrl: GENEALOGY_APP_URL
+  });
   await clerkLoadPromise;
   if (!clerkListenerAdded && typeof window.Clerk.addListener === 'function') {
     window.Clerk.addListener(() => {
@@ -1841,6 +1851,43 @@ async function ensureClerkReady() {
     clerkListenerAdded = true;
   }
   return window.Clerk;
+}
+
+async function inviteGenealogyUser() {
+  try {
+    const clerk = await ensureClerkReady();
+    if (!clerk.isSignedIn || !clerk.session) {
+      await clerk.openSignIn({
+        fallbackRedirectUrl: GENEALOGY_APP_URL,
+        forceRedirectUrl: GENEALOGY_APP_URL,
+        signInFallbackRedirectUrl: GENEALOGY_APP_URL,
+        signUpFallbackRedirectUrl: GENEALOGY_APP_URL
+      });
+      return;
+    }
+    const token = await clerk.session.getToken();
+    if (!token) throw new Error('Nepodarilo sa získať prihlasovací token Clerk.');
+    const base = BACKEND_URL.replace(/\/+$/, '');
+    const roleRes = await fetch(base + '/api/invitations', {
+      method: 'GET', headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+    });
+    const roleData = await roleRes.json().catch(() => ({}));
+    if (roleRes.status === 403) throw new Error('Pozvánky môže vytvárať iba administrátor.');
+    if (!roleRes.ok || roleData.role !== 'admin') throw new Error(roleData.error || 'Nepodarilo sa overiť administrátorské oprávnenie.');
+    const email = window.prompt('Zadaj e-mailovú adresu osoby, ktorú chceš pozvať:');
+    if (email === null) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) throw new Error('Zadaj platnú e-mailovú adresu.');
+    const inviteRes = await fetch(base + '/api/invitations', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailAddress: email.trim() }), cache: 'no-store'
+    });
+    const inviteData = await inviteRes.json().catch(() => ({}));
+    if (!inviteRes.ok) throw new Error(inviteData.error || 'Pozvánku sa nepodarilo vytvoriť.');
+    alert('Pozvánka bola odoslaná na ' + email.trim() + '. Po prijatí sa používateľ vráti na stránku rodokmeňa.');
+  } catch (err) {
+    alert(err && err.message ? err.message : 'Pozvánku sa nepodarilo vytvoriť.');
+  }
 }
 
 async function getClerkSession() {
@@ -1883,7 +1930,12 @@ async function openDbModal(mode) {
     const clerk = await ensureClerkReady();
     if (!clerk.isSignedIn || !clerk.session) {
       pendingDbMode = mode;
-      await clerk.openSignIn({});
+      await clerk.openSignIn({
+        fallbackRedirectUrl: GENEALOGY_APP_URL,
+        forceRedirectUrl: GENEALOGY_APP_URL,
+        signInFallbackRedirectUrl: GENEALOGY_APP_URL,
+        signUpFallbackRedirectUrl: GENEALOGY_APP_URL
+      });
       return; // runDbAction pokračuje po úspešnom prihlásení cez Clerk listener
     }
     await runDbAction(mode);
