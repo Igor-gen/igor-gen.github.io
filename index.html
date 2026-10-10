@@ -2158,6 +2158,35 @@ window.addEventListener('load', () => {
 });
 
 // Initial init
+
+function openFanChartModal() {
+  const modal = document.getElementById('fanChartModal');
+  if (!modal) return;
+
+  modal.classList.remove('hidden');
+  document.body.classList.add('overflow-hidden');
+
+  drawFanChart();
+}
+
+function closeFanChartModal() {
+  const modal = document.getElementById('fanChartModal');
+  if (!modal) return;
+
+  modal.classList.add('hidden');
+  document.body.classList.remove('overflow-hidden');
+
+  const menu = document.getElementById('fanChartMenu');
+  if (menu) menu.classList.add('hidden');
+}
+
+function toggleFanChartMenu() {
+  const menu = document.getElementById('fanChartMenu');
+  if (!menu) return;
+
+  menu.classList.toggle('hidden');
+}
+  
 setLanguage('sk');
 </script>
 
