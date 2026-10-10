@@ -2521,9 +2521,6 @@ function drawFanChartWithRoot(root) {
   const canvas = document.getElementById('fanChartCanvas');
   if (!canvas || !root) return;
 
-  const persons = Object.values(treeData.persons || {});
-  if (!persons.length) return;
-
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
 
@@ -2539,146 +2536,332 @@ function drawFanChartWithRoot(root) {
   ctx.fillStyle = '#ead9b8';
   ctx.fillRect(0, 0, W, H);
 
-  function buildFamilyGroups(generation) {
-    const groups = [];
-    const used = new Set();
-
-    generation.forEach(person => {
-      if (!person || used.has(person.id)) return;
-
-      let spouse = null;
-
-      for (const famId of (person.fams || [])) {
-        const fam = treeData.families[famId];
-        if (!fam) continue;
-
-        const spouseId =
-          fam.husbandId === person.id
-            ? fam.wifeId
-            : fam.husbandId;
-
-        if (spouseId && treeData.persons[spouseId]) {
-          spouse = treeData.persons[spouseId];
-          break;
-        }
-      }
-
-      if (spouse && generation.some(p => p.id === spouse.id)) {
-        groups.push({
-          people: [person, spouse]
-        });
-
-        used.add(person.id);
-        used.add(spouse.id);
-      } else {
-        groups.push({
-          people: [person]
-        });
-
-        used.add(person.id);
-      }
-    });
-
-    return groups;
-  }
-
-  const generations = buildFanGenerations(root, persons);
-
-  const familyGenerations = generations.map(generation =>
-    buildFamilyGroups(generation)
-  );
-
   const cx = W / 2;
   const cy = H - 30;
 
-  const maxRadius = Math.min(W * 0.47, H * 0.9);
+  const maxDepth = 8;
+
+  const maxRadius = Math.min(
+    W * 0.47,
+    H * 0.9
+  );
 
   const ringGap =
-    maxRadius / Math.max(familyGenerations.length, 1);
+    maxRadius / maxDepth;
 
   /*
-   * PRIPRAVÍME POZÍCIE VŠETKÝCH POLÍ
+   * Nájde manžela/manželku.
    */
-  familyGenerations.forEach((generation, generationIndex) => {
-    const innerRadius = generationIndex * ringGap;
-    const outerRadius = (generationIndex + 1) * ringGap;
-    const count = generation.length;
+  function findSpouse(person) {
+    if (!person) return null;
 
-    generation.forEach((group, index) => {
-      const startAngle =
-        -Math.PI + (index / count) * Math.PI;
+    for (const famId of (person.fams || [])) {
+      const fam = treeData.families[famId];
+      if (!fam) continue;
 
-      const endAngle =
-        -Math.PI + ((index + 1) / count) * Math.PI;
+      let spouseId = null;
 
-      const middleAngle =
-        (startAngle + endAngle) / 2;
+      if (fam.husbandId === person.id) {
+        spouseId = fam.wifeId;
+      } else if (fam.wifeId === person.id) {
+        spouseId = fam.husbandId;
+      }
 
-      group._fanChartArea = {
-        startAngle,
-        endAngle,
-        innerRadius,
-        outerRadius,
-        middleAngle,
-        rootPerson: group.people[0]
-      };
+      if (
+        spouseId &&
+        treeData.persons[spouseId]
+      ) {
+        return treeData.persons[spouseId];
+      }
+    }
+
+    return null;
+  }
+
+  /*
+   * Nájde rodinu, ktorú tvorí daný človek
+   * a jeho manžel/manželka.
+   */
+  function findFamily(person) {
+    if (!person) return null;
+
+    for (const famId of (person.fams || [])) {
+      const fam = treeData.families[famId];
+
+      if (!fam) continue;
+
+      if (
+        fam.husbandId === person.id ||
+        fam.wifeId === person.id
+      ) {
+        return fam;
+      }
+    }
+
+    return null;
+  }
+
+  /*
+   * Vytvorí jednu rodinnú skupinu.
+   *
+   * Napríklad:
+   * Igor + Gabriela
+   *
+   * alebo:
+   * Peter + Tatiana
+   */
+  function createFamilyGroup(person) {
+    if (!person) return null;
+
+    const spouse = findSpouse(person);
+
+    const people = [person];
+
+    if (
+      spouse &&
+      spouse.id !== person.id
+    ) {
+      people.push(spouse);
+    }
+
+    const family = findFamily(person);
+
+    return {
+      people,
+      family,
+      children: [],
+      startAngle: 0,
+      endAngle: 0,
+      middleAngle: 0,
+      innerRadius: 0,
+      outerRadius: 0
+    };
+  }
+
+  /*
+   * Získame deti konkrétnej rodiny.
+   */
+  function getChildren(group) {
+    if (!group || !group.family) {
+      return [];
+    }
+
+    const result = [];
+
+    (group.family.children || []).forEach(childId => {
+      const child = treeData.persons[childId];
+
+      if (child) {
+        result.push(child);
+      }
     });
+
+    return result;
+  }
+
+  /*
+   * Ochrana proti tomu, aby sa jedna osoba
+   * vykreslila viackrát.
+   */
+  const usedPersons = new Set();
+
+  /*
+   * Koreňová rodina.
+   */
+  const rootGroup =
+    createFamilyGroup(root);
+
+  if (!rootGroup) return;
+
+  rootGroup.startAngle = -Math.PI;
+  rootGroup.endAngle = 0;
+  rootGroup.middleAngle = -Math.PI / 2;
+  rootGroup.innerRadius = 0;
+  rootGroup.outerRadius = ringGap;
+
+  rootGroup.people.forEach(person => {
+    usedPersons.add(person.id);
   });
 
-  ctx.save();
-  ctx.translate(cx, cy);
+  /*
+   * Rekurzívne vytvorenie ďalších generácií.
+   *
+   * DÔLEŽITÉ:
+   *
+   * Deti každej rodiny dostanú iba tú časť
+   * polkruhu, ktorá patrí ich rodičom.
+   */
+  function buildChildren(parentGroup, depth) {
+    if (
+      depth >= maxDepth
+    ) {
+      return;
+    }
+
+    const children =
+      getChildren(parentGroup);
+
+    if (!children.length) {
+      return;
+    }
+
+    /*
+     * Odstránime deti, ktoré už boli použité.
+     */
+    const availableChildren =
+      children.filter(child => {
+        if (usedPersons.has(child.id)) {
+          return false;
+        }
+
+        usedPersons.add(child.id);
+
+        return true;
+      });
+
+    if (!availableChildren.length) {
+      return;
+    }
+
+    /*
+     * Malá medzera medzi jednotlivými rodinami.
+     */
+    const totalAngle =
+      parentGroup.endAngle -
+      parentGroup.startAngle;
+
+    const gap =
+      Math.min(
+        0.015,
+        totalAngle / 100
+      );
+
+    const usableAngle =
+      totalAngle -
+      gap * Math.max(
+        0,
+        availableChildren.length - 1
+      );
+
+    const childAngle =
+      usableAngle /
+      availableChildren.length;
+
+    availableChildren.forEach(
+      (child, index) => {
+
+        const startAngle =
+          parentGroup.startAngle +
+          index *
+            (childAngle + gap);
+
+        const endAngle =
+          startAngle +
+          childAngle;
+
+        const group =
+          createFamilyGroup(child);
+
+        if (!group) return;
+
+        /*
+         * Ak má dieťa manžela/manželku,
+         * označíme aj manžela ako použitú osobu.
+         */
+        group.people.forEach(person => {
+          usedPersons.add(person.id);
+        });
+
+        group.startAngle =
+          startAngle;
+
+        group.endAngle =
+          endAngle;
+
+        group.middleAngle =
+          (startAngle + endAngle) / 2;
+
+        group.innerRadius =
+          depth * ringGap;
+
+        group.outerRadius =
+          (depth + 1) * ringGap;
+
+        parentGroup.children.push(group);
+
+        /*
+         * Ďalšia generácia sa bude kresliť
+         * IBA v tomto výseku.
+         */
+        buildChildren(
+          group,
+          depth + 1
+        );
+      }
+    );
+  }
 
   /*
-   * NAJPRV VYKRESLÍME VŠETKY RODINNÉ POLIA
+   * Začneme deťmi koreňového páru.
    */
-  familyGenerations.forEach((generation, generationIndex) => {
-    generation.forEach(group => {
-      const area = group._fanChartArea;
+  buildChildren(
+    rootGroup,
+    1
+  );
 
-      const {
-        startAngle,
-        endAngle,
-        innerRadius,
-        outerRadius,
-        middleAngle
-      } = area;
+  /*
+   * Kreslenie jedného rodinného poľa.
+   */
+  function drawGroup(group, depth) {
 
-      ctx.beginPath();
+    const {
+      startAngle,
+      endAngle,
+      middleAngle,
+      innerRadius,
+      outerRadius
+    } = group;
 
-      ctx.arc(
-        0,
-        0,
-        outerRadius,
-        startAngle,
-        endAngle
-      );
+    /*
+     * Samotný výsek.
+     */
+    ctx.beginPath();
 
-      ctx.arc(
-        0,
-        0,
-        innerRadius,
-        endAngle,
-        startAngle,
-        true
-      );
+    ctx.arc(
+      0,
+      0,
+      outerRadius,
+      startAngle,
+      endAngle
+    );
 
-      ctx.closePath();
+    ctx.arc(
+      0,
+      0,
+      innerRadius,
+      endAngle,
+      startAngle,
+      true
+    );
 
-      ctx.fillStyle =
-        generationIndex % 2 === 0
-          ? '#d8bf94'
-          : '#c8aa78';
+    ctx.closePath();
 
-      ctx.fill();
+    ctx.fillStyle =
+      depth % 2 === 0
+        ? '#c8aa78'
+        : '#d8bf94';
 
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#80613d';
-      ctx.stroke();
+    ctx.fill();
 
-      /*
-       * MENÁ
-       */
-      const names = group.people.map(person => {
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#80613d';
+    ctx.stroke();
+
+    /*
+     * Mená.
+     */
+    const names =
+      group.people.map(person => {
         const name =
           `${person.firstName || ''} ${person.lastName || ''}`
             .trim();
@@ -2686,250 +2869,196 @@ function drawFanChartWithRoot(root) {
         return name || 'Neznámy';
       });
 
-      const isCouple = names.length === 2;
-
-      const tx =
-        Math.cos(middleAngle) *
-        ((innerRadius + outerRadius) / 2);
-
-      const ty =
-        Math.sin(middleAngle) *
-        ((innerRadius + outerRadius) / 2);
-
-      ctx.save();
-
-      ctx.translate(tx, ty);
-
-      ctx.rotate(
-        middleAngle + Math.PI / 2
+    const tx =
+      Math.cos(middleAngle) *
+      (
+        (innerRadius + outerRadius) / 2
       );
 
-      ctx.fillStyle = '#4b3520';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+    const ty =
+      Math.sin(middleAngle) *
+      (
+        (innerRadius + outerRadius) / 2
+      );
 
-      if (isCouple) {
-        ctx.font = 'bold 13px Georgia, serif';
-        ctx.fillText(names[0], 0, -9);
+    ctx.save();
 
-        ctx.font = '12px Georgia, serif';
-        ctx.fillText('♥', 0, 2);
+    ctx.translate(
+      tx,
+      ty
+    );
 
-        ctx.font = 'bold 13px Georgia, serif';
-        ctx.fillText(names[1], 0, 13);
-      } else {
-        ctx.font = 'bold 13px Georgia, serif';
-        ctx.fillText(names[0], 0, 0);
+    ctx.rotate(
+      middleAngle + Math.PI / 2
+    );
+
+    ctx.fillStyle = '#4b3520';
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    /*
+     * Manželský pár.
+     */
+    if (names.length === 2) {
+
+      ctx.font =
+        'bold 13px Georgia, serif';
+
+      ctx.fillText(
+        names[0],
+        0,
+        -9
+      );
+
+      ctx.font =
+        '12px Georgia, serif';
+
+      ctx.fillText(
+        '♥',
+        0,
+        2
+      );
+
+      ctx.font =
+        'bold 13px Georgia, serif';
+
+      ctx.fillText(
+        names[1],
+        0,
+        13
+      );
+
+    } else {
+
+      ctx.font =
+        'bold 13px Georgia, serif';
+
+      ctx.fillText(
+        names[0],
+        0,
+        0
+      );
+    }
+
+    ctx.restore();
+
+    /*
+     * Uložíme klikateľnú oblasť.
+     */
+    group._fanChartArea = {
+      startAngle,
+      endAngle,
+      innerRadius,
+      outerRadius,
+      rootPerson:
+        group.people[0]
+    };
+
+    /*
+     * Potom vykreslíme deti.
+     */
+    group.children.forEach(
+      childGroup => {
+        drawGroup(
+          childGroup,
+          depth + 1
+        );
       }
-
-      ctx.restore();
-    });
-  });
+    );
+  }
 
   /*
-   * TERAZ VYKRESLÍME SPOJENIA
-   * NAD VŠETKÝMI POLIAMI
+   * Vykreslíme celý strom.
+   *
+   * ŽIADNE SPOJOVACIE ČIARY.
    */
-  for (
-    let generationIndex = 0;
-    generationIndex < familyGenerations.length - 1;
-    generationIndex++
-  ) {
-    const parentGeneration =
-      familyGenerations[generationIndex];
-
-    const childGeneration =
-      familyGenerations[generationIndex + 1];
-
-    parentGeneration.forEach(parentGroup => {
-
-      const parentFamilyIds = new Set();
-
-      parentGroup.people.forEach(person => {
-        (person.fams || []).forEach(famId => {
-          parentFamilyIds.add(famId);
-        });
-      });
-
-      const childGroups = [];
-
-      childGeneration.forEach(childGroup => {
-        const childPerson = childGroup.people[0];
-
-        let belongsToParent = false;
-
-        for (const famId of parentFamilyIds) {
-          const fam = treeData.families[famId];
-
-          if (!fam) continue;
-
-          if (
-            (fam.children || []).includes(childPerson.id)
-          ) {
-            belongsToParent = true;
-            break;
-          }
-        }
-
-        if (belongsToParent) {
-          childGroups.push(childGroup);
-        }
-      });
-
-      if (!childGroups.length) return;
-
-      const parentArea =
-        parentGroup._fanChartArea;
-
-      /*
-       * Bod na okraji rodičovského poľa.
-       */
-      const parentX =
-        Math.cos(parentArea.middleAngle) *
-        parentArea.outerRadius;
-
-      const parentY =
-        Math.sin(parentArea.middleAngle) *
-        parentArea.outerRadius;
-
-      /*
-       * Body pri deťoch.
-       */
-      const childPoints = childGroups.map(childGroup => {
-        const area =
-          childGroup._fanChartArea;
-
-        return {
-          x:
-            Math.cos(area.middleAngle) *
-            area.innerRadius,
-
-          y:
-            Math.sin(area.middleAngle) *
-            area.innerRadius
-        };
-      });
-
-      /*
-       * Spoločný bod.
-       */
-      const averageX =
-        childPoints.reduce(
-          (sum, point) => sum + point.x,
-          0
-        ) / childPoints.length;
-
-      const averageY =
-        childPoints.reduce(
-          (sum, point) => sum + point.y,
-          0
-        ) / childPoints.length;
-
-      /*
-       * HLAVNÁ ČIARA
-       */
-      ctx.beginPath();
-
-      ctx.moveTo(
-        parentX,
-        parentY
-      );
-
-      ctx.lineTo(
-        averageX,
-        averageY
-      );
-
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#5f4328';
-      ctx.stroke();
-
-      /*
-       * ČIARY KU DEŤOM
-       */
-      childPoints.forEach(point => {
-        ctx.beginPath();
-
-        ctx.moveTo(
-          averageX,
-          averageY
-        );
-
-        ctx.lineTo(
-          point.x,
-          point.y
-        );
-
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#5f4328';
-        ctx.stroke();
-      });
-
-      /*
-       * STREDNÝ SPOJOVACÍ BOD
-       */
-      ctx.beginPath();
-
-      ctx.arc(
-        averageX,
-        averageY,
-        4,
-        0,
-        Math.PI * 2
-      );
-
-      ctx.fillStyle = '#5f4328';
-      ctx.fill();
-    });
-  }
+  drawGroup(
+    rootGroup,
+    0
+  );
 
   ctx.restore();
 
   /*
-   * KLIKNUTIE NA POLE
+   * KLIKNUTIE NA RODINNÉ POLE
    */
-  canvas.onclick = function(event) {
-    const r =
-      canvas.getBoundingClientRect();
+  canvas.onclick =
+    function(event) {
 
-    const mx =
-      event.clientX -
-      r.left -
-      cx;
+      const r =
+        canvas.getBoundingClientRect();
 
-    const my =
-      event.clientY -
-      r.top -
-      cy;
+      const mx =
+        event.clientX -
+        r.left -
+        cx;
 
-    const distance =
-      Math.sqrt(mx * mx + my * my);
+      const my =
+        event.clientY -
+        r.top -
+        cy;
 
-    const angle =
-      Math.atan2(my, mx);
+      const distance =
+        Math.sqrt(
+          mx * mx +
+          my * my
+        );
 
-    for (const generation of familyGenerations) {
-      for (const group of generation) {
+      const angle =
+        Math.atan2(
+          my,
+          mx
+        );
+
+      /*
+       * Prejdeme všetky skupiny.
+       */
+      function findClickedGroup(group) {
+
         const area =
           group._fanChartArea;
 
-        if (!area) continue;
+        if (area) {
 
-        if (
-          distance >= area.innerRadius &&
-          distance <= area.outerRadius &&
-          angle >= area.startAngle &&
-          angle <= area.endAngle
-        ) {
-          drawFanChartFromPerson(
-            area.rootPerson
-          );
-
-          return;
+          if (
+            distance >=
+              area.innerRadius &&
+            distance <=
+              area.outerRadius &&
+            angle >=
+              area.startAngle &&
+            angle <=
+              area.endAngle
+          ) {
+            return group;
+          }
         }
+
+        for (
+          const child of group.children
+        ) {
+          const found =
+            findClickedGroup(child);
+
+          if (found) {
+            return found;
+          }
+        }
+
+        return null;
       }
-    }
-  };
+
+      const clicked =
+        findClickedGroup(rootGroup);
+
+      if (clicked) {
+
+        drawFanChartFromPerson(
+          clicked.people[0]
+        );
+      }
+    };
 }
 setLanguage('sk');
 
