@@ -2163,26 +2163,32 @@ function findOldestFanRoot() {
   const persons = Object.values(treeData.persons || {});
   if (!persons.length) return null;
 
-  // Najprv nájdeme osoby, ktoré nemajú rodičovskú rodinu.
+  // Najstaršia generácia = osoby, ktoré nemajú rodičovskú rodinu.
   const roots = persons.filter(p => {
     return !p.famc || !treeData.families[p.famc];
   });
 
-  const candidates = roots.length ? roots : persons;
+  if (!roots.length) return persons[0];
 
-  // Z kandidátov vyberieme najstaršiu osobu podľa dátumu narodenia.
-  let oldest = candidates[0];
+  // Ak je medzi najstaršou generáciou žena s manželom,
+  // začneme graf u jej manžela.
+  for (const person of roots) {
+    if (person.gender !== 'F') continue;
 
-  for (const p of candidates) {
-    if (!p.birthDate) continue;
+    for (const famId of (person.fams || [])) {
+      const fam = treeData.families[famId];
+      if (!fam) continue;
 
-    if (
-      !oldest.birthDate ||
-      p.birthDate < oldest.birthDate
-    ) {
-      oldest = p;
+      if (fam.husbandId && treeData.persons[fam.husbandId]) {
+        return treeData.persons[fam.husbandId];
+      }
     }
   }
+
+  // Ak najstaršia generácia nemá takýto pár,
+  // použijeme prvú osobu z najstaršej generácie.
+  return roots[0];
+}
 
   return oldest;
 }  
