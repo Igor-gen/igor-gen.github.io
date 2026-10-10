@@ -1162,7 +1162,28 @@ function drawCombConnections() {
 }
 
 function drawPersonBubble(p) {
-  const w = LAYOUT.bw; const h = LAYOUT.bh;
+  const h = LAYOUT.bh;
+ctx.font = 'bold 13px system-ui, sans-serif';
+
+let fullN = p.firstName || '';
+if (p.middleName) fullN += ' ' + p.middleName;
+if (p.lastName) fullN += ' ' + p.lastName;
+
+const fullNameStr = `${p.title ? p.title + ' ' : ''}${fullN}`;
+
+ctx.font = 'bold 13px system-ui, sans-serif';
+const nameWidth = ctx.measureText(fullNameStr).width;
+
+ctx.font = '500 11px system-ui, sans-serif';
+const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
+const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
+const dateWidth = ctx.measureText(`${birthStr}${deathStr}`).width;
+
+ctx.font = '10px system-ui, sans-serif';
+const placeWidth = p.birthPlace ? ctx.measureText(p.birthPlace).width : 0;
+
+const contentWidth = Math.max(nameWidth, dateWidth, placeWidth);
+const w = Math.max(220, Math.min(500, contentWidth + 82));
   const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = (p.id === currentSelectedPersonId);
   const isMale = (p.gender === 'M'); const bgColor = isMale ? '#eff6ff' : '#fdf2f8'; const borderColor = isMale ? '#1e40af' : '#be185d';
   if (isSelected) { ctx.beginPath(); ctx.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); ctx.fillStyle = 'rgba(99, 102, 241, 0.3)'; ctx.fill(); }
