@@ -2231,7 +2231,13 @@ function toggleFanChartMenu() {
   fanChartCurrentRoot = fanChartHistory.pop();
   drawFanChartWithRoot(fanChartCurrentRoot);
 }
+function fanChartShowWholeTree() {
+  fanChartHistory = [];
+  fanChartCurrentRoot = findOldestFanRoot();
 
+  drawFanChartWithRoot(fanChartCurrentRoot);
+}
+  
 function drawFanChart() {
   const canvas = document.getElementById('fanChartCanvas');
   if (!canvas) return;
