@@ -2232,6 +2232,7 @@ function openFanChartModal() {
 
   // Pri otvorení vždy začneme od najstaršieho člena rodokmeňa.
   fanChartHistory = [];
+  fanChartZoom = 1;
   fanChartCurrentRoot = findOldestFanRoot();
 
   drawFanChartWithRoot(fanChartCurrentRoot);
