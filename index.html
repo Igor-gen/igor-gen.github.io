@@ -2384,23 +2384,16 @@ function buildFanGenerations(root, persons) {
     const next = [];
 
     current.forEach(parent => {
-      persons.forEach(child => {
-        if (visited.has(child.id)) return;
+      (parent.fams || []).forEach(fId => {
+        const fam = treeData.families[fId];
+        if (!fam) return;
 
-        let isChild = false;
+        (fam.children || []).forEach(childId => {
+          const child = treeData.persons[childId];
+          if (!child || visited.has(child.id)) return;
 
-        if (child.fatherId === parent.id) isChild = true;
-        if (child.motherId === parent.id) isChild = true;
-
-        if (!isChild && Array.isArray(child.parents)) {
-          if (child.parents.includes(parent.id)) {
-            isChild = true;
-          }
-        }
-
-        if (isChild) {
           next.push(child);
-        }
+        });
       });
     });
 
