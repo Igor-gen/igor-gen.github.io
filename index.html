@@ -2211,6 +2211,18 @@ function findOldestFanRoot() {
 let fanChartHistory = [];
 let fanChartCurrentRoot = null;
 
+  let fanChartZoom = 1;
+
+function fanChartZoomIn() {
+  fanChartZoom = Math.min(2, fanChartZoom + 0.1);
+  drawFanChartWithRoot(fanChartCurrentRoot);
+}
+
+function fanChartZoomOut() {
+  fanChartZoom = Math.max(0.5, fanChartZoom - 0.1);
+  drawFanChartWithRoot(fanChartCurrentRoot);
+}
+
 function openFanChartModal() {
   const modal = document.getElementById('fanChartModal');
   if (!modal) return;
