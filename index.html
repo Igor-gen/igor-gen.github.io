@@ -2457,6 +2457,17 @@ function buildFanGenerations(root, persons) {
         const fam = treeData.families[fId];
         if (!fam) return;
 
+        // Pridáme manželku/manžela do rovnakej generácie.
+        const spouseId =
+          fam.husbandId === parent.id
+            ? fam.wifeId
+            : fam.husbandId;
+
+        if (spouseId && treeData.persons[spouseId] && !visited.has(spouseId)) {
+          next.push(treeData.persons[spouseId]);
+        }
+
+        // Potom pridáme deti do ďalšej generácie.
         (fam.children || []).forEach(childId => {
           const child = treeData.persons[childId];
           if (!child || visited.has(child.id)) return;
