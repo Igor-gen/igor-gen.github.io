@@ -2556,7 +2556,8 @@ function drawFanChartWithRoot(root) {
   const cy = H - 30;
 
   const maxGenerations = 8;
-  const maxRadius = Math.min(W * 0.47, H * 0.9);
+ const maxRadius =
+  Math.min(W * 0.47, H * 0.9) * fanChartZoom;
   const ringGap = maxRadius / maxGenerations;
 
   /*
