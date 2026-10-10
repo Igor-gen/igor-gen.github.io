@@ -2160,5 +2160,43 @@ window.addEventListener('load', () => {
 // Initial init
 setLanguage('sk');
 </script>
+
+  <!-- Vejárový graf - modálne okno -->
+<div id="fanChartModal" class="fixed inset-0 z-[100] hidden bg-black/60 flex items-center justify-center p-3">
+  <div class="relative w-full h-full max-w-[1600px] max-h-[95vh] bg-[#ead9b8] rounded-2xl shadow-2xl overflow-hidden border-4 border-[#8b6b43]">
+
+    <!-- Horná lišta -->
+    <div class="absolute top-0 left-0 right-0 z-20 h-14 bg-[#d2b48c]/95 border-b border-[#8b6b43] flex items-center justify-between px-4">
+
+      <!-- Hamburger -->
+      <button onclick="toggleFanChartMenu()" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <i class="ph-bold ph-list text-xl"></i>
+      </button>
+
+      <div class="text-[#4a3420] font-bold tracking-wide">
+        Vejárový graf
+      </div>
+
+      <!-- Zatvorenie -->
+      <button onclick="closeFanChartModal()" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <i class="ph-bold ph-x text-xl"></i>
+      </button>
+    </div>
+
+    <!-- Hamburger menu -->
+    <div id="fanChartMenu" class="hidden absolute top-14 left-4 z-30 w-56 bg-[#f1e2c2] border-2 border-[#8b6b43] rounded-xl shadow-xl p-2">
+      <button onclick="saveFanChartPdf()" class="w-full text-left px-4 py-3 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] font-semibold flex items-center gap-3">
+        <i class="ph-bold ph-file-pdf text-lg"></i>
+        Uložiť PDF
+      </button>
+    </div>
+
+    <!-- Plocha grafu -->
+    <div class="absolute inset-0 pt-14">
+      <canvas id="fanChartCanvas" class="w-full h-full"></canvas>
+    </div>
+
+  </div>
+</div>
 </body>
 </html>
