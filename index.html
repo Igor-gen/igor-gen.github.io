@@ -2159,6 +2159,34 @@ window.addEventListener('load', () => {
 
 // Initial init
 
+function findOldestFanRoot() {
+  const persons = Object.values(treeData.persons || {});
+  if (!persons.length) return null;
+
+  // Najprv nájdeme osoby, ktoré nemajú rodičovskú rodinu.
+  const roots = persons.filter(p => {
+    return !p.famc || !treeData.families[p.famc];
+  });
+
+  const candidates = roots.length ? roots : persons;
+
+  // Z kandidátov vyberieme najstaršiu osobu podľa dátumu narodenia.
+  let oldest = candidates[0];
+
+  for (const p of candidates) {
+    if (!p.birthDate) continue;
+
+    if (
+      !oldest.birthDate ||
+      p.birthDate < oldest.birthDate
+    ) {
+      oldest = p;
+    }
+  }
+
+  return oldest;
+}  
+
 function openFanChartModal() {
   const modal = document.getElementById('fanChartModal');
   if (!modal) return;
