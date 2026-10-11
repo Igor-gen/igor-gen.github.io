@@ -2329,9 +2329,6 @@ function loadTreeFromServer(data, session) {
   (data.persons || []).forEach(raw => {
     if (!raw || !raw.id) return;
     const p = Object.assign(createPersonObj(raw.id), raw);
-
-
-}
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
     persons[p.id] = p;
