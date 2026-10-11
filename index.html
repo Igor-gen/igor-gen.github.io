@@ -657,6 +657,7 @@ function setLanguage(lang) {
 const LAYOUT = { bw: 200, bh: 72, gapX: 40, gapY: 48, spouseGap: 110 }; 
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
+let treeVersion = 0;
 let recentEditedIds = []; let currentSelectedPersonId = null;
 
 // Canvas states
@@ -2051,24 +2052,45 @@ async function openDbModal(mode) {
   }
 }
 
+
 async function runDbAction(mode) {
   try {
     const session = await getClerkSession();
+
     if (mode === 'load') {
       const data = await fetchTreeData(session);
       loadTreeFromServer(data, session);
     } else {
       await putTreeData(session);
+
       dbConnection = session;
       updateDbStatusUI();
       showToast(t('msgDbSaved'), 'success');
     }
   } catch (err) {
-    if (err && err.sessionExpired) dbConnection = null;
+    if (err && err.sessionExpired) {
+      dbConnection = null;
+    }
+
     updateDbStatusUI();
-    showToast(err && err.message ? err.message : 'Prihlásenie alebo pripojenie zlyhalo.', 'error');
+
+    if (err && err.versionConflict) {
+      showToast(
+        'Konflikt pri ukladaní: rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny zostali v aplikácii, ale neboli uložené. Pred ďalším ukladaním načítaj aktuálny rodokmeň zo servera.',
+        'error'
+      );
+      return;
+    }
+
+    showToast(
+      err && err.message
+        ? err.message
+        : 'Prihlásenie alebo pripojenie zlyhalo.',
+      'error'
+    );
   }
 }
+
 function closeDbModal() {
   if (dbBusy) return;
   document.getElementById('dbConnectModal').classList.add('hidden');
@@ -2106,13 +2128,38 @@ async function backendError(res, authMsgKey) {
 
 // Clerk session token sa obnovuje pri každej požiadavke; tokeny sú krátkodobé.
 // 2) Čítanie a zápis rodokmeňa s tokenom relácie
+
 async function fetchTreeData(session) {
-  const res = await backendFetch('/api/tree', 'GET', { headers: await clerkAuthHeaders(), timeout: 60000 });
-  if (!res.ok) { const err = await backendError(res, 'msgDbSessionExpired'); if (res.status === 401) err.sessionExpired = true; throw err; }
-  let data; try { data = await res.json(); } catch (e) { throw new Error(t('msgDbErrData')); }
-  if (!data || !Array.isArray(data.persons)) throw new Error(t('msgDbErrData'));
+  const res = await backendFetch('/api/tree', 'GET', {
+    headers: await clerkAuthHeaders(),
+    timeout: 60000
+  });
+
+  if (!res.ok) {
+    const err = await backendError(res, 'msgDbSessionExpired');
+    if (res.status === 401) err.sessionExpired = true;
+    throw err;
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error(t('msgDbErrData'));
+  }
+
+  if (
+    !data ||
+    !Array.isArray(data.persons) ||
+    !Number.isSafeInteger(Number(data.version)) ||
+    Number(data.version) < 0
+  ) {
+    throw new Error(t('msgDbErrData'));
+  }
+
   return data;
 }
+
 
 // --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč ---
 function fileList(p) { return (p.photos || []).map(f => [f, 'photo']).concat((p.documents || []).map(f => [f, 'doc'])); }
@@ -2173,16 +2220,97 @@ async function hydrateFiles(session) {
   } catch (e) { /* načítanie súborov je doplnkové */ }
 }
 
+
 async function putTreeData(session) {
   const persons = Object.values(treeData.persons);
-  if (persons.length === 0) throw new Error(t('msgDbEmptyTree'));
+
+  if (persons.length === 0) {
+    throw new Error(t('msgDbEmptyTree'));
+  }
+
+  if (
+    !Number.isSafeInteger(treeVersion) ||
+    treeVersion < 0
+  ) {
+    throw new Error('Chýba platná verzia rodokmeňa. Najprv rodokmeň načítaj zo servera.');
+  }
+
   await uploadPendingFiles(session);
-  const slim = persons.map(p => Object.assign({}, p, { photos: (p.photos || []).map(slimFile), documents: (p.documents || []).map(slimFile) }));
-  const body = JSON.stringify({ fileName: treeData.fileName || 'rodokmen', persons: slim, families: Object.values(treeData.families) });
-  if (new Blob([body]).size > MAX_PAYLOAD_BYTES) throw new Error(t('msgDbTooLarge'));
-  const res = await backendFetch('/api/tree', 'PUT', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }), body, timeout: 120000 });
-  if (!res.ok) { const err = await backendError(res, 'msgDbSessionExpired'); if (res.status === 401) err.sessionExpired = true; throw err; }
+
+  const slim = persons.map((p) =>
+    Object.assign({}, p, {
+      photos: (p.photos || []).map(slimFile),
+      documents: (p.documents || []).map(slimFile)
+    })
+  );
+
+  const body = JSON.stringify({
+    version: treeVersion,
+    fileName: treeData.fileName || 'rodokmen',
+    persons: slim,
+    families: Object.values(treeData.families)
+  });
+
+  if (new Blob([body]).size > MAX_PAYLOAD_BYTES) {
+    throw new Error(t('msgDbTooLarge'));
+  }
+
+  const res = await backendFetch('/api/tree', 'PUT', {
+    headers: await clerkAuthHeaders({
+      'Content-Type': 'application/json'
+    }),
+    body,
+    timeout: 120000
+  });
+
+  if (!res.ok) {
+    if (res.status === 409) {
+      let conflictData = {};
+
+      try {
+        conflictData = await res.json();
+      } catch (e) {
+        // Použijeme všeobecnú správu o konflikte.
+      }
+
+      const err = new Error(
+        'Rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny neboli uložené. Najprv načítaj aktuálny rodokmeň zo servera.'
+      );
+
+      err.versionConflict = true;
+      err.currentVersion = conflictData.currentVersion;
+      throw err;
+    }
+
+    const err = await backendError(res, 'msgDbSessionExpired');
+
+    if (res.status === 401) {
+      err.sessionExpired = true;
+    }
+
+    throw err;
+  }
+
+  let result;
+
+  try {
+    result = await res.json();
+  } catch (e) {
+    throw new Error('Server nevrátil potvrdenie o uložení rodokmeňa.');
+  }
+
+  if (
+    !result ||
+    result.ok !== true ||
+    !Number.isSafeInteger(Number(result.version)) ||
+    Number(result.version) < 0
+  ) {
+    throw new Error('Server vrátil neplatnú verziu po uložení.');
+  }
+
+  treeVersion = Number(result.version);
 }
+
 
 async function saveToServer() {
   if (!dbConnection) { openDbModal('save'); return; }
@@ -2213,7 +2341,8 @@ function loadTreeFromServer(data, session) {
   if (Object.keys(persons).length === 0) {
     createNewTree(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
   }
-  treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
+  treeVersion = Number(data.version);
+treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
   autoLayoutTree(true);
