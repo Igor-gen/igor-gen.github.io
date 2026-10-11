@@ -2329,6 +2329,10 @@ function loadTreeFromServer(data, session) {
   (data.persons || []).forEach(raw => {
     if (!raw || !raw.id) return;
     const p = Object.assign(createPersonObj(raw.id), raw);
+
+if (['@I746090@', '@I530991@'].includes(raw.id)) {
+  console.log('GENDER CHECK:', raw.id, 'raw:', raw.gender);
+}
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
     persons[p.id] = p;
