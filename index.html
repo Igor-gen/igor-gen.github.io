@@ -654,7 +654,7 @@ function setLanguage(lang) {
 }
 
 // --- GLOBAL LAYOUT SETTINGS ---
-const LAYOUT = { bw: 200, bh: 72, gapX: 30, gapY: 48, spouseGap: 110 }; 
+const LAYOUT = { bw: 200, bh: 72, gapX: 40, gapY: 48, spouseGap: 110 }; 
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
 let recentEditedIds = []; let currentSelectedPersonId = null;
@@ -709,7 +709,7 @@ function loadSampleTree() {
 function createNewTree() {
   const p1 = createPersonObj("@I1@", "", "Zakladateľ", "Rodiny", "M", "01.01.1970", "Bratislava", "Slovensko", "", ""); p1.x = 400; p1.y = 120;
   treeData = { fileName: "Novy_Rodokmen.gdz", persons: { "@I1@": p1 }, families: {}, files: {} };
-  recentEditedIds = ["@I1@"]; launchWorkspace(); showToast(t('msgNew'), "success");
+  recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success");
 }
 
 function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, bCountry, dDate, dPlace) {
@@ -843,7 +843,7 @@ async function openSqliteDirectory() {
       treeData = { fileName: loadedFileName, persons: newPersons, families: newFamilies, files: {} };
       recentEditedIds = Object.keys(newPersons).slice(0, 5); 
       launchWorkspace(); 
-      if (Object.values(newPersons).every(pp => pp.x || pp.y)) fitTreeToView(); else autoLayoutTree(true);
+      autoLayoutTree(true);
       showToast(t('msgReadOk').replace('{X}', Object.keys(newPersons).length), "success");
   } catch(e) {
       if (e.name !== 'AbortError') showToast("Chyba pri načítaní SQLite priečinku: " + e.message, "error");
@@ -938,120 +938,242 @@ function closeCurrentTree() {
   dbConnection = null; updateDbStatusUI(); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
 function updateCountsUI() { document.getElementById('statPersonsCount').innerText = Object.keys(treeData.persons).length; document.getElementById('statFamiliesCount').innerText = Object.keys(treeData.families).length; }
 
+// --- MERANIE TEXTU A GEOMETRIA BUBLÍN ---
+const MEASURE_CTX = document.createElement('canvas').getContext('2d');
+const FONT_NAME = 'bold 13px system-ui, sans-serif';
+const FONT_DATES = '500 11px system-ui, sans-serif';
+const FONT_MARR = '600 11px system-ui, sans-serif';
+function measureTxt(font, text) { MEASURE_CTX.font = font; return MEASURE_CTX.measureText(text).width; }
+
+function personNameStr(p) {
+  let n = p.firstName || ''; if (p.middleName) n += ' ' + p.middleName; if (p.lastName) n += ' ' + p.lastName;
+  return `${p.title ? p.title + ' ' : ''}${n}`.trim();
+}
+function personDatesStr(p) { return (p.birthDate ? `* ${p.birthDate}` : '* ?') + (p.deathDate ? ` † ${p.deathDate}` : ''); }
+
+// Šírka bubliny sa prispôsobuje dĺžke mena a priezviska (a dátumov).
+const personWCache = new Map();
+function personBubbleW(p) {
+  const name = personNameStr(p), dates = personDatesStr(p), key = name + '\u0001' + dates;
+  let w = personWCache.get(key);
+  if (w === undefined) {
+    w = Math.ceil(Math.min(700, Math.max(190, Math.max(measureTxt(FONT_NAME, name), measureTxt(FONT_DATES, dates)) + 82)));
+    if (personWCache.size > 5000) personWCache.clear();
+    personWCache.set(key, w);
+  }
+  return w;
+}
+
+// Bublina so svadobným dátumom: pred a za dátumom medzera v šírke jedného znaku.
+function marrInfo(fam) {
+  if (!fam || !fam.marrDate) return null;
+  const cw = measureTxt(FONT_MARR, '0'), tw = measureTxt(FONT_MARR, fam.marrDate);
+  return { cw, tw, w: tw + 2 * cw };
+}
+// Voľné miesto medzi bublinami partnerov: bublina s dátumom + po jednom znaku odstup z každej strany.
+function coupleGap(fam) { const m = marrInfo(fam); return m ? Math.max(44, m.w + 2 * m.cw) : 64; }
+
+// Geometria rodiny: uzol (hub) je presne v strede medzery medzi bublinami partnerov.
+function famGeom(fam) {
+  const P = treeData.persons, h = P[fam.husbandId], w = P[fam.wifeId];
+  if (h && w) {
+    const L = h.x <= w.x ? h : w, R = (L === h) ? w : h;
+    const x1 = L.x + personBubbleW(L) / 2, x2 = R.x - personBubbleW(R) / 2;
+    return { type: 'couple', L, R, x1, x2, hubX: (x1 + x2) / 2, hubY: L.y };
+  }
+  const s = h || w;
+  if (s) return { type: 'single', s, hubX: s.x, hubY: s.y + LAYOUT.bh / 2 };
+  return null;
+}
+
+// --- AUTOMATICKÉ ROZMIESTNENIE ---
+// Riadky = generácie (predkovia hore, potomkovia dole), partneri vždy v jednom riadku vedľa seba,
+// šírka bublín podľa mena, deti vycentrované pod uzlom rodičov. Bubliny sú uzamknuté (nedajú sa ťahať).
 function autoLayoutTree(andFitToView = true) {
-  const persons = Object.values(treeData.persons); if (persons.length === 0) return;
-  
-  const depth = {}; persons.forEach(p => depth[p.id] = 0); 
-  
-  let changed = true; let iterations = 0;
-  while (changed && iterations < 100) {
-    changed = false; iterations++;
-    persons.forEach(p => {
-      const currD = depth[p.id];
-      (p.fams || []).forEach(fId => {
-        const fam = treeData.families[fId];
-        if (fam) {
-          const spId = fam.husbandId === p.id ? fam.wifeId : fam.husbandId;
-          if (spId && treeData.persons[spId]) {
-            if (depth[spId] < currD) { depth[spId] = currD; changed = true; } 
-            else if (currD < depth[spId]) { depth[p.id] = depth[spId]; changed = true; }
-          }
-          (fam.children || []).forEach(cId => {
-             if (treeData.persons[cId]) {
-                 const pMax = Math.max(depth[p.id], spId ? depth[spId] : 0); 
-                 if (depth[cId] < pMax + 1) { depth[cId] = pMax + 1; changed = true; }
-             }
-          });
+  const P = treeData.persons, F = treeData.families;
+  const persons = Object.values(P); if (persons.length === 0) return;
+  const N = persons.length;
+  const validParents = fam => [fam.husbandId, fam.wifeId].filter(id => id && P[id]);
+
+  // 1) Generácie
+  const depth = {}; persons.forEach(p => depth[p.id] = 0);
+  let changed = true, guard = 0;
+  while (changed && guard++ < 300) {
+    changed = false;
+    Object.values(F).forEach(fam => {
+      const ps = validParents(fam); if (!ps.length) return;
+      const m = Math.max(...ps.map(id => depth[id]));
+      ps.forEach(id => { if (depth[id] < m) { depth[id] = m; changed = true; } });
+      (fam.children || []).forEach(cId => { if (P[cId] && depth[cId] < m + 1 && m + 1 <= N) { depth[cId] = m + 1; changed = true; } });
+    });
+  }
+
+  // 2) Zhluky = osoby spojené manželstvom (jeden riadok)
+  const uf = {}; persons.forEach(p => uf[p.id] = p.id);
+  const find = x => { while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; } return x; };
+  Object.values(F).forEach(fam => { if (fam.husbandId && fam.wifeId && P[fam.husbandId] && P[fam.wifeId]) uf[find(fam.husbandId)] = find(fam.wifeId); });
+  const byRoot = {}, clusters = [], clOf = {};
+  persons.forEach(p => { const r = find(p.id); if (!byRoot[r]) { byRoot[r] = { members: [] }; clusters.push(byRoot[r]); } byRoot[r].members.push(p.id); });
+  clusters.forEach(cl => { const d = Math.max(...cl.members.map(id => depth[id])); cl.members.forEach(id => { depth[id] = d; clOf[id] = cl; }); });
+
+  // Predkov nižšie k ich potomkom (kratšie spojnice), len smerom nadol
+  let moved = true; guard = 0;
+  while (moved && guard++ < 200) {
+    moved = false;
+    clusters.forEach(cl => {
+      let minChild = Infinity;
+      cl.members.forEach(id => (P[id].fams || []).forEach(fId => { const fam = F[fId]; if (fam) (fam.children || []).forEach(cId => { if (P[cId]) minChild = Math.min(minChild, depth[cId]); }); }));
+      if (minChild !== Infinity && minChild - 1 > depth[cl.members[0]]) { cl.members.forEach(id => depth[id] = minChild - 1); moved = true; }
+    });
+  }
+
+  // 3) Vnútorné usporiadanie zhluku (partneri vedľa seba, muž vľavo, žena vpravo)
+  const famBetween = (a, b) => { for (const fId of (P[a].fams || [])) { const f = F[fId]; if (f && ((f.husbandId === a && f.wifeId === b) || (f.husbandId === b && f.wifeId === a))) return f; } return null; };
+  const spousesOfId = id => { const res = []; (P[id].fams || []).forEach(fId => { const f = F[fId]; if (!f) return; const o = f.husbandId === id ? f.wifeId : f.husbandId; if (o && o !== id && P[o]) res.push({ id: o, isHusband: f.husbandId === o }); }); return res; };
+  function orderCluster(ids) {
+    if (ids.length === 1) return ids.slice();
+    let pivot = ids[0], best = -1; ids.forEach(id => { const d = spousesOfId(id).length; if (d > best) { best = d; pivot = id; } });
+    const placed = new Set([pivot]), left = [], right = [];
+    let pivotL = false, pivotR = false;
+    (function expand(id, side) {
+      spousesOfId(id).forEach(sp => {
+        if (placed.has(sp.id)) return; placed.add(sp.id);
+        let s = side;
+        if (!s) {
+          s = sp.isHusband ? 'L' : 'R';
+          if (s === 'L' && pivotL && !pivotR) s = 'R'; else if (s === 'R' && pivotR && !pivotL) s = 'L';
+          if (s === 'L') pivotL = true; else pivotR = true;
         }
+        if (s === 'L') left.unshift(sp.id); else right.push(sp.id);
+        expand(sp.id, s);
       });
-    });
+    })(pivot, null);
+    const out = [...left, pivot, ...right];
+    ids.forEach(id => { if (!placed.has(id)) out.push(id); });
+    return out;
   }
-
-  const levels = {}; Object.keys(depth).forEach(pId => { const d = depth[pId]; if (!levels[d]) levels[d] = []; levels[d].push(pId); });
-  const sortedDepths = Object.keys(levels).map(Number).sort((a, b) => a - b); const placed = new Set();
-
-  function getOrderedCouple(id1, id2) {
-      const p1 = treeData.persons[id1]; const p2 = treeData.persons[id2]; if (!p1 || !p2) return { left: id1, right: id2 };
-      const isM = (p) => p.gender === 'M'; const isF = (p) => p.gender === 'F';
-      if (isF(p1) && !isF(p2)) return { left: id2, right: id1 }; 
-      if (isM(p2) && !isM(p1)) return { left: id2, right: id1 }; 
-      return { left: id1, right: id2 };
-  }
-
-  sortedDepths.forEach(d => {
-    const tier = levels[d]; 
-    const tierY = 120 + d * (LAYOUT.bh + LAYOUT.gapY); 
-    const groups = {}; const noGroup = [];
-    
-    tier.forEach(pId => { const p = treeData.persons[pId]; if (p.famc && treeData.families[p.famc]) { if (!groups[p.famc]) groups[p.famc] = []; groups[p.famc].push(pId); } else { noGroup.push(pId); } });
-    
-    const sortedFamc = Object.keys(groups).sort((f1, f2) => {
-        const getHubX = (famId) => {
-            const fam = treeData.families[famId]; if (!fam) return 0; let h = 0, c = 0; const fa = treeData.persons[fam.husbandId]; const mo = treeData.persons[fam.wifeId];
-            if (fa && placed.has(fa.id)) { h += fa.x; c++; } if (mo && placed.has(mo.id)) { h += mo.x; c++; } return c > 0 ? h / c : 0;
-        }; return getHubX(f1) - getHubX(f2);
-    });
-
-    let nextAvailableX = 400; 
-    if (d === 0) {
-        const tierPlacedLocally = new Set();
-        tier.forEach(pId => {
-            if (tierPlacedLocally.has(pId) || placed.has(pId)) return;
-            const p = treeData.persons[pId]; let spouseId = null;
-            if (p.fams && p.fams.length > 0) { const fam = treeData.families[p.fams[0]]; if (fam) spouseId = fam.husbandId === pId ? fam.wifeId : fam.husbandId; }
-            if (spouseId && tier.includes(spouseId) && !tierPlacedLocally.has(spouseId)) {
-                const couple = getOrderedCouple(pId, spouseId);
-                treeData.persons[couple.left].x = nextAvailableX; treeData.persons[couple.left].y = tierY; placed.add(couple.left); tierPlacedLocally.add(couple.left); 
-                nextAvailableX += LAYOUT.bw + LAYOUT.spouseGap;
-                treeData.persons[couple.right].x = nextAvailableX; treeData.persons[couple.right].y = tierY; placed.add(couple.right); tierPlacedLocally.add(couple.right); 
-                nextAvailableX += LAYOUT.bw + LAYOUT.gapX; 
-            } else { treeData.persons[pId].x = nextAvailableX; treeData.persons[pId].y = tierY; placed.add(pId); tierPlacedLocally.add(pId); nextAvailableX += LAYOUT.bw + LAYOUT.gapX; }
-        });
-    } else {
-        sortedFamc.forEach(fId => {
-            const group = groups[fId]; const fam = treeData.families[fId]; let hubX = 0, c = 0;
-            const fa = treeData.persons[fam.husbandId]; const mo = treeData.persons[fam.wifeId];
-            if (fa && placed.has(fa.id)) { hubX += fa.x; c++; } if (mo && placed.has(mo.id)) { hubX += mo.x; c++; } if (c > 0) hubX /= c;
-            
-            let estWidth = 0; group.forEach(pId => { estWidth += LAYOUT.bw; const p = treeData.persons[pId]; if (p.fams && p.fams.length > 0) estWidth += LAYOUT.bw + LAYOUT.spouseGap; estWidth += LAYOUT.gapX; }); estWidth -= LAYOUT.gapX;
-            let startX = hubX - (estWidth / 2) + (LAYOUT.bw / 2); if (startX < nextAvailableX) startX = nextAvailableX; 
-            
-            group.forEach(pId => {
-                if (!placed.has(pId)) {
-                    const p = treeData.persons[pId]; let spouseId = null;
-                    if (p.fams && p.fams.length > 0) { const sFam = treeData.families[p.fams[0]]; if (sFam) spouseId = sFam.husbandId === pId ? sFam.wifeId : sFam.husbandId; }
-                    if (spouseId && noGroup.includes(spouseId) && !placed.has(spouseId)) {
-                        const couple = getOrderedCouple(pId, spouseId);
-                        treeData.persons[couple.left].x = startX; treeData.persons[couple.left].y = tierY; placed.add(couple.left); 
-                        startX += LAYOUT.bw + LAYOUT.spouseGap;
-                        treeData.persons[couple.right].x = startX; treeData.persons[couple.right].y = tierY; placed.add(couple.right); 
-                        startX += LAYOUT.bw + LAYOUT.gapX;
-                    } else { treeData.persons[pId].x = startX; treeData.persons[pId].y = tierY; placed.add(pId); startX += LAYOUT.bw + LAYOUT.gapX; }
-                    nextAvailableX = startX;
-                }
-            });
-        });
-        noGroup.forEach(pId => {
-            if (!placed.has(pId)) { let startX = Math.max(nextAvailableX, 400); treeData.persons[pId].x = startX; treeData.persons[pId].y = tierY; placed.add(pId); nextAvailableX = startX + LAYOUT.bw + LAYOUT.gapX; }
-        });
-    }
+  clusters.forEach(cl => {
+    cl.depth = depth[cl.members[0]];
+    cl.order = orderCluster(cl.members);
+    cl.ws = cl.order.map(id => personBubbleW(P[id]));
+    let x = 0; const centers = [];
+    cl.order.forEach((id, i) => { centers.push(x + cl.ws[i] / 2); x += cl.ws[i]; if (i < cl.order.length - 1) { const fam = famBetween(id, cl.order[i + 1]); x += fam ? coupleGap(fam) : 64; } });
+    cl.width = x; cl.offC = centers.map(c => c - x / 2); cl.idx = {}; cl.order.forEach((id, i) => cl.idx[id] = i);
   });
+  // vodorovná poloha uzla rodiny voči stredu zhluku
+  function hubOffset(cl, fam) {
+    const a = cl.idx[fam.husbandId], b = cl.idx[fam.wifeId];
+    if (a !== undefined && b !== undefined) { const i = Math.min(a, b), j = Math.max(a, b); return ((cl.offC[i] + cl.ws[i] / 2) + (cl.offC[j] - cl.ws[j] / 2)) / 2; }
+    const s = a !== undefined ? a : b; return s !== undefined ? cl.offC[s] : 0;
+  }
+
+  // 4) Riadky
+  const maxD = Math.max(...clusters.map(c => c.depth));
+  const rows = []; for (let d = 0; d <= maxD; d++) rows.push([]);
+  clusters.forEach(cl => rows[cl.depth].push(cl));
+  const nbrs = cl => {
+    const res = [];
+    cl.members.forEach(id => {
+      (P[id].fams || []).forEach(fId => { const f = F[fId]; if (f) (f.children || []).forEach(cId => { if (P[cId]) res.push(clOf[cId]); }); });
+      const pf = P[id].famc && F[P[id].famc]; if (pf) validParents(pf).forEach(pid => res.push(clOf[pid]));
+    });
+    return res;
+  };
+  const seen = new Set(), row0 = [];
+  function dfsVisit(cl) { if (seen.has(cl)) return; seen.add(cl); if (cl.depth === 0) row0.push(cl); nbrs(cl).forEach(dfsVisit); }
+  rows[0].forEach(dfsVisit);
+  rows[0] = row0;
+
+  const famOrder = {}; Object.keys(F).forEach((k, i) => famOrder[k] = i);
+  const sibKey = cl => { let k = Infinity; cl.order.forEach(id => { const fId = P[id].famc; const f = fId && F[fId]; if (f) { const ci = (f.children || []).indexOf(id); k = Math.min(k, (famOrder[fId] || 0) * 1000 + (ci < 0 ? 999 : ci)); } }); return k; };
+  const placedSet = new Set();
+  const rowY = d => 120 + d * (LAYOUT.bh + LAYOUT.gapY);
+  const setPos = cl => cl.order.forEach((id, i) => { P[id].x = cl.cx + cl.offC[i]; P[id].y = rowY(cl.depth); });
+
+  function contribs(cl) {
+    const out = [];
+    cl.order.forEach((id, i) => { const pf = P[id].famc && F[P[id].famc]; if (!pf) return; const parentsPlaced = validParents(pf).every(pid => placedSet.has(clOf[pid])); if (!parentsPlaced) return; const g = famGeom(pf); if (g) out.push(g.hubX - cl.offC[i]); });
+    const seenF = new Set();
+    cl.order.forEach(id => (P[id].fams || []).forEach(fId => {
+      if (seenF.has(fId)) return; seenF.add(fId);
+      const fam = F[fId]; if (!fam) return;
+      const kids = (fam.children || []).filter(cId => P[cId] && placedSet.has(clOf[cId]));
+      if (!kids.length) return;
+      const xs = kids.map(cId => P[cId].x);
+      out.push((Math.min(...xs) + Math.max(...xs)) / 2 - hubOffset(cl, fam));
+    }));
+    return out;
+  }
+
+  // Umiestnenie riadku: zoradenie podľa požadovanej polohy a minimálne vychýlenie (PAV) pri dodržaní odstupov.
+  function placeRow(row, sortOK) {
+    if (!row.length) return;
+    const des = new Map();
+    row.forEach(cl => { const c = contribs(cl); des.set(cl, c.length ? c.reduce((a, b) => a + b, 0) / c.length : null); });
+    if (sortOK) {
+      const keyed = row.map(cl => ({ cl, d: des.get(cl) !== null ? des.get(cl) : (cl.cx !== undefined ? cl.cx : null), s: sibKey(cl) }));
+      if (keyed.every(k => k.d !== null)) {
+        keyed.sort((a, b) => (a.d - b.d) || ((a.cl.cx || 0) - (b.cl.cx || 0)) || (a.s - b.s));
+        row.splice(0, row.length, ...keyed.map(k => k.cl));
+      }
+    }
+    const n = row.length, GAP = LAYOUT.gapX, off = [0];
+    for (let i = 1; i < n; i++) off[i] = off[i - 1] + (row[i - 1].width + row[i].width) / 2 + GAP;
+    const targets = [];
+    row.forEach((cl, i) => {
+      const d = des.get(cl);
+      targets.push(d === null ? (i ? targets[i - 1] : (cl.cx !== undefined ? cl.cx : 0)) : d - off[i]);
+    });
+    // izotonická regresia (nezostupná postupnosť)
+    const blocks = [];
+    targets.forEach((t, i) => {
+      blocks.push({ sum: t, w: 1, s: i, e: i });
+      while (blocks.length > 1) { const b = blocks[blocks.length - 1], a = blocks[blocks.length - 2]; if (a.sum / a.w <= b.sum / b.w) break; a.sum += b.sum; a.w += b.w; a.e = b.e; blocks.pop(); }
+    });
+    blocks.forEach(b => { const q = b.sum / b.w; for (let i = b.s; i <= b.e; i++) row[i].cx = q + off[i]; });
+    row.forEach(cl => { setPos(cl); placedSet.add(cl); });
+  }
+
+  rows.forEach((row, d) => placeRow(row, d > 0));
+  for (let it = 0; it < 8; it++) {
+    const sortOK = it < 4;
+    for (let d = maxD; d >= 0; d--) placeRow(rows[d], sortOK);
+    for (let d = 0; d <= maxD; d++) placeRow(rows[d], sortOK);
+  }
+
+  // Nezávislé rodiny (samostatné komponenty) priblížime k sebe, aby medzi nimi neboli zbytočné diery
+  const comp = new Map(); clusters.forEach(cl => comp.set(cl, cl));
+  const cfind = x => { while (comp.get(x) !== x) { comp.set(x, comp.get(comp.get(x))); x = comp.get(x); } return x; };
+  clusters.forEach(cl => nbrs(cl).forEach(o => { comp.set(cfind(cl), cfind(o)); }));
+  const groups = new Map();
+  persons.forEach(p => { const r = cfind(clOf[p.id]); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(p); });
+  const boxes = [...groups.values()].map(list => ({ list, min: Math.min(...list.map(p => p.x - personBubbleW(p) / 2)), max: Math.max(...list.map(p => p.x + personBubbleW(p) / 2)) })).sort((a, b) => a.min - b.min);
+  let prevMax = -Infinity;
+  boxes.forEach(bx => {
+    if (prevMax > -Infinity && bx.min > prevMax + 80) { const dx = bx.min - (prevMax + 80); bx.list.forEach(p => { p.x -= dx; }); bx.min -= dx; bx.max -= dx; }
+    prevMax = Math.max(prevMax, bx.max);
+  });
+
+  // Posun do kladných súradníc
+  let minLeft = Infinity; persons.forEach(p => { minLeft = Math.min(minLeft, p.x - personBubbleW(p) / 2); });
+  const shift = 100 - minLeft; persons.forEach(p => { p.x += shift; });
+
   if (andFitToView) fitTreeToView(); else drawTree();
 }
 
 function fitTreeToView() {
   const persons = Object.values(treeData.persons); if (persons.length === 0 || !canvas) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  persons.forEach(p => { minX = Math.min(minX, p.x - LAYOUT.bw / 2); maxX = Math.max(maxX, p.x + LAYOUT.bw / 2); minY = Math.min(minY, p.y - LAYOUT.bh / 2); maxY = Math.max(maxY, p.y + LAYOUT.bh / 2); });
+  persons.forEach(p => { const hw = personBubbleW(p) / 2; minX = Math.min(minX, p.x - hw); maxX = Math.max(maxX, p.x + hw); minY = Math.min(minY, p.y - LAYOUT.bh / 2); maxY = Math.max(maxY, p.y + LAYOUT.bh / 2); });
   const pad = 50; minX -= pad; maxX += pad; minY -= pad; maxY += pad;
   const contentW = maxX - minX; const contentH = maxY - minY;
   const scaleX = canvas.width / contentW; const scaleY = canvas.height / contentH;
-  scale = Math.min(Math.max(0.35, Math.min(scaleX, scaleY)), 1.2);
+  scale = Math.min(Math.max(0.2, Math.min(scaleX, scaleY)), 1.2);
   panX = (canvas.width - contentW * scale) / 2 - minX * scale; panY = (canvas.height - contentH * scale) / 2 - minY * scale;
   drawTree();
 }
 
-function zoomCanvas(factor) { scale = Math.min(Math.max(0.25, scale * factor), 2.5); drawTree(); }
+function zoomCanvas(factor) { scale = Math.min(Math.max(0.1, scale * factor), 2.5); drawTree(); }
 function centerOnPerson(personId) { const p = treeData.persons[personId]; if (!p || !canvas) return; scale = Math.max(scale, 0.95); panX = (canvas.width / 2) - (p.x * scale); panY = (canvas.height / 2) - (p.y * scale); selectPerson(personId, false); drawTree(); }
 
 function initCanvas() {
@@ -1064,11 +1186,10 @@ function initCanvas() {
   canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect(); const mouseX = (e.clientX - rect.left - panX) / scale; const mouseY = (e.clientY - rect.top - panY) / scale;
     const hitPerson = getPersonAt(mouseX, mouseY);
-    if (hitPerson) { draggedPersonId = hitPerson.id; selectPerson(hitPerson.id); } else { isDragging = true; dragStartX = e.clientX - panX; dragStartY = e.clientY - panY; }
+    if (hitPerson) selectPerson(hitPerson.id); isDragging = true; dragStartX = e.clientX - panX; dragStartY = e.clientY - panY;
   });
   window.addEventListener('mousemove', (e) => {
-    if (draggedPersonId) { const rect = canvas.getBoundingClientRect(); const p = treeData.persons[draggedPersonId]; if (p) { p.x = (e.clientX - rect.left - panX) / scale; p.y = (e.clientY - rect.top - panY) / scale; drawTree(); } } 
-    else if (isDragging) { panX = e.clientX - dragStartX; panY = e.clientY - dragStartY; drawTree(); }
+    if (isDragging) { panX = e.clientX - dragStartX; panY = e.clientY - dragStartY; drawTree(); }
   });
   window.addEventListener('mouseup', () => { isDragging = false; draggedPersonId = null; });
   
@@ -1077,7 +1198,7 @@ function initCanvas() {
       const touch = e.touches[0]; const rect = canvas.getBoundingClientRect();
       const mouseX = (touch.clientX - rect.left - panX) / scale; const mouseY = (touch.clientY - rect.top - panY) / scale;
       const hitPerson = getPersonAt(mouseX, mouseY);
-      if (hitPerson) { draggedPersonId = hitPerson.id; selectPerson(hitPerson.id); } else { isDragging = true; dragStartX = touch.clientX - panX; dragStartY = touch.clientY - panY; }
+      if (hitPerson) selectPerson(hitPerson.id); isDragging = true; dragStartX = touch.clientX - panX; dragStartY = touch.clientY - panY;
     } else if (e.touches.length === 2) {
       isDragging = false; draggedPersonId = null;
       lastPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -1088,8 +1209,7 @@ function initCanvas() {
     e.preventDefault(); 
     if (e.touches.length === 1 && !lastPinchDist) {
       const touch = e.touches[0];
-      if (draggedPersonId) { const rect = canvas.getBoundingClientRect(); const p = treeData.persons[draggedPersonId]; if (p) { p.x = (touch.clientX - rect.left - panX) / scale; p.y = (touch.clientY - rect.top - panY) / scale; drawTree(); } } 
-      else if (isDragging) { panX = touch.clientX - dragStartX; panY = touch.clientY - dragStartY; drawTree(); }
+      if (isDragging) { panX = touch.clientX - dragStartX; panY = touch.clientY - dragStartY; drawTree(); }
     } else if (e.touches.length === 2) {
       const currentPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       if (lastPinchDist) {
@@ -1098,7 +1218,7 @@ function initCanvas() {
         const midX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
         const midY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
         const prevScale = scale;
-        scale = Math.min(Math.max(0.25, scale * factor), 2.5);
+        scale = Math.min(Math.max(0.1, scale * factor), 2.5);
         panX = midX - (midX - panX) * (scale / prevScale);
         panY = midY - (midY - panY) * (scale / prevScale);
         drawTree();
@@ -1116,7 +1236,7 @@ function initCanvas() {
 
 function getPersonAt(x, y) {
   const persons = Object.values(treeData.persons);
-  for (let i = persons.length - 1; i >= 0; i--) { const p = persons[i]; if (x >= p.x - 100 && x <= p.x + 100 && y >= p.y - 36 && y <= p.y + 36) return p; } return null;
+  for (let i = persons.length - 1; i >= 0; i--) { const p = persons[i]; const hw = personBubbleW(p) / 2; if (x >= p.x - hw && x <= p.x + hw && y >= p.y - LAYOUT.bh / 2 && y <= p.y + LAYOUT.bh / 2) return p; } return null;
 }
 
 function drawTree() {
@@ -1128,99 +1248,74 @@ function drawSubtleGrid() {
   ctx.beginPath(); for (let x = offsetX; x < canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); } for (let y = offsetY; y < canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); } ctx.stroke();
 }
 
-function drawCombConnections() {
+function drawCombConnections(c = ctx) {
   Object.values(treeData.families).forEach(fam => {
-    const husband = treeData.persons[fam.husbandId]; const wife = treeData.persons[fam.wifeId]; const children = (fam.children || []).map(id => treeData.persons[id]).filter(Boolean);
-    let hubX = 0; let hubY = 0;
-    if (husband && wife) {
-      ctx.beginPath(); ctx.strokeStyle = '#e11d48'; ctx.lineWidth = 2.5; ctx.moveTo(husband.x, husband.y); ctx.lineTo(wife.x, wife.y); ctx.stroke();
-      hubX = (husband.x + wife.x) / 2; hubY = (husband.y + wife.y) / 2;
-      ctx.beginPath(); ctx.fillStyle = '#e11d48'; ctx.arc(hubX, hubY, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.stroke();
-      
-      if (fam.marrDate) { 
-        ctx.font = '9px system-ui, sans-serif'; 
-        const textStr = `  ⚭ ${fam.marrDate}  `;
-        const tw = ctx.measureText(textStr).width;
-        const th = 14;
-        const tx = hubX - tw / 2;
-        const ty = hubY - 20;
-
-        ctx.beginPath();
-        ctx.roundRect(tx, ty, tw, th, 6);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = '#e11d48';
-        ctx.stroke();
-
-        ctx.fillStyle = '#9f1239';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(textStr, hubX, ty + th / 2);
+    const g = famGeom(fam); if (!g) return;
+    const children = (fam.children || []).map(id => treeData.persons[id]).filter(Boolean);
+    const hubX = g.hubX, hubY = g.hubY;
+    if (g.type === 'couple') {
+      // spojka medzi bublinami partnerov (hrana – hrana) s uzlom presne v strede
+      c.beginPath(); c.strokeStyle = '#e11d48'; c.lineWidth = 2.5; c.moveTo(g.x1, hubY); c.lineTo(g.x2, hubY); c.stroke();
+      c.beginPath(); c.fillStyle = '#e11d48'; c.arc(hubX, hubY, 6.5, 0, Math.PI * 2); c.fill(); c.lineWidth = 2; c.strokeStyle = '#ffffff'; c.stroke();
+      // malá bublina so svadobným dátumom nad spojkou (jeden znak medzera pred aj za dátumom)
+      const m = marrInfo(fam);
+      if (m) {
+        const bw = m.w, bh = 18, bx = hubX - bw / 2, by = hubY - 11 - bh;
+        c.beginPath(); c.roundRect(bx, by, bw, bh, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 1; c.strokeStyle = '#e11d48'; c.stroke();
+        c.font = FONT_MARR; c.fillStyle = '#9f1239'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(fam.marrDate, hubX, by + bh / 2 + 0.5);
       }
+    } else {
+      c.beginPath(); c.fillStyle = '#475569'; c.arc(hubX, hubY, 5, 0, Math.PI * 2); c.fill();
+    }
 
-    } else if (husband || wife) { const single = husband || wife; hubX = single.x; hubY = single.y + 36; ctx.beginPath(); ctx.fillStyle = '#475569'; ctx.arc(hubX, hubY, 5, 0, Math.PI * 2); ctx.fill(); } else return;
-    
     if (children.length > 0) {
-      const parentY = (husband || wife).y;
-      const busY = parentY + (LAYOUT.bh / 2) + (LAYOUT.gapY / 2); 
-      ctx.beginPath(); ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.moveTo(hubX, hubY); ctx.lineTo(hubX, busY); ctx.stroke();
-      const childXCoords = children.map(c => c.x); const minChildX = Math.min(...childXCoords, hubX); const maxChildX = Math.max(...childXCoords, hubX);
-      ctx.beginPath(); ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.moveTo(minChildX, busY); ctx.lineTo(maxChildX, busY); ctx.stroke();
-      children.forEach(child => { const childTopY = child.y - (LAYOUT.bh / 2); ctx.beginPath(); ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.moveTo(child.x, busY); ctx.lineTo(child.x, childTopY); ctx.stroke(); ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.arc(child.x, childTopY, 3.5, 0, Math.PI * 2); ctx.fill(); });
+      const parentY = (g.type === 'couple') ? g.L.y : g.s.y;
+      const rank = (g.type === 'couple' ? [g.L, g.R] : [g.s]).reduce((m, pp) => Math.max(m, (pp.fams || []).indexOf(fam.id)), 0);
+      const busY = parentY + (LAYOUT.bh / 2) + LAYOUT.gapY * [0.5, 0.25, 0.75][Math.max(rank, 0) % 3];
+      c.strokeStyle = '#475569'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(hubX, hubY); c.lineTo(hubX, busY); c.stroke();
+      const xs = children.map(ch => ch.x); const minChildX = Math.min(...xs, hubX); const maxChildX = Math.max(...xs, hubX);
+      c.beginPath(); c.moveTo(minChildX, busY); c.lineTo(maxChildX, busY); c.stroke();
+      children.forEach(child => {
+        const childTopY = child.y - (LAYOUT.bh / 2);
+        c.beginPath(); c.moveTo(child.x, busY); c.lineTo(child.x, childTopY); c.stroke();
+        c.fillStyle = '#475569'; c.beginPath(); c.arc(child.x, childTopY, 3.5, 0, Math.PI * 2); c.fill();
+      });
     }
   });
 }
 
-function drawPersonBubble(p) {
-  const h = LAYOUT.bh;
-ctx.font = 'bold 13px system-ui, sans-serif';
-
-let fullN = p.firstName || '';
-if (p.middleName) fullN += ' ' + p.middleName;
-if (p.lastName) fullN += ' ' + p.lastName;
-
-const fullNameStr = `${p.title ? p.title + ' ' : ''}${fullN}`;
-
-ctx.font = 'bold 13px system-ui, sans-serif';
-const nameWidth = ctx.measureText(fullNameStr).width;
-
-ctx.font = '500 11px system-ui, sans-serif';
-const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
-const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
-const dateWidth = ctx.measureText(`${birthStr}${deathStr}`).width;
-
-ctx.font = '10px system-ui, sans-serif';
-const placeWidth = p.birthPlace ? ctx.measureText(p.birthPlace).width : 0;
-
-const contentWidth = Math.max(nameWidth, dateWidth, placeWidth);
-const w = Math.max(220, Math.min(500, contentWidth + 82));
-  const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = (p.id === currentSelectedPersonId);
+function drawPersonBubble(p, c = ctx, noSelect = false) {
+  const h = LAYOUT.bh; const w = personBubbleW(p);
+  const fullNameStr = personNameStr(p);
+  const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
+  const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
+  const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = !noSelect && (p.id === currentSelectedPersonId);
   const isMale = (p.gender === 'M'); const bgColor = isMale ? '#eff6ff' : '#fdf2f8'; const borderColor = isMale ? '#1e40af' : '#be185d';
-  if (isSelected) { ctx.beginPath(); ctx.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); ctx.fillStyle = 'rgba(99, 102, 241, 0.3)'; ctx.fill(); }
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, radius); ctx.fillStyle = bgColor; ctx.fill(); ctx.lineWidth = isSelected ? 3.5 : 2.2; ctx.strokeStyle = borderColor; ctx.stroke();
+  if (isSelected) { c.beginPath(); c.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); c.fillStyle = 'rgba(99, 102, 241, 0.3)'; c.fill(); }
+  c.beginPath(); c.roundRect(x, y, w, h, radius); c.fillStyle = bgColor; c.fill(); c.lineWidth = isSelected ? 3.5 : 2.2; c.strokeStyle = borderColor; c.stroke();
   const avatarCenterX = x + 34; const avatarCenterY = y + h / 2; const avatarRadius = 22;
-  ctx.save(); ctx.beginPath(); ctx.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); ctx.clip();
+  c.save(); c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.clip();
   const mainPhoto = p.photos.find(ph => ph.isMain) || p.photos[0];
   if (mainPhoto && mainPhoto.data) {
     let img = cachedImages[mainPhoto.id];
     if (!img) { img = new Image(); img.src = mainPhoto.data; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
-    try { ctx.drawImage(img, avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); } catch { ctx.fillStyle = isMale ? '#bfdbfe' : '#fbcfe8'; ctx.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); }
-  } else { ctx.fillStyle = isMale ? '#dbeafe' : '#fce7f3'; ctx.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); ctx.fillStyle = borderColor; ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(isMale ? '♂' : '♀', avatarCenterX, avatarCenterY); }
-  ctx.restore();
-  ctx.beginPath(); ctx.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); ctx.lineWidth = 1.5; ctx.strokeStyle = borderColor; ctx.stroke();
+    try { c.drawImage(img, avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); } catch { c.fillStyle = isMale ? '#bfdbfe' : '#fbcfe8'; c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); }
+  } else { c.fillStyle = isMale ? '#dbeafe' : '#fce7f3'; c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); c.fillStyle = borderColor; c.font = 'bold 15px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(isMale ? '♂' : '♀', avatarCenterX, avatarCenterY); }
+  c.restore();
+  c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.lineWidth = 1.5; c.strokeStyle = borderColor; c.stroke();
  const textLeft = x + 66;
 
-ctx.textAlign = 'left';
-ctx.textBaseline = 'top';
+c.textAlign = 'left';
+c.textBaseline = 'top';
 
-ctx.font = 'bold 13px system-ui, sans-serif';
-ctx.fillStyle = '#0f172a';
-ctx.fillText(fullNameStr, textLeft, y + 14);
+c.font = 'bold 13px system-ui, sans-serif';
+c.fillStyle = '#0f172a';
+c.fillText(fullNameStr, textLeft, y + 14);
 
-ctx.font = '500 11px system-ui, sans-serif';
-ctx.fillStyle = '#475569';
-ctx.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
+c.font = '500 11px system-ui, sans-serif';
+c.fillStyle = '#475569';
+c.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
 }
 
 function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidth) return str; let s = str; while (s.length > 0 && ctx.measureText(s + '...').width > maxWidth) s = s.slice(0, -1); return s + '...'; }
@@ -1660,7 +1755,9 @@ function savePersonForm(e) {
   });
   [...p.fams].forEach(dropFamIfEmpty); p.fams = p.fams.filter(fId => treeData.families[fId]);
 
-  closePersonEditor(); selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success");
+  closePersonEditor(); autoLayoutTree(false);
+  if (isNew && canvas) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
+  selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success");
 }
 
 function deleteCurrentPerson() {
@@ -1672,7 +1769,7 @@ function deleteCurrentPerson() {
     (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam) { if (fam.husbandId === pId) fam.husbandId = null; if (fam.wifeId === pId) fam.wifeId = null; if (!fam.husbandId && !fam.wifeId && fam.children.length === 0) delete treeData.families[fId]; } });
     delete treeData.persons[pId]; recentEditedIds = recentEditedIds.filter(id => id !== pId); closePersonEditor();
     const remainingIds = Object.keys(treeData.persons); if (remainingIds.length > 0) selectPerson(remainingIds[0]); else currentSelectedPersonId = null;
-    updateRecentListUI(); updateCountsUI(); drawTree(); showToast(t('msgDelOk'), "info");
+    updateRecentListUI(); updateCountsUI(); autoLayoutTree(false); showToast(t('msgDelOk'), "info");
   });
 }
 
@@ -1800,7 +1897,7 @@ function exportToPdfTiled() {
   try {
     const { jsPDF } = window.jspdf; const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    persons.forEach(p => { minX = Math.min(minX, p.x - 140); maxX = Math.max(maxX, p.x + 140); minY = Math.min(minY, p.y - 80); maxY = Math.max(maxY, p.y + 80); });
+    persons.forEach(p => { const hw = personBubbleW(p) / 2 + 20; minX = Math.min(minX, p.x - hw); maxX = Math.max(maxX, p.x + hw); minY = Math.min(minY, p.y - 80); maxY = Math.max(maxY, p.y + 80); });
     const pad = 60; minX -= pad; minY -= pad; maxX += pad; maxY += pad;
     const totalW = maxX - minX; const totalH = maxY - minY;
     const cols = totalW > 1200 ? 3 : 2; const rows = totalH > 800 ? 3 : 2;
@@ -1814,38 +1911,8 @@ function exportToPdfTiled() {
         offCtx.fillStyle = '#ffffff'; offCtx.fillRect(0, 0, offCanvas.width, offCanvas.height);
         offCtx.save(); const sc = Math.min(offCanvas.width / tileW, offCanvas.height / tileH); offCtx.translate((offCanvas.width - tileW * sc) / 2, (offCanvas.height - tileH * sc) / 2); offCtx.scale(sc, sc); offCtx.translate(-(minX + c * tileW), -(minY + r * tileH));
 
-        Object.values(treeData.families).forEach(fam => {
-          const husband = treeData.persons[fam.husbandId]; const wife = treeData.persons[fam.wifeId]; const children = (fam.children || []).map(id => treeData.persons[id]).filter(Boolean);
-          let hubX = 0, hubY = 0;
-          if (husband && wife) { offCtx.beginPath(); offCtx.strokeStyle = '#e11d48'; offCtx.lineWidth = 3; offCtx.moveTo(husband.x, husband.y); offCtx.lineTo(wife.x, wife.y); offCtx.stroke(); hubX = (husband.x + wife.x) / 2; hubY = (husband.y + wife.y) / 2; offCtx.beginPath(); offCtx.fillStyle = '#e11d48'; offCtx.arc(hubX, hubY, 7, 0, Math.PI * 2); offCtx.fill(); } 
-          else if (husband || wife) { const single = husband || wife; hubX = single.x; hubY = single.y + 36; }
-          
-          if (children.length > 0) {
-            const parentY = (husband || wife).y;
-            const busY = parentY + (LAYOUT.bh / 2) + (LAYOUT.gapY / 2);
-            offCtx.beginPath(); offCtx.strokeStyle = '#475569'; offCtx.lineWidth = 2.5; offCtx.moveTo(hubX, hubY); offCtx.lineTo(hubX, busY); offCtx.stroke();
-            const childXs = children.map(ch => ch.x); const minChildX = Math.min(...childXs, hubX); const maxChildX = Math.max(...childXs, hubX);
-            offCtx.beginPath(); offCtx.strokeStyle = '#475569'; offCtx.lineWidth = 2.5; offCtx.moveTo(minChildX, busY); offCtx.lineTo(maxChildX, busY); offCtx.stroke();
-            children.forEach(child => { offCtx.beginPath(); offCtx.strokeStyle = '#475569'; offCtx.lineWidth = 2.5; offCtx.moveTo(child.x, busY); offCtx.lineTo(child.x, child.y - (LAYOUT.bh / 2)); offCtx.stroke(); });
-          }
-
-          if (fam.marrDate && husband && wife) { 
-            offCtx.font = '600 10px sans-serif'; 
-            const textStr = `  ⚭ ${fam.marrDate}  `;
-            const tw = offCtx.measureText(textStr).width;
-            const th = 16;
-            const tx = hubX - tw / 2;
-            const ty = hubY - 22;
-            offCtx.beginPath(); offCtx.roundRect(tx, ty, tw, th, 8); offCtx.fillStyle = '#ffffff'; offCtx.fill(); offCtx.lineWidth = 1.5; offCtx.strokeStyle = '#e11d48'; offCtx.stroke();
-            offCtx.fillStyle = '#9f1239'; offCtx.textAlign = 'center'; offCtx.textBaseline = 'middle'; offCtx.fillText(textStr, hubX, ty + th / 2 + 0.5);
-          }
-        });
-        persons.forEach(p => {
-          const w = LAYOUT.bw; const h = LAYOUT.bh; const bx = p.x - w / 2; const by = p.y - h / 2; const isMale = (p.gender === 'M');
-          offCtx.beginPath(); offCtx.roundRect(bx, by, w, h, 20); offCtx.fillStyle = isMale ? '#eff6ff' : '#fdf2f8'; offCtx.fill(); offCtx.lineWidth = 2.5; offCtx.strokeStyle = isMale ? '#1e40af' : '#be185d'; offCtx.stroke(); offCtx.font = 'bold 14px sans-serif'; offCtx.fillStyle = '#0f172a';
-          let fn = p.firstName; if(p.middleName) fn += ' ' + p.middleName; fn += ' ' + p.lastName;
-          offCtx.fillText(`${p.title ? p.title + ' ' : ''}${fn}`, bx + 20, by + 28); offCtx.font = '12px sans-serif'; offCtx.fillStyle = '#475569'; offCtx.fillText(`${p.birthDate || '?'} - ${p.deathDate || ''}`, bx + 20, by + 50);
-        });
+        drawCombConnections(offCtx);
+        persons.forEach(p => drawPersonBubble(p, offCtx, true));
         offCtx.restore();
         pdf.addImage(offCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, 277, 185); pdf.setFontSize(10); pdf.setTextColor(100, 116, 139); pdf.text(`Genealogy | P. ${pageNumber} / ${totalPages} ([R-${r + 1}, S-${c + 1}])`, 12, 8); pdf.setFontSize(9); pdf.setTextColor(225, 29, 72); if (c < cols - 1) pdf.text(`--> P. ${pageNumber + 1}`, 222, 105); if (c > 0) pdf.text(`<-- P. ${pageNumber - 1}`, 12, 105); if (r < rows - 1) pdf.text(`v Pokracovanie na strane ${pageNumber + cols}`, 113.5, 203); pageNumber++;
       }
@@ -2021,7 +2088,12 @@ async function backendFetch(path, method, opts = {}) {
 
 async function backendError(res, authMsgKey) {
   let err;
-  if (res.status === 401) err = new Error(t(authMsgKey));
+  if (res.status === 401) {
+    // Zobrazíme aj dôvod, ktorý vrátil server (pomáha zistiť, prečo backend odmietol token Clerk).
+    let detail = ''; try { const j = await res.clone().json(); detail = j.error || j.message || j.reason || ''; } catch (e) {}
+    console.warn('Backend vrátil 401:', res.url, detail);
+    err = new Error(t(authMsgKey) + (detail ? ' [' + detail + ']' : ''));
+  }
   else if (res.status === 403) err = new Error(t('msgDbErrForbidden'));
   else if (res.status === 429) err = new Error(t('msgDbErrRate'));
   else if (res.status === 413) err = new Error(t('msgDbTooLarge'));
@@ -2144,7 +2216,7 @@ function loadTreeFromServer(data, session) {
   treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
-  if (Object.values(persons).every(pp => pp.x || pp.y)) fitTreeToView(); else autoLayoutTree(true);
+  autoLayoutTree(true);
   dbConnection = session; updateDbStatusUI();
   hydrateFiles(session);
   showToast(t('msgDbLoaded').replace('{X}', Object.keys(persons).length), 'success');
