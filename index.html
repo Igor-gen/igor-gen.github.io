@@ -2471,7 +2471,7 @@ function fanLayoutText(n) {
   });
   // Place the label at the middle radius and rotate its baseline along the
   // radius, not along the circular arc. Flip the left half for readability.
-  const flip = mid > Math.PI / 2 ? ' rotate(180)' : '';
+  const flip = mid < 0 ? ' rotate(180)' : '';
   const transform = `translate(${R * Math.sin(mid)},${-R * Math.cos(mid)}) rotate(${midDeg - 90})${flip}`;
   return { lines, transform };
 }
