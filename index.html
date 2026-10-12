@@ -550,15 +550,12 @@ function updateSidebarRootSurname() {
   if (!el) return;
   const persons = Object.values((treeData && treeData.persons) || {});
   if (!persons.length) { el.textContent = ''; return; }
-  let root = null, earliest = Infinity;
-  for (const person of persons) {
-    const match = String(person.birthDate || '').match(/(\d{4})/);
-    if (match && Number(match[1]) < earliest) { earliest = Number(match[1]); root = person; }
-  }
-  root = root || persons[0];
-  const surname = String(root.lastName || root.surname || '').trim();
-  el.textContent = surname || String(root.firstName || root.name || '').trim() || 'Rodokmeň';
-  el.title = surname ? ('Rodokmeň rodu ' + surname) : 'Koreňová osoba rodokmeňa';
+  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase();
+  // Igor Sklenčar je určený ako hlavná koreňová osoba rodokmeňa.
+  const root = persons.find(p => norm(p.firstName || p.name).includes('igor') && norm(p.lastName || p.surname).includes('sklencar'));
+  const surname = root ? String(root.lastName || root.surname || '').trim() : 'Sklenčar';
+  el.textContent = surname || 'Sklenčar';
+  el.title = 'Rodokmeň rodu ' + el.textContent;
 }
 
 function toggleLeftSidebar() { document.getElementById('leftSidebar').classList.toggle('-translate-x-full'); }
@@ -2584,9 +2581,12 @@ function fanChartZoomIn() { fanChartZoomBy(1.3); }
 function fanChartZoomOut() { fanChartZoomBy(1 / 1.3); }
 
 function fanDefaultRoot() {
-  if (currentSelectedPersonId && treeData.persons[currentSelectedPersonId]) return currentSelectedPersonId;
   const persons = Object.values(treeData.persons || {});
   if (!persons.length) return null;
+  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase();
+  const igorSklenčar = persons.find(p => norm(p.firstName || p.name).includes('igor') && norm(p.lastName || p.surname).includes('sklencar'));
+  if (igorSklenčar) return igorSklenčar.id;
+  if (currentSelectedPersonId && treeData.persons[currentSelectedPersonId]) return currentSelectedPersonId;
   let best = null, bestYear = Infinity;
   persons.forEach(p => { const m = String(p.birthDate || '').match(/(\d{4})/); if (m && +m[1] < bestYear) { bestYear = +m[1]; best = p; } });
   return (best || persons[0]).id;
