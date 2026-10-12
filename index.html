@@ -2548,7 +2548,7 @@ function fanRender(refit) {
   const arc = d3.arc();
   const segs = g.append('g').selectAll('g').data(nodes).join('g')
     .attr('class', 'fan-seg').style('cursor', 'pointer')
-    .on('click', (e, d) => fanSetRoot(d.person.id, true));
+    .on('click', (e, d) => { e.stopPropagation(); fanSetRoot(d.person.id, true); });
   segs.append('title').text(d => fanTooltip(d.person));
   segs.append('path')
     .attr('d', d => arc({ innerRadius: d.inner, outerRadius: d.outer, startAngle: d.a0, endAngle: d.a1 }))
@@ -2560,8 +2560,9 @@ function fanRender(refit) {
   });
 
   // Koreň v strede
-  const rg = g.append('g').attr('class', 'fan-root');
-  rg.append('title').text(fanTooltip(root));
+  const rg = g.append('g').attr('class', 'fan-root').style('cursor', 'pointer')
+    .on('click', (e) => { e.stopPropagation(); fanSetRoot(root.id, true); });
+  rg.append('title').text(fanTooltip(root) + ' — kliknutím ponecháte túto osobu v strede');
   rg.append('circle').attr('r', FAN.r0).attr('fill', '#c9a96e').attr('stroke', '#684b2c').attr('stroke-width', 3);
   fanDrawLines(rg.append('g'), fanBuildLines(root, { maxW: 116, avail: 104, nameFs: 14, childFamId: null, maxPartners: 2, splitName: true }));
 
