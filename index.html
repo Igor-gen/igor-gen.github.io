@@ -127,7 +127,14 @@
           <i class="ph-bold ph-tree-structure text-indigo-600 text-xl sm:text-2xl"></i>
           <span class="text-lg sm:text-xl font-black tracking-tight text-slate-900">Genealogy</span>
         </div>
-        <div id="sidebarRootSurname" class="mt-1 text-sm sm:text-base font-bold tracking-tight text-indigo-700 truncate max-w-[230px]" title="Priezvisko koreňovej osoby"></div>
+        <div class="mt-1 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[210px]" title="Aktuálny súbor">
+          <i class="ph ph-file-archive text-indigo-500"></i>
+          <span id="sidebarFileName" class="truncate font-mono">rodokmen.gdz</span>
+        </div>
+        <div id="sidebarDbStatus" class="hidden mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 font-medium truncate max-w-[210px]">
+          <i class="ph-bold ph-plugs-connected"></i>
+          <span id="sidebarDbHost" class="truncate font-mono"></span>
+        </div>
       </div>
       <div class="flex items-center gap-1">
         <button onclick="toggleLeftSidebar()" class="md:hidden text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 bg-slate-50">
@@ -210,7 +217,7 @@
         <div class="p-3 border-t border-slate-200 bg-white">
       <button onclick="openFanChartModal()" class="w-full px-4 py-3 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-sm font-semibold flex items-center justify-center gap-2 transition">
         <i class="ph-bold ph-fan text-amber-700"></i>
-        <span data-fan-i18n="button">Vejárový graf</span>
+        <span>Vejárový graf</span>
       </button>
     </div>
   </aside>
@@ -544,20 +551,6 @@ initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1
 });
 
 // --- MOBILNÉ TOGGLE FUNKCIE ---
-
-function updateSidebarRootSurname() {
-  const el = document.getElementById('sidebarRootSurname');
-  if (!el) return;
-  const persons = Object.values((treeData && treeData.persons) || {});
-  if (!persons.length) { el.textContent = ''; return; }
-  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase();
-  // Igor Sklenčar je určený ako hlavná koreňová osoba rodokmeňa.
-  const root = persons.find(p => norm(p.firstName || p.name).includes('igor') && norm(p.lastName || p.surname).includes('sklencar'));
-  const surname = root ? String(root.lastName || root.surname || '').trim() : 'Sklenčar';
-  el.textContent = surname || 'Sklenčar';
-  el.title = 'Rodokmeň rodu ' + el.textContent;
-}
-
 function toggleLeftSidebar() { document.getElementById('leftSidebar').classList.toggle('-translate-x-full'); }
 function openPersonPanelMobile() { document.getElementById('personDetailPanel').classList.remove('translate-x-full'); }
 function closePersonPanelMobile() { document.getElementById('personDetailPanel').classList.add('translate-x-full'); }
@@ -628,21 +621,6 @@ const i18n = {
   }
 };
 
-const fanI18n = {
-  sk: { button:'Vejárový graf', title:'Vejárový graf', menu:'Koreň diagramu', search:'Hľadať osobu...', generations:'Počet generácií', back:'Späť o jeden krok', pdf:'Uložiť PDF', menuTitle:'Menu', zoomOut:'Zmenšiť', zoomIn:'Zväčšiť', fit:'Prispôsobiť pohľadu', close:'Zavrieť', unknown:'Neznámy', empty:'Rodokmeň neobsahuje žiadne osoby.', noAncestors:'Osoba nemá zaevidovaných predkov.', noPrevious:'Žiadny predchádzajúci koreň.', d3Error:'Knižnica D3.js sa nenačítala. Skontrolujte pripojenie na internet.', pdfLibError:'PDF knižnica sa nenačítala.', imageError:'Obrázok grafu sa nepodarilo vytvoriť.' },
-  cs: { button:'Vějířový graf', title:'Vějířový graf', menu:'Kořen diagramu', search:'Hledat osobu...', generations:'Počet generací', back:'Zpět o jeden krok', pdf:'Uložit PDF', menuTitle:'Menu', zoomOut:'Zmenšit', zoomIn:'Zvětšit', fit:'Přizpůsobit pohledu', close:'Zavřít', unknown:'Neznámý', empty:'Rodokmen neobsahuje žádné osoby.', noAncestors:'Osoba nemá evidované předky.', noPrevious:'Žádný předchozí kořen.', d3Error:'Knihovna D3.js se nenačetla. Zkontrolujte připojení k internetu.', pdfLibError:'Knihovna PDF se nenačetla.', imageError:'Nepodařilo se vytvořit obrázek grafu.' },
-  en: { button:'Fan chart', title:'Fan chart', menu:'Chart root', search:'Search person...', generations:'Number of generations', back:'Go back one step', pdf:'Save PDF', menuTitle:'Menu', zoomOut:'Zoom out', zoomIn:'Zoom in', fit:'Fit to view', close:'Close', unknown:'Unknown', empty:'The family tree contains no people.', noAncestors:'This person has no recorded ancestors.', noPrevious:'There is no previous root.', d3Error:'The D3.js library did not load. Check your internet connection.', pdfLibError:'The PDF library did not load.', imageError:'Could not create the chart image.' },
-  de: { button:'Fächergrafik', title:'Fächergrafik', menu:'Diagramm-Stamm', search:'Person suchen...', generations:'Anzahl der Generationen', back:'Einen Schritt zurück', pdf:'PDF speichern', menuTitle:'Menü', zoomOut:'Verkleinern', zoomIn:'Vergrößern', fit:'Ansicht anpassen', close:'Schließen', unknown:'Unbekannt', empty:'Der Stammbaum enthält keine Personen.', noAncestors:'Für diese Person sind keine Vorfahren erfasst.', noPrevious:'Es gibt keinen vorherigen Stamm.', d3Error:'Die D3.js-Bibliothek wurde nicht geladen. Prüfen Sie Ihre Internetverbindung.', pdfLibError:'Die PDF-Bibliothek wurde nicht geladen.', imageError:'Das Diagrammbild konnte nicht erstellt werden.' }
-};
-function ft(key) { return fanI18n[currentLang]?.[key] || fanI18n.sk[key] || key; }
-function updateFanChartLanguage() {
-  document.querySelectorAll('[data-fan-i18n]').forEach(el => { el.textContent = ft(el.getAttribute('data-fan-i18n')); });
-  document.querySelectorAll('[data-fan-i18n-ph]').forEach(el => { el.placeholder = ft(el.getAttribute('data-fan-i18n-ph')); });
-  document.querySelectorAll('[data-fan-i18n-title]').forEach(el => { el.title = ft(el.getAttribute('data-fan-i18n-title')); });
-  const modal = document.getElementById('fanChartModal');
-  if (modal && !modal.classList.contains('hidden')) fanRender(false);
-}
-
 let currentLang = 'sk';
 function t(key) { return i18n[currentLang][key] || key; }
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
@@ -669,7 +647,7 @@ function setLanguage(lang) {
     }
   });
   
-  updateCountsUI(); updateRecentListUI(); updateFanChartLanguage();
+  updateCountsUI(); updateRecentListUI();
   if(currentSelectedPersonId) selectPerson(currentSelectedPersonId, false);
   if(!document.getElementById('personEditModal').classList.contains('hidden')) openPersonEditor(document.getElementById('editPersonId').value);
   if(!document.getElementById('mediaModal').classList.contains('hidden')) openMediaLightbox(currentMediaTab);
@@ -954,7 +932,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
 
 function launchWorkspace() {
   dbConnection = null; updateDbStatusUI();
-  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); updateSidebarRootSurname();
+  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = treeData.fileName || "rodokmen.gdz";
   initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0], false);
 }
 function closeCurrentTree() {
@@ -2391,7 +2369,7 @@ const FAN = { r0: 72, ringW: 130, gens: 5, history: [], rootId: null, ready: fal
 const FAN_COL = { M: ['#d6c39b', '#cbb68c'], F: ['#e6cfae', '#dcc29b'], U: ['#ddd0b4', '#d2c3a3'] };
 const FAN_FONT = 'Georgia, "Times New Roman", serif';
 
-function fanName(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || ft('unknown'); }
+function fanName(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Neznámy'; }
 
 function fanDates(p) {
   const b = (p.birthDate || '').trim(), d = (p.deathDate || '').trim();
@@ -2483,16 +2461,18 @@ function fanLayoutText(n) {
   const mid = (n.a0 + n.a1) / 2, midDeg = mid * 180 / Math.PI;
   const R = (n.inner + n.outer) / 2;
   const span = n.a1 - n.a0;
-  const tangential = span * R >= 150;
   const nameFs = [0, 15, 14, 13, 12, 11, 11, 11, 11][n.gen] || 11;
   const lines = fanBuildLines(n.person, {
-    maxW: tangential ? span * R * 0.85 : FAN.ringW - 16,
-    avail: tangential ? FAN.ringW - 12 : span * n.inner * 0.9,
+    // Text is aligned radially (from the centre towards the circumference),
+    // so the available width is the thickness of the generation ring.
+    maxW: FAN.ringW - 16,
+    avail: span * R * 0.9,
     nameFs, childFamId: n.childFamId, maxPartners: 2, splitName: false
   });
-  const transform = tangential
-    ? `translate(${R * Math.sin(mid)},${-R * Math.cos(mid)}) rotate(${midDeg})`
-    : `rotate(${midDeg - 90}) translate(${R},0)` + (mid < 0 ? ' rotate(180)' : '');
+  // Place the label at the middle radius and rotate its baseline along the
+  // radius, not along the circular arc. Flip the left half for readability.
+  const flip = mid > Math.PI / 2 ? ' rotate(180)' : '';
+  const transform = `translate(${R * Math.sin(mid)},${-R * Math.cos(mid)}) rotate(${midDeg - 90})${flip}`;
   return { lines, transform };
 }
 
@@ -2525,14 +2505,14 @@ function fanRender(refit) {
   const root = treeData.persons[FAN.rootId];
   const titleEl = document.getElementById('fanChartTitle');
   if (!root) {
-    titleEl.textContent = ft('title');
+    titleEl.textContent = 'Vejárový graf';
     FAN.extent = FAN.r0 + FAN.ringW;
     g.append('text').attr('text-anchor', 'middle').attr('font-family', FAN_FONT).attr('font-size', 22).attr('fill', '#5c4328')
-      .text(ft('empty'));
+      .text('Rodokmeň neobsahuje žiadne osoby.');
     if (refit) fanChartFit(false);
     return;
   }
-  titleEl.textContent = ft('title') + ' – ' + fanName(root);
+  titleEl.textContent = 'Vejárový graf – ' + fanName(root);
 
   const nodes = fanBuildNodes(root);
   FAN.extent = FAN.r0 + Math.max(1, d3.max(nodes, n => n.gen) || 1) * FAN.ringW;
@@ -2560,7 +2540,7 @@ function fanRender(refit) {
   if (nodes.length === 0) {
     g.append('text').attr('y', -(FAN.r0 + 40)).attr('text-anchor', 'middle').attr('font-family', FAN_FONT)
       .attr('font-size', 18).attr('font-style', 'italic').attr('fill', '#5c4328')
-      .text(ft('noAncestors'));
+      .text('Osoba nemá zaevidovaných predkov.');
   }
   if (refit) fanChartFit(false);
 }
@@ -2581,12 +2561,9 @@ function fanChartZoomIn() { fanChartZoomBy(1.3); }
 function fanChartZoomOut() { fanChartZoomBy(1 / 1.3); }
 
 function fanDefaultRoot() {
+  if (currentSelectedPersonId && treeData.persons[currentSelectedPersonId]) return currentSelectedPersonId;
   const persons = Object.values(treeData.persons || {});
   if (!persons.length) return null;
-  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase();
-  const igorSklenčar = persons.find(p => norm(p.firstName || p.name).includes('igor') && norm(p.lastName || p.surname).includes('sklencar'));
-  if (igorSklenčar) return igorSklenčar.id;
-  if (currentSelectedPersonId && treeData.persons[currentSelectedPersonId]) return currentSelectedPersonId;
   let best = null, bestYear = Infinity;
   persons.forEach(p => { const m = String(p.birthDate || '').match(/(\d{4})/); if (m && +m[1] < bestYear) { bestYear = +m[1]; best = p; } });
   return (best || persons[0]).id;
@@ -2594,7 +2571,7 @@ function fanDefaultRoot() {
 
 function openFanChartModal() {
   const modal = document.getElementById('fanChartModal'); if (!modal) return;
-  if (typeof d3 === 'undefined') { showToast(ft('d3Error'), 'error'); return; }
+  if (typeof d3 === 'undefined') { showToast('Knižnica D3.js sa nenačítala. Skontrolujte pripojenie na internet.', 'error'); return; }
   modal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
   FAN.history = [];
@@ -2646,7 +2623,7 @@ function fanChartGoBack() {
     const id = FAN.history.pop();
     if (treeData.persons[id]) { FAN.rootId = id; document.getElementById('fanChartMenu').classList.add('hidden'); fanRender(true); return; }
   }
-  showToast(ft('noPrevious'), 'info');
+  showToast('Žiadny predchádzajúci koreň.', 'info');
 }
 
 function fanSetGens(v) {
@@ -2655,7 +2632,7 @@ function fanSetGens(v) {
 }
 
 async function saveFanChartPdf() {
-  if (!window.jspdf || !window.jspdf.jsPDF) { showToast(ft('pdfLibError'), 'error'); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF) { showToast('PDF knižnica sa nenačítala.', 'error'); return; }
   const svgEl = document.getElementById('fanSvg'); if (!svgEl || !FAN.rootId) return;
   try {
     const ext = FAN.extent, pad = 30, top = 28;
@@ -2679,7 +2656,7 @@ async function saveFanChartPdf() {
 
     const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
-    await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error(ft('imageError'))); img.src = url; });
+    await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error('Obrázok grafu sa nepodarilo vytvoriť.')); img.src = url; });
     const cv = document.createElement('canvas'); cv.width = Math.round(vbW * k); cv.height = Math.round(vbH * k);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     URL.revokeObjectURL(url);
@@ -2720,23 +2697,23 @@ setLanguage('sk');
     <!-- Horná lišta -->
     <div class="absolute top-0 left-0 right-0 z-20 h-14 bg-[#d2b48c]/95 border-b border-[#8b6b43] flex items-center justify-between px-3 gap-2">
       <div class="flex items-center gap-1">
-        <button onclick="toggleFanChartMenu()" data-fan-i18n-title="menuTitle" title="Menu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="toggleFanChartMenu()" title="Menu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-list text-xl"></i>
         </button>
-        <button onclick="fanChartZoomOut()" data-fan-i18n-title="zoomOut" title="Zmenšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartZoomOut()" title="Zmenšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-minus text-xl"></i>
         </button>
-        <button onclick="fanChartZoomIn()" data-fan-i18n-title="zoomIn" title="Zväčšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartZoomIn()" title="Zväčšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-plus text-xl"></i>
         </button>
-        <button onclick="fanChartFit(true)" data-fan-i18n-title="fit" title="Prispôsobiť pohľadu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartFit(true)" title="Prispôsobiť pohľadu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-corners-out text-xl"></i>
         </button>
       </div>
 
-      <div id="fanChartTitle" data-fan-i18n="title" class="text-[#4a3420] font-bold tracking-wide truncate text-sm sm:text-base">Vejárový graf</div>
+      <div id="fanChartTitle" class="text-[#4a3420] font-bold tracking-wide truncate text-sm sm:text-base">Vejárový graf</div>
 
-      <button onclick="closeFanChartModal()" data-fan-i18n-title="close" title="Zavrieť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center flex-shrink-0">
+      <button onclick="closeFanChartModal()" title="Zavrieť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center flex-shrink-0">
         <i class="ph-bold ph-x text-xl"></i>
       </button>
     </div>
@@ -2744,22 +2721,22 @@ setLanguage('sk');
     <!-- Hamburger menu -->
     <div id="fanChartMenu" class="hidden absolute top-14 left-3 z-30 w-72 max-w-[calc(100%-1.5rem)] bg-[#f1e2c2] border-2 border-[#8b6b43] rounded-xl shadow-xl p-3 space-y-3">
       <div>
-        <div data-fan-i18n="menu" class="text-[11px] font-bold uppercase tracking-wider text-[#6b4f2f] mb-1.5">Koreň diagramu</div>
-        <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" data-fan-i18n-ph="search" placeholder="Hľadať osobu..." class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-[#6b4f2f] mb-1.5">Koreň diagramu</div>
+        <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" placeholder="Hľadať osobu..." class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
         <div id="fanRootList" class="mt-1.5 max-h-56 overflow-y-auto custom-scroll space-y-0.5"></div>
       </div>
       <div class="flex items-center justify-between gap-2">
-        <label for="fanGensSelect" data-fan-i18n="generations" class="text-xs font-semibold text-[#4a3420]">Počet generácií</label>
+        <label for="fanGensSelect" class="text-xs font-semibold text-[#4a3420]">Počet generácií</label>
         <select id="fanGensSelect" onchange="fanSetGens(this.value)" class="px-2 py-1.5 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420]">
           <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
         </select>
       </div>
       <div class="border-t border-[#c9a96e] pt-2 space-y-0.5">
         <button onclick="fanChartGoBack()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
-          <i class="ph-bold ph-arrow-left text-lg"></i> <span data-fan-i18n="back">Späť o jeden krok</span>
+          <i class="ph-bold ph-arrow-left text-lg"></i> Späť o jeden krok
         </button>
         <button onclick="saveFanChartPdf()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
-          <i class="ph-bold ph-file-pdf text-lg"></i> <span data-fan-i18n="pdf">Uložiť PDF</span>
+          <i class="ph-bold ph-file-pdf text-lg"></i> Uložiť PDF
         </button>
       </div>
     </div>
