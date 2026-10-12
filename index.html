@@ -127,14 +127,7 @@
           <i class="ph-bold ph-tree-structure text-indigo-600 text-xl sm:text-2xl"></i>
           <span class="text-lg sm:text-xl font-black tracking-tight text-slate-900">Genealogy</span>
         </div>
-        <div class="mt-1 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[210px]" title="Aktuálny súbor">
-          <i class="ph ph-file-archive text-indigo-500"></i>
-          <span id="sidebarFileName" class="truncate font-mono">rodokmen.gdz</span>
-        </div>
-        <div id="sidebarDbStatus" class="hidden mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 font-medium truncate max-w-[210px]">
-          <i class="ph-bold ph-plugs-connected"></i>
-          <span id="sidebarDbHost" class="truncate font-mono"></span>
-        </div>
+        <div id="sidebarRootSurname" class="mt-1 text-sm sm:text-base font-bold tracking-tight text-indigo-700 truncate max-w-[230px]" title="Priezvisko koreňovej osoby"></div>
       </div>
       <div class="flex items-center gap-1">
         <button onclick="toggleLeftSidebar()" class="md:hidden text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 bg-slate-50">
@@ -551,6 +544,23 @@ initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1
 });
 
 // --- MOBILNÉ TOGGLE FUNKCIE ---
+
+function updateSidebarRootSurname() {
+  const el = document.getElementById('sidebarRootSurname');
+  if (!el) return;
+  const persons = Object.values((treeData && treeData.persons) || {});
+  if (!persons.length) { el.textContent = ''; return; }
+  let root = null, earliest = Infinity;
+  for (const person of persons) {
+    const match = String(person.birthDate || '').match(/(\d{4})/);
+    if (match && Number(match[1]) < earliest) { earliest = Number(match[1]); root = person; }
+  }
+  root = root || persons[0];
+  const surname = String(root.lastName || root.surname || '').trim();
+  el.textContent = surname || String(root.firstName || root.name || '').trim() || 'Rodokmeň';
+  el.title = surname ? ('Rodokmeň rodu ' + surname) : 'Koreňová osoba rodokmeňa';
+}
+
 function toggleLeftSidebar() { document.getElementById('leftSidebar').classList.toggle('-translate-x-full'); }
 function openPersonPanelMobile() { document.getElementById('personDetailPanel').classList.remove('translate-x-full'); }
 function closePersonPanelMobile() { document.getElementById('personDetailPanel').classList.add('translate-x-full'); }
@@ -947,7 +957,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
 
 function launchWorkspace() {
   dbConnection = null; updateDbStatusUI();
-  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = treeData.fileName || "rodokmen.gdz";
+  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); updateSidebarRootSurname();
   initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0], false);
 }
 function closeCurrentTree() {
