@@ -127,9 +127,10 @@
           <i class="ph-bold ph-tree-structure text-indigo-600 text-xl sm:text-2xl"></i>
           <span class="text-lg sm:text-xl font-black tracking-tight text-slate-900">Genealogy</span>
         </div>
-        <div class="mt-1 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[210px]" title="Aktuálny súbor">
-          <i class="ph ph-file-archive text-indigo-500"></i>
-          <span id="sidebarFileName" class="truncate font-mono">rodokmen.gdz</span>
+        <div id="sidebarFamilyName" class="mt-1 text-xs sm:text-sm text-indigo-700 font-bold truncate max-w-[230px]">Rodina Sklenčar</div>
+        <div class="mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[230px]" title="Aktuálny zdroj údajov">
+          <i class="ph ph-database text-indigo-500"></i>
+          <span id="sidebarFileName" class="truncate">rodokmen.gdz</span>
         </div>
         <div id="sidebarDbStatus" class="hidden mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 font-medium truncate max-w-[210px]">
           <i class="ph-bold ph-plugs-connected"></i>
@@ -146,28 +147,22 @@
       </div>
     </div>
 
-    <!-- NOVÁ ČASŤ - OTVORIŤ (NAČÍTAŤ) SÚBOR -->
-    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 flex flex-col gap-2">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 pl-0.5" data-i18n="lblImportSidebar">Otvoriť iný súbor</div>
-      <div class="flex gap-2">
-        <button onclick="document.getElementById('fileInput').click()" class="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 shadow-sm text-[10px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 transition">
-          <i class="ph-bold ph-file-archive text-indigo-600 text-sm"></i> <span data-i18n="btnLoadGed">GDZ Archív</span>
-        </button>
-        <button onclick="openSqliteDirectory()" class="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 shadow-sm text-[10px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 transition">
-          <i class="ph-bold ph-folder-open text-blue-600 text-sm"></i> <span data-i18n="btnLoadSqlite">SQLite Zložka</span>
-        </button>
+    <!-- Hamburger menu for local file operations -->
+    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 relative">
+      <button type="button" onclick="toggleFileMenu()" aria-expanded="false" id="fileMenuButton" class="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-100">
+        <i class="ph-bold ph-list text-lg"></i> Menu
+      </button>
+      <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
+        <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i>Otvoriť zložku Gedzip</button>
+        <button onclick="closeFileMenu();openSqliteDirectory()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-database mr-2 text-blue-600"></i>Otvoriť zložku SQL</button>
+        <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i>Uložiť súbor Gedzip</button>
+        <button onclick="closeFileMenu();saveSqliteTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-database mr-2 text-blue-600"></i>Uložiť súbor SQL</button>
       </div>
     </div>
 
     <div class="p-3.5 space-y-2 border-b border-slate-100">
       <button onclick="openPersonEditor(null)" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-user-plus text-sm"></i> <span data-i18n="btnAddPerson">1. Pridať osobu</span>
-      </button>
-      <button onclick="saveGedzipTree()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
-        <i class="ph-bold ph-floppy-disk text-sm"></i> <span data-i18n="btnSaveGdz">2. Uložiť rodokmeň (.gdz)</span>
-      </button>
-      <button onclick="saveSqliteTree()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
-        <i class="ph-bold ph-database text-sm"></i> <span data-i18n="btnSaveSqlite">3. Uložiť zložku SQLite</span>
       </button>
       <button onclick="saveToServer()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-cloud-arrow-up text-sm"></i> <span data-i18n="btnSaveServer">4. Zapísať na server (SQL)</span>
@@ -930,9 +925,42 @@ function parseGedcomString(text, fileName, attachedFiles) {
   recentEditedIds = Object.keys(persons).slice(0, 5); launchWorkspace(); autoLayoutTree(true); showToast(t('msgReadOk').replace('{X}', Object.keys(persons).length), "success");
 }
 
+function toggleFileMenu() {
+  const panel = document.getElementById('fileMenuPanel');
+  const button = document.getElementById('fileMenuButton');
+  panel.classList.toggle('hidden');
+  button.setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
+}
+function closeFileMenu() {
+  const panel = document.getElementById('fileMenuPanel');
+  const button = document.getElementById('fileMenuButton');
+  if (panel) panel.classList.add('hidden');
+  if (button) button.setAttribute('aria-expanded', 'false');
+}
+function updateSidebarTreeLabels() {
+  const people = Object.values(treeData.persons || {});
+  // The family name is based on the genealogy founder, Igor Sklencar.
+  const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  let root = people.find(person => norm(person.firstName) === 'igor' && norm(person.lastName) === 'sklencar');
+  if (!root) root = people.find(person => norm(person.firstName) === 'igor' && [person.lastName, person.birthName].some(name => norm(name) === 'sklencar'));
+  // Safe fallback for a different tree that does not contain Igor Sklencar.
+  if (!root) {
+    let earliest = Infinity;
+    for (const person of people) {
+      const match = String(person.birthDate || '').match(/(\d{4})/);
+      if (match && Number(match[1]) < earliest) { earliest = Number(match[1]); root = person; }
+    }
+    if (!root) root = people[0] || null;
+  }
+  const surname = root ? (root.lastName || root.birthName || '').trim() : '';
+  const familyLabel = document.getElementById('sidebarFamilyName');
+  if (familyLabel) familyLabel.textContent = 'Rodina' + (surname ? ' ' + surname : '');
+  const fileLabel = document.getElementById('sidebarFileName');
+  if (fileLabel) fileLabel.textContent = dbConnection ? 'SQL server' : (treeData.fileName || 'rodokmen.gdz');
+}
 function launchWorkspace() {
   dbConnection = null; updateDbStatusUI();
-  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = treeData.fileName || "rodokmen.gdz";
+  document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = dbConnection ? "SQL server" : (treeData.fileName || "rodokmen.gdz"); updateSidebarTreeLabels();
   initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0], false);
 }
 function closeCurrentTree() {
@@ -1882,7 +1910,7 @@ async function saveGedzipTree() {
       try {
         const fileHandle = await window.showSaveFilePicker({ suggestedName: defaultName, types: [{ description: 'GEDZIP Archív', accept: { 'application/zip': ['.gdz', '.gedzip', '.zip'] } }], });
         const writable = await fileHandle.createWritable(); await writable.write(content); await writable.close();
-        treeData.fileName = fileHandle.name; document.getElementById('sidebarFileName').innerText = treeData.fileName; showToast(t('msgGdzOk'), "success"); return;
+        treeData.fileName = fileHandle.name; updateSidebarTreeLabels(); showToast(t('msgGdzOk'), "success"); return;
       } catch (err) { if (err.name === 'AbortError') return; }
     }
 
