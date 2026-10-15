@@ -226,7 +226,6 @@
       <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
         <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i>Otvoriť zložku Gedzip</button>
         <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i>Uložiť súbor Gedzip</button>
-        <button id="btnAiInvestigative" onclick="closeFileMenu();openAiModal()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-robot mr-2 text-indigo-600"></i>AI investigatíva</button>
         <div id="adminMenuSection" class="hidden pt-1 mt-1 border-t border-slate-200">
           <button id="btnInviteUser" onclick="closeFileMenu();inviteGenealogyUser()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-envelope-simple mr-2 text-emerald-600"></i>Pozvať používateľa</button>
         </div>
@@ -468,8 +467,21 @@
         <div class="p-4 sm:p-6 bg-slate-50 min-h-[220px]">
           <!-- MEDIA -->
           <div id="editTabMediaContent" class="space-y-3 block">
-            <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabMediaTitle">Priložené fotografie a dokumenty</h4>
-            <div id="attachedFilesList" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+              <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabMediaTitle">Priložené fotografie a dokumenty</h4>
+              <div class="flex gap-2 flex-wrap sm:flex-nowrap">
+                <label class="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 shadow-sm text-[10px] sm:text-xs">
+                  <i class="ph-bold ph-image"></i> <span data-i18n="btnUploadPhoto">Nahrať foto</span>
+                  <input type="file" multiple class="hidden" accept="image/*" onchange="handleSpecificFilesAttach(this, 'photo')">
+                </label>
+                <label class="cursor-pointer px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-sm text-[10px] sm:text-xs">
+                  <i class="ph-bold ph-file-text"></i> <span data-i18n="btnUploadDoc">Nahrať dokument</span>
+                  <input type="file" multiple class="hidden" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx" onchange="handleSpecificFilesAttach(this, 'doc')">
+                </label>
+              </div>
+            </div>
+            <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabMediaDesc">Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonom titulnú fotku)</p>
+            <div id="attachedFilesList" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
           </div>
           <!-- EVENTS -->
           <div id="editTabEventsContent" class="space-y-3 hidden">
@@ -544,25 +556,6 @@
       <button type="button" id="btnConfirmCancel" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition" data-i18n="btnCancel">Zrušiť</button>
       <button type="button" id="btnConfirmOk" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition shadow-sm" data-i18n="btnDelete">Odstrániť</button>
     </div>
-  </div>
-</div>
-
-<!-- GALÉRIA: úprava médií / dokumentov -->
-<div id="mediaEditModal" class="fixed inset-0 z-[55] bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-2 sm:p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
-    <div class="px-3 sm:px-5 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
-      <h3 id="mediaEditTitle" class="text-base sm:text-lg font-bold text-slate-800 truncate"></h3>
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="galleryDeleteSelected()" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-trash text-base"></i><span id="mediaTrashLbl">Kôš</span></button>
-        <button type="button" onclick="gallerySave()" class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-check text-base"></i><span id="mediaSaveLbl">Uložiť</span></button>
-        <button type="button" onclick="closeMediaGallery()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200"><i class="ph-bold ph-x text-lg"></i></button>
-      </div>
-    </div>
-    <div class="px-3 sm:px-5 py-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-      <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-600"><input type="checkbox" id="mediaSelectAll" onchange="gallerySelectAll(this.checked)" class="w-4 h-4 accent-indigo-600"><span id="mediaSelectAllLbl">Označiť všetko</span></label>
-      <label class="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-plus"></i><span id="mediaAddLbl">Pridať</span><input id="mediaAddInput" type="file" multiple class="hidden" onchange="galleryHandleFiles(this)"></label>
-    </div>
-    <div id="mediaEditGrid" class="p-3 sm:p-5 overflow-y-auto custom-scroll grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 flex-1"></div>
   </div>
 </div>
 
@@ -727,7 +720,6 @@ const LAYOUT = { bw: 200, bh: 72, gapX: 40, gapY: 48, spouseGap: 110 };
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
 let treeVersion = 0;
-let originalTreeData = null;
 // Pôvod aktuálneho rodokmeňa: 'server' = načítaný zo servera (možno ukladať na server aj do GEDZIP), 'local' = lokálny súbor/ukážka/nový (iba lokálne ukladanie)
 let treeSource = 'local';
 let hydratePromise = null;
@@ -776,7 +768,6 @@ function loadSampleTree() {
   p3.fams = ["@F2@"]; p4.fams = ["@F2@"]; p5.famc = "@F2@"; p6.famc = "@F2@";
 
   treeData = { fileName: "Ukazkovy_Rodokmen.gdz", persons: { "@I1@": p1, "@I2@": p2, "@I3@": p3, "@I4@": p4, "@I5@": p5, "@I6@": p6 }, families: { "@F1@": fam1, "@F2@": fam2 }, files: {} };
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@", "@I2@", "@I3@", "@I4@", "@I5@"];
   launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success");
 }
@@ -784,7 +775,6 @@ function loadSampleTree() {
 function createNewTree() {
   const p1 = createPersonObj("@I1@", "", "Zakladateľ", "Rodiny", "M", "01.01.1970", "Bratislava", "Slovensko", "", ""); p1.x = 400; p1.y = 120;
   treeData = { fileName: "Novy_Rodokmen.gdz", persons: { "@I1@": p1 }, families: {}, files: {} };
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success");
 }
 
@@ -855,7 +845,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
           else if (tagOrId === "NOTE") { currentEntity.notes.push(value); }
           else if (tagOrId === "OBJE") { currentEntity._obje = currentEntity._obje || []; currentEntity._obje.push({ file: "", main: false }); }
         } else if (level === 2) {
-          if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); else if (tagOrId === "TITL") lo.title = value; }
+          if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); }
           else if (currentSubTag === "NOTE" && (tagOrId === "CONT" || tagOrId === "CONC") && currentEntity.notes.length) { currentEntity.notes[currentEntity.notes.length - 1] += (tagOrId === "CONT" ? "\n" : "") + value; }
           else if (currentSubTag === "BIRT") { if (tagOrId === "DATE") currentEntity.birthDate = value; if (tagOrId === "PLAC") currentEntity.birthPlace = value; } 
           else if (currentSubTag === "DEAT") { if (tagOrId === "DATE") currentEntity.deathDate = value; if (tagOrId === "PLAC") currentEntity.deathPlace = value; } 
@@ -877,8 +867,6 @@ function parseGedcomString(text, fileName, attachedFiles) {
             if (tagOrId === "TYPE" && currentSubTag === "EDUC") { if (value.toLowerCase().includes("základná") || value.toLowerCase().includes("elementary")) lastEv.type = "EDUC_ZS"; else if (value.toLowerCase().includes("stredná") || value.toLowerCase().includes("high")) lastEv.type = "EDUC_SS"; else if (value.toLowerCase().includes("vysoká") || value.toLowerCase().includes("uni")) lastEv.type = "EDUC_VS"; }
             if (tagOrId === "TYPE" && currentSubTag === "EVEN") lastEv.title = value;
           }
-        } else if (level === 3 && currentSubTag === "OBJE" && tagOrId === "TITL" && currentEntity._obje && currentEntity._obje.length) {
-          currentEntity._obje[currentEntity._obje.length - 1].title = value;
         }
       } else if (currentEntity.husbandId !== undefined) {
         if (level === 1) { currentSubTag = tagOrId; if (tagOrId === "HUSB") currentEntity.husbandId = value; else if (tagOrId === "WIFE") currentEntity.wifeId = value; else if (tagOrId === "CHIL") currentEntity.children.push(value); } 
@@ -895,8 +883,8 @@ function parseGedcomString(text, fileName, attachedFiles) {
       const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext);
       const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
       const uid = Math.random().toString(36).slice(2, 9);
-      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main, caption: ref.title || '' });
-      else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext, caption: ref.title || '' });
+      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main });
+      else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext });
     });
     if (per.photos.length && !per.photos.some(ph => ph.isMain)) per.photos[0].isMain = true;
   });
@@ -1562,7 +1550,6 @@ function handleSpecificFilesAttach(input, targetType) {
         data: e.target.result, 
         type: isPhoto ? 'photo' : ext, 
         isTargetType: targetType,
-        caption: '',
         isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain) 
       }); 
       renderAttachedFilesList(); 
@@ -1572,136 +1559,13 @@ function handleSpecificFilesAttach(input, targetType) {
   input.value = "";
 }
 
-function captionPlaceholder() {
-  return ({ sk: 'Popis (zobrazí sa pod súborom)...', cs: 'Popis (zobrazí se pod souborem)...', en: 'Caption (shown below the file)...', de: 'Beschreibung (unter der Datei angezeigt)...' })[currentLang] || 'Popis...';
-}
-const GALLERY_I18N = {
-  sk: { editMedia: 'Upraviť média', editDocs: 'Upraviť dokumenty', trash: 'Kôš', save: 'Uložiť', addPhotos: 'Pridať fotografie', addDocs: 'Pridať dokumenty', selectAll: 'Označiť všetko', confirmDeleteN: 'Naozaj chcete odstrániť označené súbory ({N})?', nothingSelected: 'Najprv označte súbory, ktoré chcete zmazať.', deletedHint: 'Súbory boli odstránené. Zmeny potvrďte tlačidlom Uložiť.', setMain: 'Nastaviť ako hlavnú fotografiu', noMain: 'Bez fotografie', noDoc: 'Žiadny dokument', photosN: 'Fotografií', docsN: 'Dokumentov', empty: 'Zatiaľ žiadne súbory.' },
-  cs: { editMedia: 'Upravit média', editDocs: 'Upravit dokumenty', trash: 'Koš', save: 'Uložit', addPhotos: 'Přidat fotografie', addDocs: 'Přidat dokumenty', selectAll: 'Označit vše', confirmDeleteN: 'Opravdu chcete odstranit označené soubory ({N})?', nothingSelected: 'Nejprve označte soubory, které chcete smazat.', deletedHint: 'Soubory byly odstraněny. Změny potvrďte tlačítkem Uložit.', setMain: 'Nastavit jako hlavní fotografii', noMain: 'Bez fotografie', noDoc: 'Žádný dokument', photosN: 'Fotografií', docsN: 'Dokumentů', empty: 'Zatím žádné soubory.' },
-  en: { editMedia: 'Edit media', editDocs: 'Edit documents', trash: 'Trash', save: 'Save', addPhotos: 'Add photos', addDocs: 'Add documents', selectAll: 'Select all', confirmDeleteN: 'Do you really want to delete the selected files ({N})?', nothingSelected: 'Select the files you want to delete first.', deletedHint: 'Files removed. Confirm the changes with the Save button.', setMain: 'Set as main photo', noMain: 'No photo', noDoc: 'No document', photosN: 'Photos', docsN: 'Documents', empty: 'No files yet.' },
-  de: { editMedia: 'Medien bearbeiten', editDocs: 'Dokumente bearbeiten', trash: 'Papierkorb', save: 'Speichern', addPhotos: 'Fotos hinzufügen', addDocs: 'Dokumente hinzufügen', selectAll: 'Alle auswählen', confirmDeleteN: 'Möchten Sie die ausgewählten Dateien ({N}) wirklich löschen?', nothingSelected: 'Wählen Sie zuerst die zu löschenden Dateien aus.', deletedHint: 'Dateien entfernt. Bestätigen Sie die Änderungen mit Speichern.', setMain: 'Als Hauptfoto festlegen', noMain: 'Kein Foto', noDoc: 'Kein Dokument', photosN: 'Fotos', docsN: 'Dokumente', empty: 'Noch keine Dateien.' }
-};
-function gt(k) { return (GALLERY_I18N[currentLang] && GALLERY_I18N[currentLang][k]) || GALLERY_I18N.sk[k] || k; }
-function isPhotoFile(f) { return f.isTargetType ? f.isTargetType === 'photo' : (f.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(f.type)); }
-
-// Tab „Médiá a Docs“: iba hlavná fotografia a prvý dokument + tlačidlá na úpravu
 function renderAttachedFilesList() {
-  const list = document.getElementById('attachedFilesList'); if (!list) return;
-  const photos = tempAttachedFiles.filter(isPhotoFile), docs = tempAttachedFiles.filter(f => !isPhotoFile(f));
-  const main = photos.find(f => f.isMain) || photos[0], doc = docs[0];
-  const photoBox = main && main.data ? `<img src="${main.data}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
-  const docBox = doc ? `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-3xl"></i><span class="font-bold uppercase text-[10px]">${esc(doc.type)}</span></div>` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-file-text text-3xl"></i><span class="text-[11px]">${esc(gt('noDoc'))}</span></div>`;
-  list.innerHTML = `
-    <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
-      <div class="h-36 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">${photoBox}</div>
-      <p class="text-[11px] text-slate-600 min-h-[16px] break-words">${main && main.caption ? esc(main.caption) : ''}</p>
-      <p class="text-[10px] text-slate-400">${esc(gt('photosN'))}: ${photos.length}</p>
-      <button type="button" onclick="openMediaGallery('photo')" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5"><i class="ph-bold ph-images"></i> ${esc(gt('editMedia'))}</button>
-    </div>
-    <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
-      <div class="h-36 rounded-xl bg-amber-50 overflow-hidden flex items-center justify-center">${docBox}</div>
-      <p class="text-[11px] text-slate-600 min-h-[16px] break-words">${doc && doc.caption ? esc(doc.caption) : ''}</p>
-      <p class="text-[10px] text-slate-400">${esc(gt('docsN'))}: ${docs.length}</p>
-      <button type="button" onclick="openMediaGallery('doc')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5"><i class="ph-bold ph-file-text"></i> ${esc(gt('editDocs'))}</button>
-    </div>`;
-}
-
-// ---- Galéria (okno na úpravu médií / dokumentov) ----
-let galleryType = 'photo', galleryItems = [], gallerySelected = new Set();
-function openMediaGallery(type) {
-  galleryType = type;
-  galleryItems = tempAttachedFiles.filter(f => (type === 'photo') === isPhotoFile(f)).map(f => Object.assign({}, f));
-  gallerySelected = new Set();
-  document.getElementById('mediaEditTitle').innerText = gt(type === 'photo' ? 'editMedia' : 'editDocs');
-  document.getElementById('mediaTrashLbl').innerText = gt('trash');
-  document.getElementById('mediaSaveLbl').innerText = gt('save');
-  document.getElementById('mediaSelectAllLbl').innerText = gt('selectAll');
-  document.getElementById('mediaAddLbl').innerText = gt(type === 'photo' ? 'addPhotos' : 'addDocs');
-  document.getElementById('mediaAddInput').accept = type === 'photo' ? 'image/*' : '.pdf,.doc,.docx,.txt,.xls,.xlsx';
-  document.getElementById('mediaSelectAll').checked = false;
-  document.getElementById('mediaEditModal').classList.remove('hidden');
-  renderMediaGallery();
-}
-function closeMediaGallery() { gallerySave(); }
-function renderMediaGallery() {
-  const grid = document.getElementById('mediaEditGrid');
-  if (!galleryItems.length) { grid.innerHTML = `<div class="col-span-full text-center text-slate-400 italic py-10 text-sm">${esc(gt('empty'))}</div>`; return; }
-  const isPh = galleryType === 'photo';
-  grid.innerHTML = galleryItems.map(f => {
-    const sel = gallerySelected.has(f.id);
-    const body = isPh
-      ? (f.data ? `<img src="${f.data}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
-      : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
-    const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
-    return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
-      <div class="relative aspect-square rounded-xl overflow-hidden ${isPh ? 'bg-slate-100' : 'bg-amber-50'} flex items-center justify-center">
-        ${body}
-        <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
-        ${star}
-      </div><input type="text" maxlength="300" data-id="${f.id}" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" onchange="galleryCaption('${f.id}', this.value)" onkeyup="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
-      </div>`;
-  }).join('');
-  document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
-}
-function updatePhotoCaptionDirect(id, value) {
-  const cleanVal = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300);
-  // Aktualizuje v galérii
-  const f = galleryItems.find(x => x.id === id);
-  if (f) f.caption = cleanVal;
-  // Okamžite aktualizuje aj v hlavnom zozname priložených súborov osoby
-  const tf = tempAttachedFiles.find(x => x.id === id);
-  if (tf) tf.caption = cleanVal;
-}
-function galleryCaption(id, value) { const f = galleryItems.find(x => x.id === id); if (f) f.caption = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300); }
-function galleryToggle(id, on) { if (on) gallerySelected.add(id); else gallerySelected.delete(id); renderMediaGallery(); }
-function gallerySelectAll(on) { gallerySelected = on ? new Set(galleryItems.map(f => f.id)) : new Set(); renderMediaGallery(); }
-function galleryMakeMain(id) { galleryItems.forEach(f => { f.isMain = (f.id === id); }); renderMediaGallery(); }
-function galleryDeleteSelected() {
-  if (gallerySelected.size === 0) { showToast(gt('nothingSelected'), 'error'); return; }
-  showConfirm(t('confirmTitle'), gt('confirmDeleteN').replace('{N}', gallerySelected.size), () => {
-    galleryItems = galleryItems.filter(f => !gallerySelected.has(f.id));
-    gallerySelected = new Set();
-    if (galleryType === 'photo' && galleryItems.length && !galleryItems.some(f => f.isMain)) galleryItems[0].isMain = true;
-    renderMediaGallery(); showToast(gt('deletedHint'), 'info');
+  const list = document.getElementById('attachedFilesList'); list.innerHTML = "";
+  if (tempAttachedFiles.length === 0) { list.innerHTML = `<span class="text-slate-400 italic text-[11px] col-span-2 p-2">${t('tNoFiles')}</span>`; return; }
+  tempAttachedFiles.forEach(file => {
+    const isPhoto = (file.isTargetType === 'photo' || file.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(file.type));
+    list.innerHTML += `<div class="flex items-center justify-between p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs"><div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${file.type}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${esc(file.name)}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div><button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="ph-bold ph-trash"></i></button></div>`;
   });
-}
-async function galleryHandleFiles(input) {
-  const files = Array.from(input.files || []); if (!files.length) return;
-  const isPh = galleryType === 'photo';
-  for (const file of files) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`Súbor "${file.name}" ${t('tFileBanned')}`, 'error'); continue; }
-    const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = e => ok(e.target.result); r.onerror = no; r.readAsDataURL(file); });
-    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: file.name, data, type: isPh ? 'photo' : ext, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
-  }
-  input.value = '';
-  renderMediaGallery();
-}
-function gallerySave() {
-  // Ručne prejdeme všetky inputy v mriežke galérie a aktualizujeme popisy
-  const gridInputs = document.querySelectorAll('#mediaEditGrid input[type="text"]');
-  gridInputs.forEach(input => {
-    // Nájdeme element podľa štruktúry alebo uloženej hodnoty
-    // Alternatívne: prejdeme položené items v galleryItems
-  });
-
-  // Bezpečné prenesenie údajov z galleryItems do tempAttachedFiles
-  galleryItems.forEach(item => {
-    const matchingInput = document.querySelector(`#mediaEditGrid input[data-id="${item.id}"]`);
-    // Ak input existuje, vytiahneme aktuálny text priamo z DOM políčka
-  });
-
-  // Štandardné zlúčenie a uloženie
-  const others = tempAttachedFiles.filter(f => (galleryType === 'photo') !== isPhotoFile(f));
-  const mine = galleryItems.map(f => Object.assign({}, f, { isTargetType: galleryType }));
-  if (galleryType === 'photo') {
-    let seen = false; mine.forEach(f => { if (f.isMain && !seen) seen = true; else f.isMain = false; });
-    if (mine.length && !seen) mine[0].isMain = true;
-  } else mine.forEach(f => { f.isMain = false; });
-  
-  tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
-  document.getElementById('mediaEditModal').classList.add('hidden');
-  renderAttachedFilesList();
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
 function removeTempFile(fileId) { 
@@ -1820,7 +1684,7 @@ function showPhotoSlider() {
   isMosaicActive = false; document.getElementById('mosaicBtnText').innerText = t('btnMosaic'); document.getElementById('photoSliderView').classList.remove('hidden'); document.getElementById('photoMosaicView').classList.add('hidden');
   const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { document.getElementById('activePhotoImg').src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
-  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : ''; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
+  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerText = `${cur.name} ${cur.isMain ? t('tMainPhLbl') : ''}`; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
 }
 
 function nextPhoto() { const p = treeData.persons[activeMediaPersonId]; if (!p || !p.photos.length) return; currentPhotoIndex = (currentPhotoIndex + 1) % p.photos.length; showPhotoSlider(); }
@@ -1831,13 +1695,13 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${esc(ph.name)}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${esc(doc.name)}</h4><p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
@@ -1904,8 +1768,8 @@ async function saveGedzipTreeInternal() {
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
 
-      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
-      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${dc.caption ? '3 TITL ' + String(dc.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
     });
 
     Object.keys(treeData.families).forEach(oldFamId => {
@@ -2264,7 +2128,7 @@ async function uploadPendingFiles(session) {
   }
 }
 
-function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, key: f.key, mime: f.mime || '', size: f.size || 0 }; }
 
 // Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
 async function hydrateFiles(session) {
@@ -2421,7 +2285,6 @@ function loadTreeFromServer(data, session) {
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
   treeSource = 'server'; updateSourceUI();
@@ -2830,423 +2693,5 @@ setLanguage('sk');
   </div>
 </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-<!-- AI MODAL -->
-<div id="aiModal" class="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 font-sans">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
-    
-    <!-- Hlavička -->
-    <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
-          <i class="ph-bold ph-robot text-2xl"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-slate-800 tracking-tight">Open-Genealogy AI Analýza</h3>
-          <p class="text-[11px] text-slate-500">Expertiak FAN Cluster a matrík (v9)</p>
-        </div>
-      </div>
-      <button onclick="closeAiModal()" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200 transition">
-        <i class="ph-bold ph-x text-xl"></i>
-      </button>
-    </div>
-
-    <!-- Telo modálu -->
-    <div class="flex-1 overflow-y-auto p-5 custom-scroll space-y-5">
-      
-      <!-- Nastavenie kľúča -->
-      
-      <!-- Nastavenie kľúča a modelu -->
-      <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl mb-4 text-[0.85rem]">
-        <div class="flex gap-3 items-center flex-wrap mb-2">
-          <label for="ogGeminiKey" class="font-semibold text-emerald-800 uppercase tracking-wider text-[11px] w-full sm:w-auto">Sem zapiš osobný Gemini API kľúč:</label>
-          <div class="relative flex-grow flex items-center gap-2">
-            <div class="relative flex-grow">
-               <i class="ph-bold ph-key absolute left-3 top-2 text-emerald-500"></i>
-               <input type="password" id="ogGeminiKey" placeholder="AIzaSy..." class="w-full pl-9 pr-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 transition" oninput="handleKeyChange(this)">
-            </div>
-            
-            <div class="relative group cursor-help flex-shrink-0">
-              <span class="flex items-center justify-center bg-emerald-700 text-white w-5 h-5 rounded-full text-xs font-bold shadow-sm">?</span>
-              <div class="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute z-50 right-0 sm:-right-2 top-full mt-2 w-64 sm:w-72 bg-slate-800 text-white text-left rounded-xl p-3 shadow-xl transition-all duration-200 font-normal leading-relaxed text-xs">
-                Ak chcete využívať umelú inteligenciu na hľadanie väzieb v matrikách, vložte do políčka tento kód: <strong>[VÁŠ_KĽÚČ]</strong>.<br><br>
-                Kód stačí vložiť raz pri otvorení stránky, po zatvorení sa sám vymaže.<br><br>
-                🔑 Nový kľúč si môžete vygenerovať bezplatne v 
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-300 font-bold hover:underline">Google AI Studio</a>.
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="flex gap-3 items-center flex-wrap border-t border-emerald-200/50 pt-2">
-          <label for="ogModelSelect" class="font-semibold text-emerald-800 uppercase tracking-wider text-[11px] w-full sm:w-auto">Verzia AI modelu:</label>
-          <select id="ogModelSelect" class="flex-grow pl-2 pr-8 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700">
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Najnovší rýchly model)</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Detailnejší expertný model)</option>
-            <option value="gemini-3.5-flash">Gemini 3.5 Flash (Stabilný)</option>
-            <option value="gemini-flash-latest" selected>Gemini Flash Latest (Predvolený)</option>
-            <option value="gemini-pro-latest">Gemini Pro Latest (Najlepší dostupný Pro)</option>
-            <option value="gemma-4-31b-it">Gemma 4 31B IT</option>
-          </select>
-        </div>
-        
-        <div id="keyStatus" class="text-emerald-700 text-[11px] mt-1.5 font-medium min-h-[16px]"></div>
-      </div>
-
-
-      <!-- Výber osoby pre analýzu s vyhľadávaním -->
-      <div class="relative">
-        <label for="aiPersonSearch" class="block text-xs font-bold text-slate-700 mb-2">Vyberte osobu na analýzu (hľadajte meno alebo rok):</label>
-        <div class="relative">
-          <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
-          <input type="text" id="aiPersonSearch" autocomplete="off" placeholder="Začnite písať meno, priezvisko alebo rok..." class="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition" oninput="handleAiPersonSearch(this.value)" onfocus="handleAiPersonSearch(this.value)">
-          <button id="clearAiSearchBtn" onclick="clearAiSearch()" class="hidden absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
-            <i class="ph-bold ph-x text-sm"></i>
-          </button>
-        </div>
-        <!-- Vyskakovací zoznam s výsledkami -->
-        <div id="aiSearchResults" class="hidden absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto custom-scroll"></div>
-        <input type="hidden" id="aiPersonSelect" onchange="updateAiPersonPreview()">
-      </div>
-
-      <!-- Dáta, ktoré sa pošlú AI -->
-      <div id="aiPreviewBox" class="hidden mt-4">
-        <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Tieto dáta budú analyzované:</h4>
-        <div id="aiPersonData" class="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 leading-relaxed font-mono whitespace-pre-wrap max-h-40 overflow-y-auto custom-scroll"></div>
-      </div>
-
-      <!-- Loader -->
-      <div id="aiLoader" class="hidden flex flex-col items-center justify-center py-8 space-y-4">
-        <div class="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-        <div class="text-center">
-          <p class="font-bold text-slate-700 text-sm">Aplikujem pravidlá Open-Genealogy...</p>
-          <p class="text-xs text-slate-500 mt-1 max-w-xs">Analyzujem okruh príbuzných (FAN cluster), svedkov a hľadám nezhody v matrikách a záznamoch.</p>
-        </div>
-      </div>
-
-      <!-- Výsledok -->
-      <div id="aiResultBox" class="hidden mt-4">
-        <h4 class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-2">Výsledok analýzy:</h4>
-        <div id="aiContent" class="bg-indigo-50/50 border border-indigo-100 p-4 rounded-xl text-sm text-slate-800 prose prose-sm max-w-none"></div>
-      </div>
-
-    </div>
-
-    <!-- Pätička -->
-    <div class="px-5 py-4 border-t border-slate-100 bg-white flex items-center justify-end gap-3">
-      <button onclick="closeAiModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition">Zatvoriť</button>
-      <button id="btnRunAi" onclick="runAiAnalysis()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold flex items-center gap-2 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed">
-        <i class="ph-bold ph-lightning"></i> Spustiť analýzu
-      </button>
-    </div>
-
-  </div>
-</div>
-
-
-<script>
-// ===================== AI INVESTIGATÍVA =====================
-function openAiModal() {
-  document.getElementById('aiModal').classList.remove('hidden');
-  const savedKey = localStorage.getItem('og_gemini_key');
-  if (savedKey) document.getElementById('ogGeminiKey').value = savedKey;
-
-  document.getElementById('aiPersonSearch').value = '';
-  document.getElementById('aiPersonSelect').value = '';
-  document.getElementById('aiSearchResults').classList.add('hidden');
-  document.getElementById('clearAiSearchBtn').classList.add('hidden');
-  
-  if (currentSelectedPersonId && treeData.persons[currentSelectedPersonId]) {
-    selectAiPerson(currentSelectedPersonId);
-  } else {
-    document.getElementById('aiPreviewBox').classList.add('hidden');
-  }
-
-  document.getElementById('aiResultBox').classList.add('hidden');
-  document.getElementById('aiContent').innerHTML = '';
-}
-
-function handleKeyChange(input) {
-  const statusDiv = document.getElementById('keyStatus');
-  const val = input.value.trim();
-  if (val.length > 0) {
-    statusDiv.innerText = '✓ Kľúč bol dočasne uložený do pamäte (nebude sa ukladať na server).';
-    statusDiv.style.color = '#15803d';
-  } else {
-    statusDiv.innerText = '';
-  }
-}
-
-function closeAiModal() {
-  document.getElementById('aiModal').classList.add('hidden');
-}
-
-function removeDiacritics(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function handleAiPersonSearch(query) {
-  const cleanQ = removeDiacritics(query.trim().toLowerCase());
-  const resultsBox = document.getElementById('aiSearchResults');
-  const clearBtn = document.getElementById('clearAiSearchBtn');
-  const hiddenInput = document.getElementById('aiPersonSelect');
-  
-  if (query !== '' && !document.getElementById('aiPersonSearch').dataset.selectedName) {
-      hiddenInput.value = '';
-      document.getElementById('aiPreviewBox').classList.add('hidden');
-  }
-  document.getElementById('aiPersonSearch').dataset.selectedName = '';
-
-  if (!cleanQ) {
-    resultsBox.classList.add('hidden');
-    clearBtn.classList.add('hidden');
-    renderAiSearchResults(Object.values(treeData.persons || {}).slice(0, 50));
-    resultsBox.classList.remove('hidden');
-    return;
-  }
-  
-  clearBtn.classList.remove('hidden');
-  resultsBox.classList.remove('hidden');
-
-  const matches = Object.values(treeData.persons).filter(p => {
-    const searchString = `${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''} ${p.birthName || ''} ${p.birthDate || ''} ${p.deathDate || ''}`.toLowerCase();
-    return removeDiacritics(searchString).includes(cleanQ);
-  });
-
-  renderAiSearchResults(matches);
-}
-
-function renderAiSearchResults(persons) {
-  const resultsBox = document.getElementById('aiSearchResults');
-  if (persons.length === 0) {
-    resultsBox.innerHTML = `<div class="p-3 text-xs text-slate-400 text-center italic">Žiadna osoba nespĺňa kritériá.</div>`;
-    return;
-  }
-
-  persons.sort((a, b) => 
-    (a.lastName || '').localeCompare(b.lastName || '', 'sk') || 
-    (a.firstName || '').localeCompare(b.firstName || '', 'sk')
-  );
-
-  let html = '';
-  persons.slice(0, 50).forEach(p => {
-    const dates = `${p.birthDate ? '* '+p.birthDate : ''} ${p.deathDate ? '† '+p.deathDate : ''}`.trim();
-    const name = `${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''} ${p.birthName ? '('+p.birthName+')' : ''}`.trim().replace(/ +/g, ' ');
-    const isMale = p.gender === 'M';
-    
-    html += `
-      <div onclick="selectAiPerson('${p.id}')" class="flex items-center justify-between p-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0 transition">
-        <div class="flex items-center gap-2.5 truncate">
-          <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isMale ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}">
-            <i class="ph-bold ph-user text-[10px]"></i>
-          </div>
-          <div class="truncate">
-            <div class="text-xs font-semibold text-slate-800 truncate">${esc(name)}</div>
-            <div class="text-[10px] text-slate-400 truncate">${esc(dates) || 'Dátumy neznáme'}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  
-  if (persons.length > 50) {
-     html += `<div class="p-2 text-[10px] text-slate-400 text-center bg-slate-50">Zobrazených prvých 50 výsledkov. Upresnite hľadanie.</div>`;
-  }
-  resultsBox.innerHTML = html;
-}
-
-function selectAiPerson(personId) {
-  const p = treeData.persons[personId];
-  if (!p) return;
-  const hiddenInput = document.getElementById('aiPersonSelect');
-  const searchInput = document.getElementById('aiPersonSearch');
-  const resultsBox = document.getElementById('aiSearchResults');
-  
-  hiddenInput.value = personId;
-  const name = `${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''}`.trim().replace(/ +/g, ' ');
-  searchInput.value = name;
-  searchInput.dataset.selectedName = name;
-  resultsBox.classList.add('hidden');
-  document.getElementById('clearAiSearchBtn').classList.remove('hidden');
-  updateAiPersonPreview();
-}
-
-function clearAiSearch() {
-  const searchInput = document.getElementById('aiPersonSearch');
-  searchInput.value = '';
-  searchInput.dataset.selectedName = '';
-  searchInput.focus();
-  document.getElementById('aiPersonSelect').value = '';
-  document.getElementById('aiPreviewBox').classList.add('hidden');
-  document.getElementById('aiResultBox').classList.add('hidden');
-  document.getElementById('clearAiSearchBtn').classList.add('hidden');
-}
-
-document.addEventListener('click', function(event) {
-  const searchContainer = document.getElementById('aiPersonSearch')?.parentElement?.parentElement;
-  const resultsBox = document.getElementById('aiSearchResults');
-  if (searchContainer && resultsBox && !searchContainer.contains(event.target)) {
-    resultsBox.classList.add('hidden');
-  }
-});
-
-function formatPersonForAi(personId) {
-  const p = treeData.persons[personId];
-  if (!p) return null;
-
-  let out = `MENO: ${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''} ${p.birthName ? '(Rodné: '+p.birthName+')' : ''}\n`;
-  out += `POHLAVIE: ${p.gender === 'M' ? 'Muž' : p.gender === 'F' ? 'Žena' : 'Neznáme'}\n`;
-  out += `NARODENIE: ${p.birthDate || 'Neznáme'} | Miesto: ${p.birthPlace || 'Neznáme'} (${p.birthCountry || ''})\n`;
-  out += `ÚMRTIE: ${p.deathDate || 'Neznáme'} | Miesto: ${p.deathPlace || 'Neznáme'}\n\n`;
-
-  const parents = getParentsOf(p.id);
-  out += `RODIČIA:\n`;
-  if (parents.father) out += `- Otec: ${parents.father.firstName} ${parents.father.lastName}\n`;
-  if (parents.mother) out += `- Matka: ${parents.mother.firstName} ${parents.mother.lastName}\n`;
-  if (!parents.father && !parents.mother) out += `- Neznámi\n`;
-
-  const spouses = getSpousesOf(p.id);
-  if (spouses.length > 0) {
-    out += `\nPARTNERI A SOBÁŠE:\n`;
-    spouses.forEach(sp => out += `- ${sp.person.firstName} ${sp.person.lastName} (Sobáš: ${sp.marrDate || 'Neznámy dátum'})\n`);
-  }
-
-  const children = getChildrenOf(p.id);
-  if (children.length > 0) {
-    out += `\nDETI:\n`;
-    children.forEach(c => out += `- ${c.firstName} ${c.lastName} (* ${c.birthDate || '?'})\n`);
-  }
-
-  if (p.events && p.events.length > 0) {
-    out += `\nUDALOSTI:\n`;
-    p.events.forEach(e => out += `- ${e.type} / ${e.title}: ${e.date || '?'} v ${e.place || '?'}\n`);
-  }
-
-  if (p.occupations && p.occupations.length > 0) {
-    out += `\nPOVOLANIA:\n`;
-    p.occupations.forEach(o => out += `- ${o.title} v ${o.city || '?'} (${o.dateFrom || '?'} - ${o.dateTo || '?'})\n`);
-  }
-
-  if (p.addresses && p.addresses.length > 0) {
-    out += `\nADRESY:\n`;
-    p.addresses.forEach(a => out += `- ${a.address} (${a.type}) od ${a.dateFrom || '?'} do ${a.dateTo || '?'}\n`);
-  }
-
-  if (p.notes && p.notes.length > 0) {
-    out += `\nPOZNÁMKY A ZÁZNAMY:\n`;
-    p.notes.forEach(n => out += `- ${n}\n`);
-  }
-
-  return out.replace(/ +/g, ' ');
-}
-
-function updateAiPersonPreview() {
-  const pId = document.getElementById('aiPersonSelect').value;
-  const previewBox = document.getElementById('aiPreviewBox');
-  const dataBox = document.getElementById('aiPersonData');
-  if (!pId) { previewBox.classList.add('hidden'); return; }
-  dataBox.innerText = formatPersonForAi(pId);
-  previewBox.classList.remove('hidden');
-}
-
-async function runAiAnalysis() {
-  const apiKey = document.getElementById('ogGeminiKey').value.trim();
-  if (!apiKey) return showToast("Zadajte bezplatný Google Gemini API kľúč.", "error");
-
-  const pId = document.getElementById('aiPersonSelect').value;
-  if (!pId) return showToast("Vyberte osobu na analýzu.", "error");
-
-  const personData = formatPersonForAi(pId);
-  const loader = document.getElementById("aiLoader");
-  const resultBox = document.getElementById("aiResultBox");
-  const content = document.getElementById("aiContent");
-  const runBtn = document.getElementById("btnRunAi");
-
-  loader.classList.remove("hidden");
-  resultBox.classList.add("hidden");
-  runBtn.disabled = true;
-
-  const systemInstruction = `Si profesionálny genealogický asistent riadiaci sa štandardom GPS (Genealogical Proof Standard) a projektom Open-Genealogy. Tvoj prístup je striktne analytický.
-Pravidlá, ktoré musíš dodržať:
-1. NIKDY NEFABRIKUJ (nevymýšľaj si mená, dátumy ani udalosti, ktoré v texte nie sú). Ak v dátach nie je svedok, nehovor o svedkoch.
-2. Aplikuj princíp FAN cluster (Family, Associates, Neighbors) - hľadaj prepojenia medzi rodinou, krstnými rodičmi, svedkami a susedmi. Analyzuj poznámky, či sa tam nenachádzajú mená.
-3. Rozlišuj mieru spoľahlivosti (hypotéza vs. fakt).
-4. Odhaľuj anomálie (napr. nelogické veky pri pôrode, sobáši, geografické skoky).
-5. Výstup musí byť formátovaný v Markdown-e a štruktúrovaný do troch sekcií:
-   ### 🧬 Analýza FAN väzieb
-   ### ⚠️ Potenciálne konflikty alebo anomálie
-   ### 📋 Odporúčaný plán ďalšieho výskumu`;
-
-  const userPrompt = `Zanalyzuj genealogické väzby pre túto osobu:\n\n${personData}`;
-
-  try {
-    // Note: The correct endpoint for Gemini REST API v1beta is gemini-1.5-flash:generateContent
-    // Wait, the API requires system_instruction instead of systemInstruction in REST JSON.
-    const selectedModel = document.getElementById('ogModelSelect').value || 'gemini-flash-latest';
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-        system_instruction: { parts: [{ text: systemInstruction }] },
-        generationConfig: { temperature: 0.2 }
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let aiText = data.candidates[0].content.parts[0].text;
-    
-    // Markdown na HTML
-    let formattedHtml = aiText
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/### (.*)/g, "<h4 class='text-sm font-bold text-indigo-800 mt-4 mb-2 pb-1 border-b border-indigo-200'>$1</h4>")
-      .replace(/\n- (.*)/g, "<li class='ml-5 list-disc'>$1</li>")
-      .replace(/\n/g, "<br>");
-
-    content.innerHTML = formattedHtml;
-    resultBox.classList.remove("hidden");
-
-  } catch (error) {
-    content.innerHTML = `<div class="text-rose-600 bg-rose-50 p-4 rounded-xl border border-rose-200"><div class="font-bold flex items-center gap-2 mb-1"><i class="ph-bold ph-warning-circle text-lg"></i> Chyba analýzy:</div>${error.message}</div>`;
-    resultBox.classList.remove("hidden");
-  } finally {
-    loader.classList.add("hidden");
-    runBtn.disabled = false;
-  }
-}
-</script>
-
-
-<!-- CONFLICT RESOLUTION MODAL -->
-<div id="conflictModalMain" class="fixed inset-0 z-[90] bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4 font-sans">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
-    <div class="px-5 py-4 border-b border-rose-100 bg-rose-50 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-rose-200 flex items-center justify-center text-rose-700">
-          <i class="ph-bold ph-git-merge text-2xl"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-slate-800">Kolízia pri ukladaní</h3>
-          <p class="text-[11px] text-slate-600">Iný používateľ medzitým upravil rovnaké údaje a vznikli konflikty. <b>Nekolidujúce zmeny boli automaticky prevzaté.</b> Vyberte, ktoré z kolidujúcich zmien chcete zachovať.</p>
-        </div>
-      </div>
-    </div>
-    <div id="conflictList" class="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50 custom-scroll">
-        <!-- Conflict items dynamically injected here -->
-    </div>
-    <div class="px-5 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
-      <span id="conflictProgress" class="text-sm font-semibold text-slate-500">Vyriešené: 0 / X</span>
-      <div class="flex gap-3">
-         <button onclick="cancelConflictResolution()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition">Zrušiť ukladanie</button>
-         <button id="btnResolveConflicts" disabled onclick="submitResolvedConflicts()" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-sm transition flex items-center gap-2">
-            <i class="ph-bold ph-check"></i> Potvrdiť a zlúčiť
-         </button>
-      </div>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
