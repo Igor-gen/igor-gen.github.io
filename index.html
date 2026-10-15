@@ -467,21 +467,8 @@
         <div class="p-4 sm:p-6 bg-slate-50 min-h-[220px]">
           <!-- MEDIA -->
           <div id="editTabMediaContent" class="space-y-3 block">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-              <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabMediaTitle">Priložené fotografie a dokumenty</h4>
-              <div class="flex gap-2 flex-wrap sm:flex-nowrap">
-                <label class="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 shadow-sm text-[10px] sm:text-xs">
-                  <i class="ph-bold ph-image"></i> <span data-i18n="btnUploadPhoto">Nahrať foto</span>
-                  <input type="file" multiple class="hidden" accept="image/*" onchange="handleSpecificFilesAttach(this, 'photo')">
-                </label>
-                <label class="cursor-pointer px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold rounded-lg border border-amber-200 flex items-center gap-1.5 shadow-sm text-[10px] sm:text-xs">
-                  <i class="ph-bold ph-file-text"></i> <span data-i18n="btnUploadDoc">Nahrať dokument</span>
-                  <input type="file" multiple class="hidden" accept=".pdf,.doc,.docx,.txt,.xls,.xlsx" onchange="handleSpecificFilesAttach(this, 'doc')">
-                </label>
-              </div>
-            </div>
-            <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabMediaDesc">Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonom titulnú fotku)</p>
-            <div id="attachedFilesList" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+            <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabMediaTitle">Priložené fotografie a dokumenty</h4>
+            <div id="attachedFilesList" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
           </div>
           <!-- EVENTS -->
           <div id="editTabEventsContent" class="space-y-3 hidden">
@@ -556,6 +543,25 @@
       <button type="button" id="btnConfirmCancel" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition" data-i18n="btnCancel">Zrušiť</button>
       <button type="button" id="btnConfirmOk" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm transition shadow-sm" data-i18n="btnDelete">Odstrániť</button>
     </div>
+  </div>
+</div>
+
+<!-- GALÉRIA: úprava médií / dokumentov -->
+<div id="mediaEditModal" class="fixed inset-0 z-[55] bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
+    <div class="px-3 sm:px-5 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+      <h3 id="mediaEditTitle" class="text-base sm:text-lg font-bold text-slate-800 truncate"></h3>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="galleryDeleteSelected()" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-trash text-base"></i><span id="mediaTrashLbl">Kôš</span></button>
+        <button type="button" onclick="gallerySave()" class="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-check text-base"></i><span id="mediaSaveLbl">Uložiť</span></button>
+        <button type="button" onclick="closeMediaGallery()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200"><i class="ph-bold ph-x text-lg"></i></button>
+      </div>
+    </div>
+    <div class="px-3 sm:px-5 py-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-600"><input type="checkbox" id="mediaSelectAll" onchange="gallerySelectAll(this.checked)" class="w-4 h-4 accent-indigo-600"><span id="mediaSelectAllLbl">Označiť všetko</span></label>
+      <label class="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-plus"></i><span id="mediaAddLbl">Pridať</span><input id="mediaAddInput" type="file" multiple class="hidden" onchange="galleryHandleFiles(this)"></label>
+    </div>
+    <div id="mediaEditGrid" class="p-3 sm:p-5 overflow-y-auto custom-scroll grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 flex-1"></div>
   </div>
 </div>
 
@@ -1565,23 +1571,109 @@ function handleSpecificFilesAttach(input, targetType) {
 function captionPlaceholder() {
   return ({ sk: 'Popis (zobrazí sa pod súborom)...', cs: 'Popis (zobrazí se pod souborem)...', en: 'Caption (shown below the file)...', de: 'Beschreibung (unter der Datei angezeigt)...' })[currentLang] || 'Popis...';
 }
-function setFileCaption(fileId, value) {
-  const f = tempAttachedFiles.find(x => x.id === fileId);
-  if (f) f.caption = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300);
-}
+const GALLERY_I18N = {
+  sk: { editMedia: 'Upraviť média', editDocs: 'Upraviť dokumenty', trash: 'Kôš', save: 'Uložiť', addPhotos: 'Pridať fotografie', addDocs: 'Pridať dokumenty', selectAll: 'Označiť všetko', confirmDeleteN: 'Naozaj chcete odstrániť označené súbory ({N})?', nothingSelected: 'Najprv označte súbory, ktoré chcete zmazať.', deletedHint: 'Súbory boli odstránené. Zmeny potvrďte tlačidlom Uložiť.', setMain: 'Nastaviť ako hlavnú fotografiu', noMain: 'Bez fotografie', noDoc: 'Žiadny dokument', photosN: 'Fotografií', docsN: 'Dokumentov', empty: 'Zatiaľ žiadne súbory.' },
+  cs: { editMedia: 'Upravit média', editDocs: 'Upravit dokumenty', trash: 'Koš', save: 'Uložit', addPhotos: 'Přidat fotografie', addDocs: 'Přidat dokumenty', selectAll: 'Označit vše', confirmDeleteN: 'Opravdu chcete odstranit označené soubory ({N})?', nothingSelected: 'Nejprve označte soubory, které chcete smazat.', deletedHint: 'Soubory byly odstraněny. Změny potvrďte tlačítkem Uložit.', setMain: 'Nastavit jako hlavní fotografii', noMain: 'Bez fotografie', noDoc: 'Žádný dokument', photosN: 'Fotografií', docsN: 'Dokumentů', empty: 'Zatím žádné soubory.' },
+  en: { editMedia: 'Edit media', editDocs: 'Edit documents', trash: 'Trash', save: 'Save', addPhotos: 'Add photos', addDocs: 'Add documents', selectAll: 'Select all', confirmDeleteN: 'Do you really want to delete the selected files ({N})?', nothingSelected: 'Select the files you want to delete first.', deletedHint: 'Files removed. Confirm the changes with the Save button.', setMain: 'Set as main photo', noMain: 'No photo', noDoc: 'No document', photosN: 'Photos', docsN: 'Documents', empty: 'No files yet.' },
+  de: { editMedia: 'Medien bearbeiten', editDocs: 'Dokumente bearbeiten', trash: 'Papierkorb', save: 'Speichern', addPhotos: 'Fotos hinzufügen', addDocs: 'Dokumente hinzufügen', selectAll: 'Alle auswählen', confirmDeleteN: 'Möchten Sie die ausgewählten Dateien ({N}) wirklich löschen?', nothingSelected: 'Wählen Sie zuerst die zu löschenden Dateien aus.', deletedHint: 'Dateien entfernt. Bestätigen Sie die Änderungen mit Speichern.', setMain: 'Als Hauptfoto festlegen', noMain: 'Kein Foto', noDoc: 'Kein Dokument', photosN: 'Fotos', docsN: 'Dokumente', empty: 'Noch keine Dateien.' }
+};
+function gt(k) { return (GALLERY_I18N[currentLang] && GALLERY_I18N[currentLang][k]) || GALLERY_I18N.sk[k] || k; }
+function isPhotoFile(f) { return f.isTargetType ? f.isTargetType === 'photo' : (f.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(f.type)); }
+
+// Tab „Médiá a Docs“: iba hlavná fotografia a prvý dokument + tlačidlá na úpravu
 function renderAttachedFilesList() {
-  const list = document.getElementById('attachedFilesList'); list.innerHTML = "";
-  if (tempAttachedFiles.length === 0) { list.innerHTML = `<span class="text-slate-400 italic text-[11px] col-span-2 p-2">${t('tNoFiles')}</span>`; return; }
-  tempAttachedFiles.forEach(file => {
-    const isPhoto = (file.isTargetType === 'photo' || file.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(file.type));
-    list.innerHTML += `<div class="flex flex-col gap-2 p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs">
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${esc(file.type)}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${esc(file.name)}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div>
-        <button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1 flex-none"><i class="ph-bold ph-trash"></i></button>
-      </div>
-      <input type="text" maxlength="300" value="${esc(file.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="setFileCaption('${file.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+  const list = document.getElementById('attachedFilesList'); if (!list) return;
+  const photos = tempAttachedFiles.filter(isPhotoFile), docs = tempAttachedFiles.filter(f => !isPhotoFile(f));
+  const main = photos.find(f => f.isMain) || photos[0], doc = docs[0];
+  const photoBox = main && main.data ? `<img src="${main.data}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
+  const docBox = doc ? `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-3xl"></i><span class="font-bold uppercase text-[10px]">${esc(doc.type)}</span></div>` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-file-text text-3xl"></i><span class="text-[11px]">${esc(gt('noDoc'))}</span></div>`;
+  list.innerHTML = `
+    <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div class="h-36 rounded-xl bg-slate-100 overflow-hidden flex items-center justify-center">${photoBox}</div>
+      <p class="text-[11px] text-slate-600 min-h-[16px] break-words">${main && main.caption ? esc(main.caption) : ''}</p>
+      <p class="text-[10px] text-slate-400">${esc(gt('photosN'))}: ${photos.length}</p>
+      <button type="button" onclick="openMediaGallery('photo')" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5"><i class="ph-bold ph-images"></i> ${esc(gt('editMedia'))}</button>
+    </div>
+    <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div class="h-36 rounded-xl bg-amber-50 overflow-hidden flex items-center justify-center">${docBox}</div>
+      <p class="text-[11px] text-slate-600 min-h-[16px] break-words">${doc && doc.caption ? esc(doc.caption) : ''}</p>
+      <p class="text-[10px] text-slate-400">${esc(gt('docsN'))}: ${docs.length}</p>
+      <button type="button" onclick="openMediaGallery('doc')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center justify-center gap-1.5"><i class="ph-bold ph-file-text"></i> ${esc(gt('editDocs'))}</button>
     </div>`;
+}
+
+// ---- Galéria (okno na úpravu médií / dokumentov) ----
+let galleryType = 'photo', galleryItems = [], gallerySelected = new Set();
+function openMediaGallery(type) {
+  galleryType = type;
+  galleryItems = tempAttachedFiles.filter(f => (type === 'photo') === isPhotoFile(f)).map(f => Object.assign({}, f));
+  gallerySelected = new Set();
+  document.getElementById('mediaEditTitle').innerText = gt(type === 'photo' ? 'editMedia' : 'editDocs');
+  document.getElementById('mediaTrashLbl').innerText = gt('trash');
+  document.getElementById('mediaSaveLbl').innerText = gt('save');
+  document.getElementById('mediaSelectAllLbl').innerText = gt('selectAll');
+  document.getElementById('mediaAddLbl').innerText = gt(type === 'photo' ? 'addPhotos' : 'addDocs');
+  document.getElementById('mediaAddInput').accept = type === 'photo' ? 'image/*' : '.pdf,.doc,.docx,.txt,.xls,.xlsx';
+  document.getElementById('mediaSelectAll').checked = false;
+  document.getElementById('mediaEditModal').classList.remove('hidden');
+  renderMediaGallery();
+}
+function closeMediaGallery() { document.getElementById('mediaEditModal').classList.add('hidden'); }
+function renderMediaGallery() {
+  const grid = document.getElementById('mediaEditGrid');
+  if (!galleryItems.length) { grid.innerHTML = `<div class="col-span-full text-center text-slate-400 italic py-10 text-sm">${esc(gt('empty'))}</div>`; return; }
+  const isPh = galleryType === 'photo';
+  grid.innerHTML = galleryItems.map(f => {
+    const sel = gallerySelected.has(f.id);
+    const body = isPh
+      ? (f.data ? `<img src="${f.data}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
+      : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
+    const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
+    return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
+      <div class="relative aspect-square rounded-xl overflow-hidden ${isPh ? 'bg-slate-100' : 'bg-amber-50'} flex items-center justify-center">
+        ${body}
+        <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
+        ${star}
+      </div>
+      <input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+    </div>`;
+  }).join('');
+  document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
+}
+function galleryCaption(id, value) { const f = galleryItems.find(x => x.id === id); if (f) f.caption = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300); }
+function galleryToggle(id, on) { if (on) gallerySelected.add(id); else gallerySelected.delete(id); renderMediaGallery(); }
+function gallerySelectAll(on) { gallerySelected = on ? new Set(galleryItems.map(f => f.id)) : new Set(); renderMediaGallery(); }
+function galleryMakeMain(id) { galleryItems.forEach(f => { f.isMain = (f.id === id); }); renderMediaGallery(); }
+function galleryDeleteSelected() {
+  if (gallerySelected.size === 0) { showToast(gt('nothingSelected'), 'error'); return; }
+  showConfirm(t('confirmTitle'), gt('confirmDeleteN').replace('{N}', gallerySelected.size), () => {
+    galleryItems = galleryItems.filter(f => !gallerySelected.has(f.id));
+    gallerySelected = new Set();
+    if (galleryType === 'photo' && galleryItems.length && !galleryItems.some(f => f.isMain)) galleryItems[0].isMain = true;
+    renderMediaGallery(); showToast(gt('deletedHint'), 'info');
   });
+}
+async function galleryHandleFiles(input) {
+  const files = Array.from(input.files || []); if (!files.length) return;
+  const isPh = galleryType === 'photo';
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`Súbor "${file.name}" ${t('tFileBanned')}`, 'error'); continue; }
+    const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = e => ok(e.target.result); r.onerror = no; r.readAsDataURL(file); });
+    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: file.name, data, type: isPh ? 'photo' : ext, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
+  }
+  input.value = '';
+  renderMediaGallery();
+}
+function gallerySave() {
+  const others = tempAttachedFiles.filter(f => (galleryType === 'photo') !== isPhotoFile(f));
+  const mine = galleryItems.map(f => Object.assign({}, f, { isTargetType: galleryType }));
+  if (galleryType === 'photo') {
+    let seen = false; mine.forEach(f => { if (f.isMain && !seen) seen = true; else f.isMain = false; });
+    if (mine.length && !seen) mine[0].isMain = true;
+  } else mine.forEach(f => { f.isMain = false; });
+  tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
+  closeMediaGallery(); renderAttachedFilesList();
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
 function removeTempFile(fileId) { 
@@ -1700,7 +1792,7 @@ function showPhotoSlider() {
   isMosaicActive = false; document.getElementById('mosaicBtnText').innerText = t('btnMosaic'); document.getElementById('photoSliderView').classList.remove('hidden'); document.getElementById('photoMosaicView').classList.add('hidden');
   const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { document.getElementById('activePhotoImg').src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
-  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = (cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : '') + `<span class="block ${cur.caption ? 'text-[10px] sm:text-xs text-slate-400 mt-0.5' : ''}">${esc(cur.name)} ${cur.isMain ? t('tMainPhLbl') : ''}</span>`; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
+  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : ''; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
 }
 
 function nextPhoto() { const p = treeData.persons[activeMediaPersonId]; if (!p || !p.photos.length) return; currentPhotoIndex = (currentPhotoIndex + 1) % p.photos.length; showPhotoSlider(); }
@@ -1711,13 +1803,13 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${esc(ph.name)}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${esc(doc.name)}</h4>${doc.caption ? `<p class="text-[11px] sm:text-xs text-slate-200 mt-0.5 break-words">${esc(doc.caption)}</p>` : `<p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p>`}</div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
