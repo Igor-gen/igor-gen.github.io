@@ -161,11 +161,8 @@
         <button onclick="createNewTree()" class="btn-glass px-4 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2">
           <i class="ph-bold ph-plus-circle text-emerald-400"></i> <span data-i18n="btnNew">Vytvoriť nový rodokmeň</span>
         </button>
-        <button onclick="openDbModal('load')" class="btn-glass px-4 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2">
+        <button onclick="openDbModal('load')" class="btn-glass sm:col-span-2 px-4 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2">
           <i class="ph-bold ph-plugs-connected" style="color:#52a5ff;"></i> <span data-i18n="btnConnectDb">Pripojiť databázu na serveri</span>
-        </button>
-        <button onclick="inviteGenealogyUser()" class="btn-glass px-4 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2">
-          <i class="ph-bold ph-envelope-simple text-emerald-400"></i> <span>Pozvať používateľa</span>
         </button>
       </div>
 
@@ -229,6 +226,9 @@
       <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
         <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i>Otvoriť zložku Gedzip</button>
         <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i>Uložiť súbor Gedzip</button>
+        <div id="adminMenuSection" class="hidden pt-1 mt-1 border-t border-slate-200">
+          <button id="btnInviteUser" onclick="closeFileMenu();inviteGenealogyUser()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-envelope-simple mr-2 text-emerald-600"></i>Pozvať používateľa</button>
+        </div>
       </div>
     </div>
 
@@ -1855,15 +1855,46 @@ async function ensureClerkReady() {
   await clerkLoadPromise;
   if (!clerkListenerAdded && typeof window.Clerk.addListener === 'function') {
     window.Clerk.addListener(() => {
-      if (window.Clerk.isSignedIn && window.Clerk.session && pendingDbMode) {
-        const mode = pendingDbMode;
-        pendingDbMode = null;
-        runDbAction(mode);
+      if (window.Clerk.isSignedIn && window.Clerk.session) {
+        checkAdminRole();
+        if (pendingDbMode) {
+          const mode = pendingDbMode;
+          pendingDbMode = null;
+          runDbAction(mode);
+        }
+      } else {
+        isAdmin = false; adminCheckedFor = null; updateAdminMenuUI();
       }
     });
     clerkListenerAdded = true;
   }
   return window.Clerk;
+}
+
+// Tlačidlo „Pozvať používateľa“ v menu sa zobrazí iba administrátorovi (rolu overuje backend).
+let isAdmin = false;
+let adminCheckedFor = null;
+function updateAdminMenuUI() {
+  const el = document.getElementById('adminMenuSection');
+  if (el) el.classList.toggle('hidden', !isAdmin);
+}
+async function checkAdminRole() {
+  try {
+    if (!isBackendConfigured() || !window.Clerk || !window.Clerk.isSignedIn || !window.Clerk.session) {
+      isAdmin = false; adminCheckedFor = null; updateAdminMenuUI(); return;
+    }
+    const sid = window.Clerk.session.id;
+    if (adminCheckedFor === sid) return;
+    adminCheckedFor = sid;
+    const token = await window.Clerk.session.getToken();
+    if (!token) { adminCheckedFor = null; return; }
+    const res = await fetch(BACKEND_URL.replace(/\/+$/, '') + '/api/invitations', {
+      method: 'GET', headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
+    });
+    const data = await res.json().catch(() => ({}));
+    isAdmin = res.ok && data.role === 'admin';
+  } catch (e) { isAdmin = false; adminCheckedFor = null; }
+  updateAdminMenuUI();
 }
 
 async function inviteGenealogyUser() {
@@ -1968,6 +1999,7 @@ async function runDbAction(mode) {
     if (mode === 'load') {
       const data = await fetchTreeData(session);
       loadTreeFromServer(data, session);
+      checkAdminRole();
     } else {
       await putTreeData(session);
 
@@ -2270,7 +2302,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 window.addEventListener('load', () => {
-  ensureClerkReady().catch(err => console.error('Clerk initialization failed:', err));
+  ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
 
 // ===================== VEJÁROVÝ GRAF (D3.js) =====================
