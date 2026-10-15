@@ -1639,7 +1639,7 @@ function renderMediaGallery() {
         <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
         ${star}
       </div>
-      <input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+      <input type="text" maxlength="300" value="${esc(f.caption || \'\')}" placeholder="${esc(captionPlaceholder())}" onchange="galleryCaption(\'${f.id}\', this.value)" onkeyup="galleryCaption(\'${f.id}\', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
     </div>`;
   }).join('');
   document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
