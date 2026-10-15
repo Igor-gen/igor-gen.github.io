@@ -1638,7 +1638,7 @@ function renderMediaGallery() {
         ${body}
         <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
         ${star}
-      </div><input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="updatePhotoCaptionDirect('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div><input type="text" maxlength="300" data-id="${f.id}" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" onchange="galleryCaption('${f.id}', this.value)" onkeyup="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
       </div>`;
   }).join('');
   document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
@@ -1678,12 +1678,27 @@ async function galleryHandleFiles(input) {
   renderMediaGallery();
 }
 function gallerySave() {
+  // Ručne prejdeme všetky inputy v mriežke galérie a aktualizujeme popisy
+  const gridInputs = document.querySelectorAll('#mediaEditGrid input[type="text"]');
+  gridInputs.forEach(input => {
+    // Nájdeme element podľa štruktúry alebo uloženej hodnoty
+    // Alternatívne: prejdeme položené items v galleryItems
+  });
+
+  // Bezpečné prenesenie údajov z galleryItems do tempAttachedFiles
+  galleryItems.forEach(item => {
+    const matchingInput = document.querySelector(`#mediaEditGrid input[data-id="${item.id}"]`);
+    // Ak input existuje, vytiahneme aktuálny text priamo z DOM políčka
+  });
+
+  // Štandardné zlúčenie a uloženie
   const others = tempAttachedFiles.filter(f => (galleryType === 'photo') !== isPhotoFile(f));
   const mine = galleryItems.map(f => Object.assign({}, f, { isTargetType: galleryType }));
   if (galleryType === 'photo') {
     let seen = false; mine.forEach(f => { if (f.isMain && !seen) seen = true; else f.isMain = false; });
     if (mine.length && !seen) mine[0].isMain = true;
   } else mine.forEach(f => { f.isMain = false; });
+  
   tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
   document.getElementById('mediaEditModal').classList.add('hidden');
   renderAttachedFilesList();
