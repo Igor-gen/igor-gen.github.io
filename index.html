@@ -566,6 +566,26 @@
   </div>
 </div>
 
+<!-- KONFLIKT ZMIEN: výber medzi záznamom na serveri a mojím záznamom -->
+<div id="mergeModal" class="fixed inset-0 z-[90] bg-slate-900/70 backdrop-blur-sm hidden flex items-center justify-center p-2 sm:p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
+    <div class="px-4 sm:px-5 py-3 border-b border-slate-100 bg-amber-50">
+      <h3 id="mergeTitle" class="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2"><i class="ph-bold ph-git-merge text-amber-600"></i><span></span></h3>
+      <p id="mergeIntro" class="text-xs text-slate-600 mt-1"></p>
+      <p id="mergeInfo" class="text-xs font-semibold text-slate-700 mt-1"></p>
+    </div>
+    <div class="px-4 sm:px-5 py-2 border-b border-slate-100 flex flex-wrap gap-2">
+      <button type="button" id="mergeBtnAllServer" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"></button>
+      <button type="button" id="mergeBtnAllMine" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold"></button>
+    </div>
+    <div id="mergeConflictList" class="p-3 sm:p-5 overflow-y-auto custom-scroll space-y-3 bg-slate-50 flex-1"></div>
+    <div class="px-4 sm:px-5 py-3 border-t border-slate-100 flex flex-wrap justify-end gap-2">
+      <button type="button" id="mergeBtnCancel" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold"></button>
+      <button type="button" id="mergeBtnApply" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"></button>
+    </div>
+  </div>
+</div>
+
 <!-- DB CONNECT MODAL -->
 <div id="dbConnectModal" class="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
   <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
@@ -2287,7 +2307,312 @@ async function hydrateFiles(session) {
 }
 
 
+// ===== Zlúčenie súbežných zmien: trojcestné zlúčenie (základ = stav pri načítaní, môj stav, stav na serveri) =====
+const MERGE_I18N = {
+  sk: {
+    title: 'Konflikt zmien', intro: 'Iný používateľ medzitým uložil svoje zmeny. Vaše zmeny, ktoré s jeho zmenami nekolidujú, sa zapíšu automaticky. Pri nasledujúcich záznamoch sa zmeny líšia – vyberte, ktorý záznam sa má zapísať.',
+    autoInfo: 'Automaticky zlúčených vašich zmien: {N}. Kolízií na vyriešenie: {M}.', serverVersion: 'Záznam na serveri (zmena iného používateľa)', myVersion: 'Váš záznam',
+    rejectAll: 'Zamietnuť všetky moje zmeny', acceptAll: 'Použiť všetky moje zmeny', cancel: 'Zrušiť ukladanie', apply: 'Zapísať vybrané',
+    fetching: 'Rodokmeň sa medzitým zmenil. Načítavam aktuálnu verziu a zlučujem zmeny...', cancelled: 'Ukladanie bolo zrušené. Na serveri sa nič nezmenilo, vaše úpravy zostávajú v aplikácii.',
+    tooMany: 'Zmeny sa nepodarilo zapísať, server sa počas zlučovania stále menil. Skúste uložiť znova.', merged: 'Zmeny boli zlúčené s aktuálnou verziou zo servera.',
+    removedByMe: 'Záznam ste odstránili', removedByOther: 'Záznam odstránil iný používateľ', personRemovedByMe: 'Osobu ste odstránili', personRemovedByOther: 'Osobu odstránil iný používateľ',
+    personEdited: 'Osoba bola upravená: {X}', famRemovedByMe: 'Rodinu ste odstránili', famRemovedByOther: 'Rodinu odstránil iný používateľ', family: 'Rodina', empty: '—', male: 'Muž', female: 'Žena', unknown: 'Neznáme',
+    f_title: 'Titul', f_firstName: 'Meno', f_middleName: 'Druhé meno', f_lastName: 'Priezvisko', f_birthName: 'Rodné priezvisko', f_gender: 'Pohlavie', f_birthDate: 'Dátum narodenia', f_birthPlace: 'Miesto narodenia', f_birthCountry: 'Štát narodenia', f_deathDate: 'Dátum úmrtia', f_deathPlace: 'Miesto úmrtia',
+    f_husbandId: 'Manžel', f_wifeId: 'Manželka', f_marrDate: 'Dátum sobáša', k_events: 'Udalosť', k_addresses: 'Adresa', k_occupations: 'Povolanie', k_photos: 'Fotografia', k_documents: 'Dokument'
+  },
+  cs: {
+    title: 'Konflikt změn', intro: 'Jiný uživatel mezitím uložil své změny. Vaše změny, které s jeho změnami nekolidují, se zapíší automaticky. U následujících záznamů se změny liší – vyberte, který záznam se má zapsat.',
+    autoInfo: 'Automaticky sloučených vašich změn: {N}. Kolizí k vyřešení: {M}.', serverVersion: 'Záznam na serveru (změna jiného uživatele)', myVersion: 'Váš záznam',
+    rejectAll: 'Zamítnout všechny mé změny', acceptAll: 'Použít všechny mé změny', cancel: 'Zrušit ukládání', apply: 'Zapsat vybrané',
+    fetching: 'Rodokmen se mezitím změnil. Načítám aktuální verzi a slučuji změny...', cancelled: 'Ukládání bylo zrušeno. Na serveru se nic nezměnilo, vaše úpravy zůstávají v aplikaci.',
+    tooMany: 'Změny se nepodařilo zapsat, server se během slučování stále měnil. Zkuste uložit znovu.', merged: 'Změny byly sloučeny s aktuální verzí ze serveru.',
+    removedByMe: 'Záznam jste odstranili', removedByOther: 'Záznam odstranil jiný uživatel', personRemovedByMe: 'Osobu jste odstranili', personRemovedByOther: 'Osobu odstranil jiný uživatel',
+    personEdited: 'Osoba byla upravena: {X}', famRemovedByMe: 'Rodinu jste odstranili', famRemovedByOther: 'Rodinu odstranil jiný uživatel', family: 'Rodina', empty: '—', male: 'Muž', female: 'Žena', unknown: 'Neznámé',
+    f_title: 'Titul', f_firstName: 'Jméno', f_middleName: 'Druhé jméno', f_lastName: 'Příjmení', f_birthName: 'Rodné příjmení', f_gender: 'Pohlaví', f_birthDate: 'Datum narození', f_birthPlace: 'Místo narození', f_birthCountry: 'Stát narození', f_deathDate: 'Datum úmrtí', f_deathPlace: 'Místo úmrtí',
+    f_husbandId: 'Manžel', f_wifeId: 'Manželka', f_marrDate: 'Datum sňatku', k_events: 'Událost', k_addresses: 'Adresa', k_occupations: 'Povolání', k_photos: 'Fotografie', k_documents: 'Dokument'
+  },
+  en: {
+    title: 'Change conflict', intro: 'Another user has saved changes in the meantime. Your changes that do not collide with theirs will be written automatically. The records below differ – choose which record should be written.',
+    autoInfo: 'Your changes merged automatically: {N}. Conflicts to resolve: {M}.', serverVersion: 'Record on the server (other user\'s change)', myVersion: 'Your record',
+    rejectAll: 'Reject all my changes', acceptAll: 'Use all my changes', cancel: 'Cancel saving', apply: 'Write selected',
+    fetching: 'The family tree has changed in the meantime. Loading the current version and merging changes...', cancelled: 'Saving was cancelled. Nothing changed on the server; your edits remain in the app.',
+    tooMany: 'The changes could not be written because the server kept changing during the merge. Please try saving again.', merged: 'Your changes were merged with the current server version.',
+    removedByMe: 'You removed the record', removedByOther: 'Another user removed the record', personRemovedByMe: 'You removed the person', personRemovedByOther: 'Another user removed the person',
+    personEdited: 'Person was edited: {X}', famRemovedByMe: 'You removed the family', famRemovedByOther: 'Another user removed the family', family: 'Family', empty: '—', male: 'Male', female: 'Female', unknown: 'Unknown',
+    f_title: 'Title', f_firstName: 'First name', f_middleName: 'Middle name', f_lastName: 'Last name', f_birthName: 'Birth name', f_gender: 'Gender', f_birthDate: 'Birth date', f_birthPlace: 'Birth place', f_birthCountry: 'Birth country', f_deathDate: 'Death date', f_deathPlace: 'Death place',
+    f_husbandId: 'Husband', f_wifeId: 'Wife', f_marrDate: 'Marriage date', k_events: 'Event', k_addresses: 'Address', k_occupations: 'Occupation', k_photos: 'Photo', k_documents: 'Document'
+  },
+  de: {
+    title: 'Änderungskonflikt', intro: 'Ein anderer Benutzer hat inzwischen Änderungen gespeichert. Ihre Änderungen, die nicht kollidieren, werden automatisch geschrieben. Die folgenden Einträge unterscheiden sich – wählen Sie, welcher Eintrag geschrieben werden soll.',
+    autoInfo: 'Automatisch zusammengeführte Änderungen von Ihnen: {N}. Zu lösende Konflikte: {M}.', serverVersion: 'Eintrag auf dem Server (Änderung des anderen Benutzers)', myVersion: 'Ihr Eintrag',
+    rejectAll: 'Alle meine Änderungen verwerfen', acceptAll: 'Alle meine Änderungen verwenden', cancel: 'Speichern abbrechen', apply: 'Auswahl schreiben',
+    fetching: 'Der Stammbaum hat sich inzwischen geändert. Lade die aktuelle Version und führe Änderungen zusammen...', cancelled: 'Speichern wurde abgebrochen. Auf dem Server hat sich nichts geändert, Ihre Änderungen bleiben in der App.',
+    tooMany: 'Die Änderungen konnten nicht geschrieben werden, weil sich der Server beim Zusammenführen ständig änderte. Bitte erneut speichern.', merged: 'Ihre Änderungen wurden mit der aktuellen Serverversion zusammengeführt.',
+    removedByMe: 'Sie haben den Eintrag entfernt', removedByOther: 'Ein anderer Benutzer hat den Eintrag entfernt', personRemovedByMe: 'Sie haben die Person entfernt', personRemovedByOther: 'Ein anderer Benutzer hat die Person entfernt',
+    personEdited: 'Person wurde bearbeitet: {X}', famRemovedByMe: 'Sie haben die Familie entfernt', famRemovedByOther: 'Ein anderer Benutzer hat die Familie entfernt', family: 'Familie', empty: '—', male: 'Mann', female: 'Frau', unknown: 'Unbekannt',
+    f_title: 'Titel', f_firstName: 'Vorname', f_middleName: 'Zweiter Vorname', f_lastName: 'Nachname', f_birthName: 'Geburtsname', f_gender: 'Geschlecht', f_birthDate: 'Geburtsdatum', f_birthPlace: 'Geburtsort', f_birthCountry: 'Geburtsland', f_deathDate: 'Sterbedatum', f_deathPlace: 'Sterbeort',
+    f_husbandId: 'Ehemann', f_wifeId: 'Ehefrau', f_marrDate: 'Heiratsdatum', k_events: 'Ereignis', k_addresses: 'Adresse', k_occupations: 'Beruf', k_photos: 'Foto', k_documents: 'Dokument'
+  }
+};
+function mt(k) { return ((MERGE_I18N[currentLang] || MERGE_I18N.sk)[k]) || MERGE_I18N.sk[k] || k; }
+
+const MERGE_PERSON_FIELDS = ['title', 'firstName', 'middleName', 'lastName', 'birthName', 'gender', 'birthDate', 'birthPlace', 'birthCountry', 'deathDate', 'deathPlace'];
+const MERGE_FAMILY_FIELDS = ['husbandId', 'wifeId', 'marrDate'];
+const MERGE_LISTS = {
+  events: ['type', 'title', 'date', 'place'],
+  addresses: ['type', 'address', 'dateFrom', 'dateTo'],
+  occupations: ['title', 'city', 'dateFrom', 'dateTo'],
+  photos: ['name', 'type', 'isMain', 'caption'],
+  documents: ['name', 'type', 'caption']
+};
+const mv = (v) => (v == null ? '' : String(v));
+const mNorm = (o, fields) => (o ? JSON.stringify(fields.map(f => (f === 'isMain' ? !!o[f] : mv(o[f])))) : null);
+const mPersonNorm = (p) => p ? JSON.stringify([
+  MERGE_PERSON_FIELDS.map(k => mv(p[k])),
+  Object.keys(MERGE_LISTS).map(k => (p[k] || []).map(i => mNorm(i, MERGE_LISTS[k]) + '#' + mv(i.id))),
+  (p.sources || []).map(mv), (p.notes || []).map(mv)
+]) : null;
+const mFamNorm = (f) => f ? JSON.stringify([MERGE_FAMILY_FIELDS.map(k => mv(f[k])), (f.children || []).map(mv).sort()]) : null;
+const mPersonName = (p) => ((p && ((mv(p.firstName) + ' ' + mv(p.lastName)).trim() || p.id)) || '?');
+
+function mergeSummarize(kind, it, nameOf) {
+  if (!it) return mt('empty');
+  const j = (a) => a.filter(Boolean).join(', ');
+  if (kind === 'events') return j([it.title || it.type, it.date, it.place]) || mt('empty');
+  if (kind === 'addresses') return j([it.address, [it.dateFrom, it.dateTo].filter(Boolean).join(' – ')]) || mt('empty');
+  if (kind === 'occupations') return j([it.title, it.city, [it.dateFrom, it.dateTo].filter(Boolean).join(' – ')]) || mt('empty');
+  return (it.caption ? '„' + it.caption + '“ – ' : '') + mv(it.name);
+}
+function mergeShowScalar(k, v, nameOf) {
+  if (v === '' || v == null) return mt('empty');
+  if (k === 'gender') return v === 'M' ? mt('male') : v === 'F' ? mt('female') : mt('unknown');
+  if (k === 'husbandId' || k === 'wifeId') return nameOf(v);
+  return v;
+}
+
+// Skalárne pole: tri cesty (základ b, môj m, server t). Predvolene sa berie server; kolízia sa zapíše do zoznamu.
+function mergeField(ctx, target, key, b, m, t, label, show) {
+  if (m === t || m === b) { target[key] = t; return; }
+  if (t === b) { target[key] = m; ctx.auto++; return; }
+  target[key] = t;
+  ctx.conflicts.push({ label, mineText: show(m), theirsText: show(t), applyMine: () => { target[key] = m; } });
+}
+// Množina reťazcov (zdroje, poznámky, deti rodiny): bez kolízií – spojí pridania a rešpektuje zmazania.
+function mergeSet(ctx, b, m, t) {
+  b = b || []; m = m || []; t = t || [];
+  const bs = new Set(b), ms = new Set(m), ts = new Set(t), out = [];
+  t.forEach(x => { if (bs.has(x) && !ms.has(x)) { ctx.auto++; return; } out.push(x); });
+  m.forEach(x => { if (!bs.has(x) && !ts.has(x)) { out.push(x); ctx.auto++; } });
+  return out;
+}
+// Zoznam záznamov s id (udalosti, adresy, povolania, fotky, dokumenty)
+function mergeKeyed(ctx, bArr, mArr, tArr, fields, label, show) {
+  const idx = (a) => { const mp = new Map(); (a || []).forEach(x => { if (x && x.id != null) mp.set(x.id, x); }); return mp; };
+  const B = idx(bArr), M = idx(mArr), T = idx(tArr), out = [];
+  const ids = [...T.keys()]; M.forEach((_, id) => { if (!T.has(id)) ids.push(id); });
+  const swap = (oldItem, newItem) => () => { const i = out.indexOf(oldItem); if (i >= 0) out[i] = newItem; };
+  ids.forEach(id => {
+    const b = B.get(id), m = M.get(id), t = T.get(id);
+    const nb = mNorm(b, fields), nm = mNorm(m, fields), nt = mNorm(t, fields);
+    if (!b) {
+      if (m && !t) { out.push(m); ctx.auto++; return; }
+      if (t && !m) { out.push(t); return; }
+      out.push(t);
+      if (nm !== nt) ctx.conflicts.push({ label, mineText: show(m), theirsText: show(t), applyMine: swap(t, m) });
+      return;
+    }
+    if (!m && !t) return;
+    if (!m) {
+      if (nt === nb) { ctx.auto++; return; }
+      out.push(t);
+      ctx.conflicts.push({ label, mineText: mt('removedByMe'), theirsText: show(t), applyMine: () => { const i = out.indexOf(t); if (i >= 0) out.splice(i, 1); } });
+      return;
+    }
+    if (!t) {
+      if (nm === nb) return;
+      ctx.conflicts.push({ label, mineText: show(m), theirsText: mt('removedByOther'), applyMine: () => { out.push(m); } });
+      return;
+    }
+    if (nm === nb || nm === nt) { out.push(t); return; }
+    if (nt === nb) { out.push(m); ctx.auto++; return; }
+    out.push(t);
+    ctx.conflicts.push({ label, mineText: show(m), theirsText: show(t), applyMine: swap(t, m) });
+  });
+  return out;
+}
+
+function mergePersons(ctx, bMap, mMap, tMap, nameOf) {
+  const out = {}, ids = Object.keys(tMap);
+  Object.keys(mMap).forEach(id => { if (!(id in tMap)) ids.push(id); });
+  ids.forEach(id => {
+    const b = bMap[id], m = mMap[id], t = tMap[id];
+    if (!b) {
+      if (m && !t) { out[id] = m; ctx.auto++; return; }
+      out[id] = t || m; return;
+    }
+    if (!m && !t) return;
+    const nb = mPersonNorm(b), nm = mPersonNorm(m), nt = mPersonNorm(t);
+    if (!m) {
+      if (nt === nb) { ctx.auto++; return; }
+      out[id] = t;
+      ctx.conflicts.push({ label: mPersonName(t), mineText: mt('personRemovedByMe'), theirsText: mt('personEdited').replace('{X}', mPersonName(t)), applyMine: () => { delete out[id]; } });
+      return;
+    }
+    if (!t) {
+      if (nm === nb) return;
+      ctx.conflicts.push({ label: mPersonName(m), mineText: mt('personEdited').replace('{X}', mPersonName(m)), theirsText: mt('personRemovedByOther'), applyMine: () => { out[id] = m; } });
+      return;
+    }
+    const r = Object.assign({}, t), name = mPersonName(t);
+    MERGE_PERSON_FIELDS.forEach(k => mergeField(ctx, r, k, mv(b[k]), mv(m[k]), mv(t[k]), name + ' – ' + mt('f_' + k), v => mergeShowScalar(k, v, nameOf)));
+    Object.keys(MERGE_LISTS).forEach(k => { r[k] = mergeKeyed(ctx, b[k], m[k], t[k], MERGE_LISTS[k], name + ' – ' + mt('k_' + k), it => mergeSummarize(k, it, nameOf)); });
+    r.sources = mergeSet(ctx, b.sources, m.sources, t.sources);
+    r.notes = mergeSet(ctx, b.notes, m.notes, t.notes);
+    out[id] = r;
+  });
+  return out;
+}
+
+function mergeFamilies(ctx, bMap, mMap, tMap, nameOf) {
+  const famName = (f) => mt('family') + ' (' + [f.husbandId, f.wifeId].filter(Boolean).map(nameOf).join(' + ') + ')';
+  const out = {}, ids = Object.keys(tMap);
+  Object.keys(mMap).forEach(id => { if (!(id in tMap)) ids.push(id); });
+  ids.forEach(id => {
+    const b = bMap[id], m = mMap[id], t = tMap[id];
+    if (!b) {
+      if (m && !t) { out[id] = m; ctx.auto++; return; }
+      out[id] = t || m; return;
+    }
+    if (!m && !t) return;
+    const nb = mFamNorm(b), nm = mFamNorm(m), nt = mFamNorm(t);
+    if (!m) {
+      if (nt === nb) { ctx.auto++; return; }
+      out[id] = t;
+      ctx.conflicts.push({ label: famName(t), mineText: mt('famRemovedByMe'), theirsText: famName(t), applyMine: () => { delete out[id]; } });
+      return;
+    }
+    if (!t) {
+      if (nm === nb) return;
+      ctx.conflicts.push({ label: famName(m), mineText: famName(m), theirsText: mt('famRemovedByOther'), applyMine: () => { out[id] = m; } });
+      return;
+    }
+    const r = Object.assign({}, t), name = famName(t);
+    MERGE_FAMILY_FIELDS.forEach(k => mergeField(ctx, r, k, mv(b[k]), mv(m[k]), mv(t[k]), name + ' – ' + mt('f_' + k), v => mergeShowScalar(k, v, nameOf)));
+    r.children = mergeSet(ctx, b.children, m.children, t.children);
+    out[id] = r;
+  });
+  return out;
+}
+
+function mergeTrees(base, mine, theirs) {
+  const ctx = { conflicts: [], auto: 0 };
+  const bp = (base && base.persons) || {}, bf = (base && base.families) || {};
+  const nameOf = (id) => { const p = theirs.persons[id] || mine.persons[id] || bp[id]; return p ? mPersonName(p) : mv(id); };
+  const persons = mergePersons(ctx, bp, mine.persons, theirs.persons, nameOf);
+  const families = mergeFamilies(ctx, bf, mine.families, theirs.families, nameOf);
+  return { ctx, persons, families };
+}
+
+// Po zlúčení: odkazy rodín na neexistujúce osoby, väzby fams/famc, najviac jedna hlavná fotografia
+function finalizeMerged(persons, families) {
+  Object.values(families).forEach(f => {
+    f.husbandId = (f.husbandId && persons[f.husbandId]) ? f.husbandId : null;
+    f.wifeId = (f.wifeId && persons[f.wifeId]) ? f.wifeId : null;
+    f.children = (f.children || []).filter(c => persons[c]);
+  });
+  Object.values(persons).forEach(p => {
+    p.fams = []; p.famc = null; let main = false;
+    (p.photos || []).forEach(ph => { if (ph.isMain && !main) main = true; else ph.isMain = false; });
+  });
+  Object.values(families).forEach(f => {
+    [f.husbandId, f.wifeId].forEach(pid => { if (pid && persons[pid] && !persons[pid].fams.includes(f.id)) persons[pid].fams.push(f.id); });
+    (f.children || []).forEach(c => { if (persons[c] && !persons[c].famc) persons[c].famc = f.id; });
+  });
+}
+
+function serverDataToTree(data) {
+  const persons = {};
+  (data.persons || []).forEach(raw => {
+    if (!raw || !raw.id) return;
+    const p = Object.assign(createPersonObj(raw.id), raw);
+    ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
+    p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
+    persons[p.id] = p;
+  });
+  const families = {};
+  (data.families || []).forEach(raw => {
+    if (!raw || !raw.id) return;
+    families[raw.id] = { id: raw.id, husbandId: raw.husbandId || null, wifeId: raw.wifeId || null, marrDate: raw.marrDate || '', children: Array.isArray(raw.children) ? raw.children : [] };
+  });
+  return { persons, families };
+}
+// Kópia stavu bez obsahu súborov (iba kľúče) – slúži ako základ pre ďalšie zlúčenie
+function snapshotBase(tree) {
+  return JSON.parse(JSON.stringify({ persons: tree.persons, families: tree.families }, (k, v) => (k === 'data' && typeof v === 'string' ? undefined : v)));
+}
+
+function showMergeModal(ctx) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('mergeModal'), list = document.getElementById('mergeConflictList');
+    document.getElementById('mergeTitle').querySelector('span').innerText = mt('title');
+    document.getElementById('mergeIntro').innerText = mt('intro');
+    document.getElementById('mergeInfo').innerText = mt('autoInfo').replace('{N}', ctx.auto).replace('{M}', ctx.conflicts.length);
+    document.getElementById('mergeBtnAllServer').innerText = mt('rejectAll');
+    document.getElementById('mergeBtnAllMine').innerText = mt('acceptAll');
+    document.getElementById('mergeBtnCancel').innerText = mt('cancel');
+    document.getElementById('mergeBtnApply').innerText = mt('apply');
+    list.innerHTML = ctx.conflicts.map((c, i) => `<div class="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+      <p class="text-xs font-bold text-slate-700 break-words">${esc(c.label)}</p>
+      <label class="flex items-start gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs"><input type="radio" name="mc_${i}" value="theirs" checked class="mt-0.5 accent-indigo-600"><span class="min-w-0"><b class="block text-[10px] uppercase tracking-wide text-slate-400">${esc(mt('serverVersion'))}</b><span class="break-words">${esc(c.theirsText)}</span></span></label>
+      <label class="flex items-start gap-2 p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs"><input type="radio" name="mc_${i}" value="mine" class="mt-0.5 accent-indigo-600"><span class="min-w-0"><b class="block text-[10px] uppercase tracking-wide text-slate-400">${esc(mt('myVersion'))}</b><span class="break-words">${esc(c.mineText)}</span></span></label>
+    </div>`).join('');
+    const done = (val) => { modal.classList.add('hidden'); resolve(val); };
+    document.getElementById('mergeBtnApply').onclick = () => done(ctx.conflicts.map((_, i) => ((modal.querySelector('input[name="mc_' + i + '"]:checked') || {}).value === 'mine')));
+    document.getElementById('mergeBtnCancel').onclick = () => done(null);
+    document.getElementById('mergeBtnAllServer').onclick = () => modal.querySelectorAll('input[value="theirs"]').forEach(r => { r.checked = true; });
+    document.getElementById('mergeBtnAllMine').onclick = () => modal.querySelectorAll('input[value="mine"]').forEach(r => { r.checked = true; });
+    modal.classList.remove('hidden');
+    list.scrollTop = 0;
+  });
+}
+
+async function resolveVersionConflict(session) {
+  showToast(mt('fetching'), 'info');
+  const data = await fetchTreeData(session);
+  const theirs = serverDataToTree(data);
+  const nextBase = snapshotBase(theirs);               // základ pre ďalšie ukladanie = aktuálny stav servera
+  const res = mergeTrees(originalTreeData, treeData, theirs);
+  if (res.ctx.conflicts.length) {
+    const choices = await showMergeModal(res.ctx);
+    if (!choices) { const e = new Error(mt('cancelled')); e.mergeCancelled = true; throw e; }
+    res.ctx.conflicts.forEach((c, i) => { if (choices[i]) c.applyMine(); });
+  }
+  finalizeMerged(res.persons, res.families);
+  treeData.persons = res.persons; treeData.families = res.families;
+  treeVersion = Number(data.version);
+  originalTreeData = nextBase;
+  try { autoLayoutTree(false); } catch (e) { /* rozloženie nie je kritické */ }
+  drawTree();
+  hydratePromise = hydrateFiles(session);              // dotiahne súbory, ktoré pridal iný používateľ
+  showToast(mt('merged'), 'info');
+}
+
+// Uloženie: pri konflikte verzií sa zmeny zlúčia (pri kolízii sa používateľ rozhodne) a zápis sa zopakuje.
 async function putTreeData(session) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await putTreeDataOnce(session);
+      originalTreeData = snapshotBase(treeData);
+      return;
+    } catch (err) {
+      if (!err || !err.versionConflict) throw err;
+      await resolveVersionConflict(session);
+    }
+  }
+  throw new Error(mt('tooMany'));
+}
+
+async function putTreeDataOnce(session) {
   if (treeSource !== 'server') throw new Error('Tento rodokmeň nebol načítaný zo servera, preto sa nedá nahrať na server. Môžete ho uložiť iba do lokálneho súboru GEDZIP.');
   const persons = Object.values(treeData.persons);
 
