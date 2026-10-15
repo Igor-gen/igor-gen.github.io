@@ -1622,7 +1622,7 @@ function openMediaGallery(type) {
   document.getElementById('mediaEditModal').classList.remove('hidden');
   renderMediaGallery();
 }
-function closeMediaGallery() { gallerySave(); }
+function closeMediaGallery() { document.getElementById('mediaEditModal').classList.add('hidden'); }
 function renderMediaGallery() {
   const grid = document.getElementById('mediaEditGrid');
   if (!galleryItems.length) { grid.innerHTML = `<div class="col-span-full text-center text-slate-400 italic py-10 text-sm">${esc(gt('empty'))}</div>`; return; }
@@ -1639,7 +1639,7 @@ function renderMediaGallery() {
         <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
         ${star}
       </div>
-      <input type="text" maxlength="300" value="${esc(f.caption || \'\')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption(\'${f.id}\', this.value)" onchange="galleryCaption(\'${f.id}\', this.value)" onkeyup="galleryCaption(\'${f.id}\', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+      <input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
     </div>`;
   }).join('');
   document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
@@ -1677,8 +1677,7 @@ function gallerySave() {
     if (mine.length && !seen) mine[0].isMain = true;
   } else mine.forEach(f => { f.isMain = false; });
   tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
-  document.getElementById('mediaEditModal').classList.add('hidden');
-  renderAttachedFilesList();
+  closeMediaGallery(); renderAttachedFilesList();
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
 function removeTempFile(fileId) { 
@@ -2363,7 +2362,6 @@ async function putTreeData(session) {
   }
 
   treeVersion = Number(result.version);
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
 }
 
 
@@ -2372,26 +2370,10 @@ async function saveToServer() {
   if (!dbConnection) { openDbModal('save'); return; }
   if (dbBusy) return;
   dbBusy = true; showToast(t('msgDbSaving'), 'info');
-  try { 
-      await putTreeData(dbConnection); 
-      showToast(t('msgDbSaved'), 'success'); 
-  }
+  try { await putTreeData(dbConnection); showToast(t('msgDbSaved'), 'success'); }
   catch (err) {
-    if (err.sessionExpired) { 
-        dbConnection = null; updateDbStatusUI(); openDbModal('save'); showDbError(err.message); 
-    }
-    else if (err.versionConflict) {
-        showToast('Zisťujem rozdiely na serveri...', 'info');
-        try {
-            const serverData = await fetchTreeData(dbConnection);
-            handleTreeConflicts(serverData);
-        } catch (e) {
-            showToast('Chyba pri sťahovaní dát na zlúčenie: ' + e.message, 'error');
-        }
-    }
-    else {
-        showToast(err.message, 'error');
-    }
+    if (err.sessionExpired) { dbConnection = null; updateDbStatusUI(); openDbModal('save'); showDbError(err.message); }
+    else showToast(err.message, 'error');
   }
   finally { dbBusy = false; }
 }
@@ -2761,187 +2743,6 @@ window.addEventListener('keydown', e => {
 });
 
 setLanguage('sk');
-
-  
-function isDeepEqual(a, b) {
-    if (a === b) return true;
-    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
-    let keysA = Object.keys(a), keysB = Object.keys(b);
-    if (keysA.length !== keysB.length) return false;
-    for (let key of keysA) {
-        if (!keysB.includes(key)) return false;
-        if (!isDeepEqual(a[key], b[key])) return false;
-    }
-    return true;
-}
-
-function handleTreeConflicts(serverData) {
-    let hasConflicts = false;
-    let conflictsList = []; 
-    let newPersons = {};
-    
-    const allPersonIds = new Set([...Object.keys(serverData.persons), ...Object.keys(treeData.persons)]);
-
-    allPersonIds.forEach(id => {
-        const origP = originalTreeData && originalTreeData.persons ? originalTreeData.persons[id] : null;
-        const localP = treeData.persons[id];
-        const serverP = serverData.persons[id];
-
-        if (!origP) {
-            if (localP && !serverP) newPersons[id] = localP;
-            else if (!localP && serverP) newPersons[id] = serverP;
-            else if (localP && serverP) {
-                 if (isDeepEqual(localP, serverP)) newPersons[id] = localP;
-                 else { hasConflicts = true; conflictsList.push({id, local: localP, server: serverP}); newPersons[id] = localP; }
-            }
-        } else {
-            const localChanged = !isDeepEqual(localP, origP);
-            const serverChanged = !isDeepEqual(serverP, origP);
-
-            if (!localChanged && !serverChanged) {
-                if (origP) newPersons[id] = origP;
-            } else if (localChanged && !serverChanged) {
-                if (localP) newPersons[id] = localP;
-            } else if (!localChanged && serverChanged) {
-                if (serverP) newPersons[id] = serverP;
-            } else {
-                if (isDeepEqual(localP, serverP)) {
-                    if (localP) newPersons[id] = localP;
-                } else {
-                    hasConflicts = true;
-                    conflictsList.push({id, local: localP, server: serverP});
-                    newPersons[id] = localP; 
-                }
-            }
-        }
-    });
-
-    let newFamilies = {};
-    const allFamIds = new Set([...Object.keys(serverData.families || {}), ...Object.keys(treeData.families || {})]);
-    allFamIds.forEach(id => {
-        const origF = originalTreeData && originalTreeData.families ? originalTreeData.families[id] : null;
-        const localF = treeData.families[id];
-        const serverF = (serverData.families || {})[id];
-        
-        const localChanged = !isDeepEqual(localF, origF);
-        const serverChanged = !isDeepEqual(serverF, origF);
-        
-        if (localChanged && !serverChanged) { if(localF) newFamilies[id] = localF; }
-        else if (!localChanged && serverChanged) { if(serverF) newFamilies[id] = serverF; }
-        else if (localChanged && serverChanged) {
-            if (localF && serverF) {
-                let mergedF = {...serverF, husbandId: localF.husbandId || serverF.husbandId, wifeId: localF.wifeId || serverF.wifeId, marrDate: localF.marrDate || serverF.marrDate};
-                let childSet = new Set([...(localF.children||[]), ...(serverF.children||[])]);
-                mergedF.children = Array.from(childSet);
-                newFamilies[id] = mergedF;
-            } else if (localF) newFamilies[id] = localF;
-            else if (serverF) newFamilies[id] = serverF;
-        } else {
-            if (origF) newFamilies[id] = origF;
-        }
-    });
-
-    if (!hasConflicts) {
-        treeData.persons = newPersons;
-        treeData.families = newFamilies;
-        treeVersion = Number(serverData.version);
-        originalTreeData = JSON.parse(JSON.stringify(treeData));
-        drawTree();
-        saveToServer(); // automaticky znova ulozi bez zdrziavania
-    } else {
-        window.currentConflicts = conflictsList;
-        window.pendingMergeData = { persons: newPersons, families: newFamilies, version: Number(serverData.version) };
-        renderConflictModal();
-    }
-}
-
-function formatConflictData(p) {
-    if (!p) return 'Zmazané';
-    return `Meno: ${p.title||''} ${p.firstName||''} ${p.lastName||''}
-Dátumy: * ${p.birthDate||'?'}  † ${p.deathDate||'?'}
-Miesto nar.: ${p.birthPlace||'?'}
-Fotiek: ${(p.photos||[]).length} | Poznámok: ${(p.notes||[]).length}`;
-}
-
-function renderConflictModal() {
-    const list = document.getElementById('conflictList');
-    list.innerHTML = '';
-    window.resolvedConflicts = {}; 
-    
-    window.currentConflicts.forEach((c, idx) => {
-        const nameLocal = c.local ? `${c.local.firstName || ''} ${c.local.lastName || ''}`.trim() : 'Zmazaná osoba';
-        const nameServer = c.server ? `${c.server.firstName || ''} ${c.server.lastName || ''}`.trim() : 'Zmazaná osoba';
-        const displayTitle = c.local ? nameLocal : nameServer;
-
-        list.innerHTML += `
-        <div class="p-4 bg-white rounded-xl border border-rose-200 shadow-sm">
-            <h4 class="font-bold text-slate-800 text-sm mb-3">Kolízia #${idx+1}: ${esc(displayTitle)}</h4>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-indigo-500 hover:ring-1 ring-indigo-500" id="conf_${idx}_local" onclick="selectConflict(${idx}, 'local')">
-                    <div class="text-xs font-bold text-indigo-600 mb-1">Tvoja verzia</div>
-                    <div class="text-[11px] text-slate-600 whitespace-pre-wrap">${formatConflictData(c.local)}</div>
-                </div>
-                <div class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-emerald-500 hover:ring-1 ring-emerald-500" id="conf_${idx}_server" onclick="selectConflict(${idx}, 'server')">
-                    <div class="text-xs font-bold text-emerald-600 mb-1">Verzia zo servera (iný používateľ)</div>
-                    <div class="text-[11px] text-slate-600 whitespace-pre-wrap">${formatConflictData(c.server)}</div>
-                </div>
-            </div>
-        </div>`;
-    });
-    document.getElementById('conflictModalMain').classList.remove('hidden');
-    updateConflictProgress();
-}
-
-function selectConflict(idx, choice) {
-    window.resolvedConflicts[idx] = choice;
-    document.getElementById(`conf_${idx}_local`).classList.remove('ring-2', 'border-indigo-500', 'bg-indigo-50');
-    document.getElementById(`conf_${idx}_server`).classList.remove('ring-2', 'border-emerald-500', 'bg-emerald-50');
-    
-    if (choice === 'local') {
-         document.getElementById(`conf_${idx}_local`).classList.add('ring-2', 'border-indigo-500', 'bg-indigo-50');
-    } else {
-         document.getElementById(`conf_${idx}_server`).classList.add('ring-2', 'border-emerald-500', 'bg-emerald-50');
-    }
-    updateConflictProgress();
-}
-
-function updateConflictProgress() {
-    const total = window.currentConflicts.length;
-    const resolved = Object.keys(window.resolvedConflicts).length;
-    document.getElementById('conflictProgress').innerText = `Vyriešené: ${resolved} / ${total}`;
-    document.getElementById('btnResolveConflicts').disabled = resolved < total;
-}
-
-function cancelConflictResolution() {
-    document.getElementById('conflictModalMain').classList.add('hidden');
-    showToast('Ukladanie zrušené. Tvoje zmeny zostali v prehliadači, ale nie sú na serveri.', 'info');
-}
-
-async function submitResolvedConflicts() {
-    document.getElementById('conflictModalMain').classList.add('hidden');
-    showToast('Zlučujem a ukladám zmeny...', 'info');
-    
-    window.currentConflicts.forEach((c, idx) => {
-        const choice = window.resolvedConflicts[idx];
-        if (choice === 'server') {
-            if (c.server) window.pendingMergeData.persons[c.id] = c.server;
-            else delete window.pendingMergeData.persons[c.id];
-        } else {
-            if (c.local) window.pendingMergeData.persons[c.id] = c.local;
-            else delete window.pendingMergeData.persons[c.id];
-        }
-    });
-
-    treeData.persons = window.pendingMergeData.persons;
-    treeData.families = window.pendingMergeData.families;
-    treeVersion = window.pendingMergeData.version;
-    originalTreeData = JSON.parse(JSON.stringify(treeData));
-    
-    drawTree();
-    
-    // Automaticky sa pokúsi znova uložiť už spojenú a opravenú verziu
-    saveToServer();
-}
 
   console.log('HLAVNY SCRIPT SA NACITAL');
 </script>
