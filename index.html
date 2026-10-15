@@ -7,6 +7,8 @@
   <!-- Clerk authentication (invite-only users are managed in Clerk Dashboard) -->
   <script defer crossorigin="anonymous" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js"></script>
   <script defer crossorigin="anonymous" data-clerk-publishable-key="pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- JSZip pre prácu s formátom GEDZIP -->
@@ -52,24 +54,91 @@
 </div>
 
 <!-- WELCOME SCREEN -->
-<div id="welcomeScreen" class="fixed inset-0 z-[50] flex flex-col text-white overflow-y-auto" style="background: radial-gradient(circle at 50% 50%, #1a2a3a 0%, #0d131a 100%);">
-  <!-- Dekoratívna sieť rodokmeňa na pozadí -->
-  <div class="pointer-events-none fixed inset-0 z-0" style="opacity:0.04; background-image: radial-gradient(circle at 20% 20%, #ffffff 2px, transparent 3px), radial-gradient(circle at 80% 40%, #ffffff 2px, transparent 3px), linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px); background-size: 100% 100%, 100% 100%, 50px 50px, 50px 50px;"></div>
+<div id="welcomeScreen" class="fixed inset-0 z-[50] flex flex-col text-white overflow-y-auto" style="background: radial-gradient(circle at 50% 50%, #1a2a3a 0%, #0d131a 100%); background-attachment: fixed; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <!-- Emblém: kompas so stromom života -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="emblem" viewBox="0 0 100 100">
+        <g fill="#a9d0f8" fill-opacity="0.92" stroke="#8fc4ff" stroke-width="1" stroke-linejoin="round">
+          <polygon points="50,2 57,44 43,44"/><polygon points="50,98 57,56 43,56"/>
+          <polygon points="98,50 56,57 56,43"/><polygon points="2,50 44,57 44,43"/>
+        </g>
+        <g fill="#8fc4ff" fill-opacity="0.45">
+          <polygon points="50,50 78,22 56,44"/><polygon points="50,50 22,22 44,44"/>
+          <polygon points="50,50 78,78 56,56"/><polygon points="50,50 22,78 44,56"/>
+        </g>
+        <circle cx="50" cy="50" r="29" fill="#17314f" stroke="#8fc4ff" stroke-width="2"/>
+        <circle cx="50" cy="50" r="25" fill="none" stroke="#8fc4ff" stroke-opacity="0.4" stroke-width="0.8"/>
+        <g fill="none" stroke="#dcecff" stroke-width="2" stroke-linecap="round">
+          <path d="M50 70 V52"/><path d="M50 62 C43 60 39 55 38 48"/><path d="M50 62 C57 60 61 55 62 48"/>
+          <path d="M50 56 C46 52 44 46 45 40"/><path d="M50 56 C54 52 56 46 55 40"/><path d="M50 52 V34"/>
+          <path d="M46 71 H54"/>
+        </g>
+        <g fill="#dcecff">
+          <circle cx="38" cy="47" r="2.6"/><circle cx="62" cy="47" r="2.6"/><circle cx="45" cy="39" r="2.6"/>
+          <circle cx="55" cy="39" r="2.6"/><circle cx="50" cy="33" r="2.8"/>
+        </g>
+      </symbol>
+      <filter id="nodeGlow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3.5"/></filter>
+    </defs>
+  </svg>
 
-  <!-- Horný banner (zatiaľ iba logo vľavo) -->
-  <header class="relative z-10 w-full px-5 sm:px-10 py-5 flex items-center justify-between">
-    <div class="flex items-center gap-2.5 font-semibold text-lg tracking-wide">
-      <i class="ph-bold ph-tree-structure text-2xl" style="color:#52a5ff;"></i>
-      <span>Genealogy</span>
+  <!-- Abstraktné pozadie: sieť uzlov v rohoch, nenápadný rodinný strom a kompas -->
+  <svg class="pointer-events-none fixed inset-0 z-0 w-full h-full" viewBox="0 0 1408 768" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <!-- kompas za kartou -->
+    <g fill="#9cc4ee" fill-opacity="0.07" stroke="#9cc4ee" stroke-opacity="0.12" stroke-width="1">
+      <circle cx="704" cy="345" r="265" fill="none"/>
+      <polygon points="704,78 722,150 686,150"/><polygon points="704,612 722,540 686,540"/>
+    </g>
+    <!-- rodinný strom vľavo a vpravo -->
+    <g stroke="#9cc4ee" stroke-opacity="0.16" stroke-width="1.5" fill="none">
+      <path d="M348 346 H417 M417 347 V320 H435 V281 M382 346 V393 M349 346 V393 M411 347 V393 M383 392 L440 420"/>
+      <path d="M1073 347 H968 M1003 347 V393 M1030 347 V393 M981 282 V320 H968 M1063 347 V393 M1000 392 L975 420"/>
+    </g>
+    <g fill="#9cc4ee" fill-opacity="0.16" stroke="#9cc4ee" stroke-opacity="0.22" stroke-width="1.5">
+      <circle cx="348" cy="346" r="10" fill="none"/><circle cx="417" cy="347" r="12"/><circle cx="435" cy="281" r="10"/>
+      <circle cx="981" cy="282" r="10" fill="none"/><circle cx="968" cy="347" r="12"/><circle cx="1003" cy="347" r="12"/><circle cx="1073" cy="347" r="11" fill="none"/>
+      <rect x="339" y="383" width="20" height="20" rx="4"/><rect x="369" y="383" width="20" height="20" rx="4"/><rect x="401" y="383" width="20" height="20" rx="4"/>
+      <rect x="1020" y="383" width="20" height="20" rx="4"/><rect x="1053" y="383" width="20" height="20" rx="4"/>
+    </g>
+    <!-- sieť vpravo hore -->
+    <g fill="none" stroke="#9cc4ee" stroke-opacity="0.22" stroke-width="1">
+      <path d="M1152 62 L1232 72 L1357 92 L1392 80 M1232 72 L1171 137 L1193 201 M1232 72 L1288 170 L1357 92 M1171 137 L1288 170 L1366 220 M1288 170 L1268 243 L1314 262 L1379 278 L1366 220 M1314 262 L1268 243 M1379 278 L1398 350 M1193 201 L1268 243"/>
+    </g>
+    <g fill="#b6d3f2" fill-opacity="0.55">
+      <circle cx="1152" cy="62" r="4"/><circle cx="1232" cy="72" r="5.5"/><circle cx="1357" cy="92" r="4.5"/><circle cx="1392" cy="80" r="5"/>
+      <circle cx="1171" cy="137" r="4"/><circle cx="1288" cy="170" r="6"/><circle cx="1193" cy="201" r="4"/><circle cx="1366" cy="220" r="4.5"/>
+      <circle cx="1268" cy="243" r="4"/><circle cx="1314" cy="262" r="4.5"/><circle cx="1379" cy="278" r="5.5"/><circle cx="1398" cy="350" r="4"/>
+    </g>
+    <g fill="#52a5ff" fill-opacity="0.55" filter="url(#nodeGlow)"><circle cx="1232" cy="72" r="6"/><circle cx="1288" cy="170" r="7"/><circle cx="1379" cy="278" r="6"/></g>
+    <!-- sieť vľavo dole -->
+    <g fill="none" stroke="#9cc4ee" stroke-opacity="0.22" stroke-width="1">
+      <path d="M0 440 L71 466 L149 469 L190 482 M71 466 L67 553 L139 549 L149 469 M139 549 L255 541 M67 553 L36 613 L105 640 L139 549 M36 613 L0 620 M105 640 L208 613 L255 541 M208 613 L195 633 L262 632 M105 640 L59 677 M195 633 L105 640 M149 469 L190 482 L255 541"/>
+    </g>
+    <g fill="#b6d3f2" fill-opacity="0.55">
+      <circle cx="0" cy="440" r="4"/><circle cx="71" cy="466" r="5"/><circle cx="149" cy="469" r="5"/><circle cx="190" cy="482" r="4"/>
+      <circle cx="67" cy="553" r="5.5"/><circle cx="139" cy="549" r="6"/><circle cx="255" cy="541" r="4.5"/><circle cx="36" cy="613" r="5.5"/>
+      <circle cx="105" cy="640" r="6"/><circle cx="208" cy="613" r="5"/><circle cx="195" cy="633" r="4.5"/><circle cx="262" cy="632" r="4"/><circle cx="59" cy="677" r="4"/><circle cx="0" cy="620" r="4"/>
+    </g>
+    <g fill="#52a5ff" fill-opacity="0.55" filter="url(#nodeGlow)"><circle cx="139" cy="549" r="7"/><circle cx="105" cy="640" r="7"/><circle cx="36" cy="613" r="6"/></g>
+  </svg>
+
+  <!-- Horný banner (zatiaľ iba logo vľavo, bez menu vpravo) -->
+  <header class="relative z-10 w-full" style="background: rgba(8,13,19,0.72); border-bottom: 1px solid rgba(255,255,255,0.07); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
+    <div class="max-w-5xl mx-auto px-5 h-[52px] flex items-center justify-between">
+      <div class="flex items-center gap-2.5 font-semibold text-lg tracking-wide" style="font-family: 'Montserrat', 'Segoe UI', sans-serif;">
+        <svg class="w-7 h-7" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 6px rgba(82,165,255,0.6));"><use href="#emblem"/></svg>
+        <span>Genealogy</span>
+      </div>
     </div>
   </header>
 
   <!-- Hlavná karta (matné sklo) -->
   <main class="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-5">
-    <div class="w-full max-w-[620px] text-center flex flex-col items-center rounded-2xl px-5 sm:px-10 py-8 sm:py-12" style="background: rgba(255,255,255,0.03); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.07); box-shadow: 0 20px 50px rgba(0,0,0,0.4);">
-      <i class="ph-bold ph-tree-structure text-6xl sm:text-7xl mb-5" style="color:#52a5ff; filter: drop-shadow(0 0 15px rgba(82,165,255,0.4));"></i>
-      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mb-3">Genealogy</h1>
-      <p class="text-sm sm:text-base leading-relaxed mb-8 max-w-sm" style="color: rgba(255,255,255,0.6);" data-i18n="appDesc">Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)</p>
+    <div class="w-full max-w-[620px] text-center flex flex-col items-center rounded-2xl px-5 sm:px-10 py-6 sm:py-8" style="background: linear-gradient(180deg, rgba(60,82,106,0.38), rgba(38,56,76,0.30)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 20px 50px rgba(0,0,0,0.4), inset 0 0 50px rgba(82,165,255,0.05);">
+      <svg class="w-20 h-20 sm:w-24 sm:h-24 mb-2" viewBox="0 0 100 100" style="filter: drop-shadow(0 0 14px rgba(82,165,255,0.55));"><use href="#emblem"/></svg>
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mb-3" style="font-family: 'Montserrat', 'Segoe UI', sans-serif;">Genealogy</h1>
+      <p class="text-sm sm:text-base leading-relaxed mb-6 max-w-sm" style="color: rgba(255,255,255,0.6);" data-i18n="appDesc">Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)</p>
 
       <div id="dropZone" class="w-full border-2 border-dashed border-sky-400/30 hover:border-sky-400/70 bg-white/5 hover:bg-white/10 transition-all rounded-2xl p-5 sm:p-6 cursor-pointer flex flex-col items-center justify-center space-y-4">
         <input type="file" id="fileInput" class="hidden" accept=".gdz,.gedzip,.zip,.ged">
@@ -119,7 +188,7 @@
   </main>
 
   <!-- Dolný banner (zatiaľ prázdny) -->
-  <footer class="relative z-10 w-full py-5"></footer>
+  <footer class="relative z-10 w-full h-[58px]" style="background: rgba(8,13,19,0.72); border-top: 1px solid rgba(255,255,255,0.07);"></footer>
 </div>
 
 <div id="mainApp" class="hidden h-screen w-screen flex flex-row overflow-hidden relative">
