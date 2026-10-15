@@ -1638,11 +1638,19 @@ function renderMediaGallery() {
         ${body}
         <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
         ${star}
-      </div>
-      <input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" onchange="galleryCaption('${f.id}', this.value)" onkeyup="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
-    </div>`;
+      </div><input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="updatePhotoCaptionDirect('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+      </div>`;
   }).join('');
   document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
+}
+function updatePhotoCaptionDirect(id, value) {
+  const cleanVal = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300);
+  // Aktualizuje v galérii
+  const f = galleryItems.find(x => x.id === id);
+  if (f) f.caption = cleanVal;
+  // Okamžite aktualizuje aj v hlavnom zozname priložených súborov osoby
+  const tf = tempAttachedFiles.find(x => x.id === id);
+  if (tf) tf.caption = cleanVal;
 }
 function galleryCaption(id, value) { const f = galleryItems.find(x => x.id === id); if (f) f.caption = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300); }
 function galleryToggle(id, on) { if (on) gallerySelected.add(id); else gallerySelected.delete(id); renderMediaGallery(); }
