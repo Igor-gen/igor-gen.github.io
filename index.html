@@ -1625,7 +1625,9 @@ function openMediaGallery(type) {
   document.getElementById('mediaEditModal').classList.remove('hidden');
   renderMediaGallery();
 }
-function closeMediaGallery() { document.getElementById('mediaEditModal').classList.add('hidden'); }
+function closeMediaGallery() { 
+  gallerySave(); // Toto zabezpečí, že sa popisy uložia aj keď klikneš na 'X'
+}
 function renderMediaGallery() {
   const grid = document.getElementById('mediaEditGrid');
   if (!galleryItems.length) { grid.innerHTML = `<div class="col-span-full text-center text-slate-400 italic py-10 text-sm">${esc(gt('empty'))}</div>`; return; }
@@ -1680,7 +1682,10 @@ function gallerySave() {
     if (mine.length && !seen) mine[0].isMain = true;
   } else mine.forEach(f => { f.isMain = false; });
   tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
-  closeMediaGallery(); renderAttachedFilesList();
+  
+  // Namiesto closeMediaGallery() zavoláme len skrytie modálneho okna
+  document.getElementById('mediaEditModal').classList.add('hidden'); 
+  renderAttachedFilesList();
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
 function removeTempFile(fileId) { 
