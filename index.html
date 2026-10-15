@@ -15,8 +15,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- D3.js pre vejárový graf -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <!-- sql.js pre prácu so SQLite v prehliadači -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.min.js"></script>
   <!-- Phosphor Icons pre symboly UI -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script>
@@ -69,14 +67,11 @@
       </div>
       <div class="space-y-1 text-center">
         <p class="text-base sm:text-lg font-semibold text-slate-200" data-i18n="dropZoneText">Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber</p>
-        <p class="text-[10px] sm:text-xs text-slate-400" data-i18n="dropZoneSub">Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite zložky</p>
+        <p class="text-[10px] sm:text-xs text-slate-400" data-i18n="dropZoneSub">Podporované formáty: GEDZIP (.gdz), .zip, .ged</p>
       </div>
       <div class="flex gap-2 justify-center w-full mt-2">
         <button type="button" onclick="document.getElementById('fileInput').click()" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg transition-transform active:scale-95 text-sm flex items-center justify-center gap-2">
           <i class="ph ph-folder-open text-base"></i> <span data-i18n="btnLoadGed">GDZ / GEDCOM</span>
-        </button>
-        <button type="button" onclick="openSqliteDirectory()" class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg transition-transform active:scale-95 text-sm flex items-center justify-center gap-2">
-          <i class="ph ph-database text-base"></i> <span data-i18n="btnLoadSqlite">Zložka SQLite</span>
         </button>
       </div>
     </div>
@@ -154,9 +149,7 @@
       </button>
       <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
         <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i>Otvoriť zložku Gedzip</button>
-        <button onclick="closeFileMenu();openSqliteDirectory()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-database mr-2 text-blue-600"></i>Otvoriť zložku SQL</button>
         <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i>Uložiť súbor Gedzip</button>
-        <button onclick="closeFileMenu();saveSqliteTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-database mr-2 text-blue-600"></i>Uložiť súbor SQL</button>
       </div>
     </div>
 
@@ -164,7 +157,7 @@
       <button onclick="openPersonEditor(null)" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-user-plus text-sm"></i> <span data-i18n="btnAddPerson">1. Pridať osobu</span>
       </button>
-      <button onclick="saveToServer()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
+      <button id="btnSaveServerSidebar" onclick="saveToServer()" class="w-full py-2 sm:py-2.5 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[11px] sm:text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition">
         <i class="ph-bold ph-cloud-arrow-up text-sm"></i> <span data-i18n="btnSaveServer">4. Zapísať na server (SQL)</span>
       </button>
       <div class="grid grid-cols-2 gap-1.5 pt-1">
@@ -539,12 +532,6 @@
 </div>
 
 <script>
-// --- INICIALIZACIA SQLITE.JS ---
-let SQL = null;
-initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(sql){
-    SQL = sql;
-});
-
 // --- MOBILNÉ TOGGLE FUNKCIE ---
 function toggleLeftSidebar() { document.getElementById('leftSidebar').classList.toggle('-translate-x-full'); }
 function openPersonPanelMobile() { document.getElementById('personDetailPanel').classList.remove('translate-x-full'); }
@@ -576,7 +563,7 @@ document.getElementById('btnConfirmOk').addEventListener('click', () => {
 // --- I18N DICTIONARY ---
 const i18n = {
   sk: {
-    appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite zložky",
+    appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged",
     btnSelectFile: "Vybrať súbor z počítača", btnSample: "Načítať ukážkový rodokmeň", btnNew: "Vytvoriť nový rodokmeň", footerText: "Genealogy HTML5 Single-File • Žiadne dáta neopúšťajú váš prehliadač",
     btnAddPerson: "1. Pridať osobu", btnSaveGdz: "2. Uložiť rodokmeň (.gdz)", btnLayout: "Preusporiadať", btnExportPdf: "Export do PDF",
     zoomView: "Lupa & Pohľad:", searchPlaceholder: "Hľadať osobu podľa mena...", recentEdited: "Posledne editované", statPersons: "Celkovo osôb:", statFamilies: "Rodín:",
@@ -594,21 +581,21 @@ const i18n = {
     btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "4. Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgFileUploading: "Nahrávam súbory na úložisko: {X} / {N}…", msgFileUploadFail: "Súbor sa nepodarilo nahrať", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "3. Uložiť zložku SQLite"
   },
   cs: {
-    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged a SQLite složky", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Hledat osobu podle jména...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Detail • 2x klik = Úprava", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 internetových odkazů na matriky, archivy nebo jiné zdroje (skryté před veřejným náhledem).", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
+    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Hledat osobu podle jména...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Detail • 2x klik = Úprava", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 internetových odkazů na matriky, archivy nebo jiné zdroje (skryté před veřejným náhledem).", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Přidejte doplňující poznámky k osobě (max 250 znaků). Nezobrazují se na veřejné kartě.", phNoteText: "Zadejte text poznámky...",
     tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.",
     confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit",
     btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "4. Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgFileUploading: "Nahrávám soubory do úložiště: {X} / {N}…", msgFileUploadFail: "Soubor se nepodařilo nahrát", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "3. Uložit složku SQLite"
   },
   en: {
-    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged and SQLite folders", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Search person by name...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Detail • 2x click = Edit", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 web links to registries, archives, or other sources (hidden from public view).", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
+    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Search person by name...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Detail • 2x click = Edit", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 web links to registries, archives, or other sources (hidden from public view).", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
     tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Add supplementary notes for this person (max 250 chars). Hidden from public card.", phNoteText: "Enter note text...",
     tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.",
     confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete",
     btnConnectDb: "Connect to database on server", btnSaveServer: "4. Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgFileUploading: "Uploading files to storage: {X} / {N}…", msgFileUploadFail: "File upload failed", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "3. Save SQLite Folder"
   },
   de: {
-    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged und SQLite Ordner", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Person nach Namen suchen...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Details • 2x Klick = Bearbeiten", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Weblinks zu Registern, Archiven oder anderen Quellen hinzu (für die Öffentlichkeit verborgen).", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
+    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Person nach Namen suchen...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Details • 2x Klick = Bearbeiten", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Weblinks zu Registern, Archiven oder anderen Quellen hinzu (für die Öffentlichkeit verborgen).", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
     tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Zusätzliche Notizen hinzufügen (max 250 Zeichen). Auf der öffentlichen Karte ausgeblendet.", phNoteText: "Notiztext eingeben...",
     tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.",
     confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen",
@@ -653,6 +640,9 @@ const LAYOUT = { bw: 200, bh: 72, gapX: 40, gapY: 48, spouseGap: 110 };
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
 let treeVersion = 0;
+// Pôvod aktuálneho rodokmeňa: 'server' = načítaný zo servera (možno ukladať na server aj do GEDZIP), 'local' = lokálny súbor/ukážka/nový (iba lokálne ukladanie)
+let treeSource = 'local';
+let hydratePromise = null;
 let recentEditedIds = []; let currentSelectedPersonId = null;
 
 // Canvas states
@@ -742,108 +732,6 @@ async function processFile(file) {
       parseGedcomString(gedcomContent, fileName, attachedFiles);
     } else { const reader = new FileReader(); reader.onload = function(e) { parseGedcomString(e.target.result, fileName, {}); }; reader.readAsText(file); }
   } catch (err) { showToast(t('msgReadErr') + " " + err.message, "error"); }
-}
-
-async function openSqliteDirectory() {
-  if (!SQL) { showToast("Knižnica SQLite sa ešte načítava...", "error"); return; }
-  if (!('showDirectoryPicker' in window)) { showToast("Váš prehliadač nepodporuje výber priečinka.", "error"); return; }
-  
-  try {
-      const dirHandle = await window.showDirectoryPicker();
-      let dbFileHandle = null;
-      let loadedFileName = "rodokmen.sqlite";
-      
-      for await (const entry of dirHandle.values()) {
-          if (entry.kind === 'file' && (entry.name.endsWith('.sqlite') || entry.name.endsWith('.db'))) {
-              dbFileHandle = entry;
-              loadedFileName = entry.name;
-              break;
-          }
-      }
-      
-      if (!dbFileHandle) { showToast("V zvolenom priečinku sa nenašiel žiadny .sqlite súbor.", "error"); return; }
-      showToast(t('msgProcess') + " " + loadedFileName, "info");
-      
-      const file = await dbFileHandle.getFile();
-      const arrayBuffer = await file.arrayBuffer();
-      const db = new SQL.Database(new Uint8Array(arrayBuffer));
-      
-      const newPersons = {};
-      const newFamilies = {};
-      
-      try {
-        const resMeta = db.exec("SELECT key, value FROM metadata");
-        if (resMeta.length > 0) { resMeta[0].values.forEach(row => { if (row[0] === 'fileName') loadedFileName = row[1]; }); }
-      } catch(e) {}
-
-      const resPersons = db.exec("SELECT * FROM persons");
-      if (resPersons.length > 0) {
-        const cols = resPersons[0].columns;
-        resPersons[0].values.forEach(row => {
-          const p = {}; cols.forEach((col, idx) => p[col] = row[idx]);
-          const dataJson = p.data_json ? JSON.parse(p.data_json) : {};
-          
-          const newP = createPersonObj(p.id, p.title, p.firstName, p.lastName, p.gender, p.birthDate, p.birthPlace, p.birthCountry, p.deathDate, p.deathPlace);
-          newP.middleName = p.middleName || ""; newP.birthName = p.birthName || ""; newP.famc = p.famc || null;
-          newP.fams = dataJson.fams || []; newP.events = dataJson.events || []; newP.sources = dataJson.sources || [];
-          newP.addresses = dataJson.addresses || []; newP.occupations = dataJson.occupations || []; newP.notes = dataJson.notes || [];
-          newP.photos = dataJson.photos || []; newP.documents = dataJson.documents || [];
-          newP.x = dataJson.x || 0; newP.y = dataJson.y || 0;
-          newPersons[newP.id] = newP;
-        });
-      }
-
-      const resFam = db.exec("SELECT * FROM families");
-      if (resFam.length > 0) {
-        const cols = resFam[0].columns;
-        resFam[0].values.forEach(row => {
-          const f = {}; cols.forEach((col, idx) => f[col] = row[idx]);
-          const dataJson = f.data_json ? JSON.parse(f.data_json) : {};
-          newFamilies[f.id] = { id: f.id, husbandId: f.husbandId || null, wifeId: f.wifeId || null, marrDate: f.marrDate || "", children: dataJson.children || [] };
-        });
-      }
-
-      // Prečitame base64 späť do pamäte z priečinkov
-      let mediaDir = null; let docsDir = null;
-      try { mediaDir = await dirHandle.getDirectoryHandle('media'); } catch(e){}
-      try { docsDir = await dirHandle.getDirectoryHandle('docs'); } catch(e){}
-
-      async function readFileAsBase64(dHandle, filename) {
-          if (!dHandle) return null;
-          try {
-              const fHandle = await dHandle.getFileHandle(filename);
-              const f = await fHandle.getFile();
-              return new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onload = (e) => resolve(e.target.result);
-                  reader.readAsDataURL(f);
-              });
-          } catch(e) { return null; }
-      }
-
-      for (const p of Object.values(newPersons)) {
-          for (const ph of p.photos) {
-              if (ph.savedPath && ph.savedPath.startsWith('media/')) {
-                  const b64 = await readFileAsBase64(mediaDir, ph.savedPath.replace('media/', ''));
-                  if (b64) ph.data = b64;
-              }
-          }
-          for (const doc of p.documents) {
-              if (doc.savedPath && doc.savedPath.startsWith('docs/')) {
-                  const b64 = await readFileAsBase64(docsDir, doc.savedPath.replace('docs/', ''));
-                  if (b64) doc.data = b64;
-              }
-          }
-      }
-
-      treeData = { fileName: loadedFileName, persons: newPersons, families: newFamilies, files: {} };
-      recentEditedIds = Object.keys(newPersons).slice(0, 5); 
-      launchWorkspace(); 
-      autoLayoutTree(true);
-      showToast(t('msgReadOk').replace('{X}', Object.keys(newPersons).length), "success");
-  } catch(e) {
-      if (e.name !== 'AbortError') showToast("Chyba pri načítaní SQLite priečinku: " + e.message, "error");
-  }
 }
 
 function getMimeTypeFromExt(ext) { switch (ext) { case 'jpg': case 'jpeg': return 'image/jpeg'; case 'png': return 'image/png'; case 'webp': return 'image/webp'; case 'pdf': return 'application/pdf'; case 'doc': return 'application/msword'; case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; case 'txt': return 'text/plain'; default: return 'application/octet-stream'; } }
@@ -958,13 +846,19 @@ function updateSidebarTreeLabels() {
   const fileLabel = document.getElementById('sidebarFileName');
   if (fileLabel) fileLabel.textContent = dbConnection ? 'SQL server' : (treeData.fileName || 'rodokmen.gdz');
 }
+function updateSourceUI() {
+  const btn = document.getElementById('btnSaveServerSidebar'); if (!btn) return;
+  const ok = treeSource === 'server';
+  btn.classList.toggle('opacity-40', !ok); btn.classList.toggle('cursor-not-allowed', !ok);
+  btn.title = ok ? '' : 'Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP.';
+}
 function launchWorkspace() {
-  dbConnection = null; updateDbStatusUI();
+  treeSource = 'local'; hydratePromise = null; dbConnection = null; updateDbStatusUI(); updateSourceUI();
   document.getElementById('welcomeScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('sidebarFileName').innerText = dbConnection ? "SQL server" : (treeData.fileName || "rodokmen.gdz"); updateSidebarTreeLabels();
   initCanvas(); updateRecentListUI(); updateCountsUI(); const pKeys = Object.keys(treeData.persons); if (pKeys.length > 0) selectPerson(pKeys[0], false);
 }
 function closeCurrentTree() {
-  dbConnection = null; updateDbStatusUI(); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
+  treeSource = 'local'; hydratePromise = null; updateSourceUI(); dbConnection = null; updateDbStatusUI(); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
 function updateCountsUI() { document.getElementById('statPersonsCount').innerText = Object.keys(treeData.persons).length; document.getElementById('statFamiliesCount').innerText = Object.keys(treeData.families).length; }
 
 // --- MERANIE TEXTU A GEOMETRIA BUBLÍN ---
@@ -1603,114 +1497,6 @@ function removeTempFile(fileId) {
   });
 }
 
-async function saveSqliteTree() {
-  if (!SQL) { showToast("Knižnica SQLite sa ešte načítava...", "error"); return; }
-  if (!('showDirectoryPicker' in window)) { showToast("Váš prehliadač nepodporuje priamy zápis do priečinkov (napr. Firefox). Použite prosím Chrome/Edge alebo uloženie do .gdz", "error"); return; }
-
-  try {
-    const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    showToast("Pripravujem SQLite databázu a priečinky...", "info");
-
-    const db = new SQL.Database();
-    db.run(`CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT)`);
-    db.run(`CREATE TABLE persons (id TEXT PRIMARY KEY, title TEXT, firstName TEXT, middleName TEXT, lastName TEXT, birthName TEXT, gender TEXT, birthDate TEXT, birthPlace TEXT, birthCountry TEXT, deathDate TEXT, deathPlace TEXT, famc TEXT, data_json TEXT)`);
-    db.run(`CREATE TABLE families (id TEXT PRIMARY KEY, husbandId TEXT, wifeId TEXT, marrDate TEXT, data_json TEXT)`);
-    db.run(`CREATE TABLE files (id TEXT PRIMARY KEY, name TEXT, ext TEXT, type TEXT, path TEXT)`); 
-
-    const stmtMeta = db.prepare(`INSERT INTO metadata VALUES (?, ?)`);
-    stmtMeta.run(["fileName", treeData.fileName || "rodokmen.sqlite"]);
-    stmtMeta.free();
-
-    const mediaDir = await dirHandle.getDirectoryHandle('media', { create: true });
-    const docsDir = await dirHandle.getDirectoryHandle('docs', { create: true });
-
-    async function writeBase64ToFile(dHandle, filename, b64Data) {
-        try {
-            const fileHandle = await dHandle.getFileHandle(filename, { create: true });
-            const writable = await fileHandle.createWritable();
-            const response = await fetch(b64Data);
-            const blob = await response.blob();
-            await writable.write(blob);
-            await writable.close();
-        } catch(e) { console.error("Chyba zapisu suboru", filename, e); }
-    }
-
-    const stmtFile = db.prepare(`INSERT INTO files VALUES (?, ?, ?, ?, ?)`);
-    const stmtPerson = db.prepare(`INSERT INTO persons VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-
-    for (const p of Object.values(treeData.persons)) {
-        let pCopy = JSON.parse(JSON.stringify(p)); 
-        
-        for (let i = 0; i < pCopy.photos.length; i++) {
-            const ph = pCopy.photos[i];
-            if (ph.data && ph.data.startsWith('data:')) {
-                const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                const filename = `${p.id.replace(/@/g, '')}_photo_${i}_${cleanName}`;
-                await writeBase64ToFile(mediaDir, filename, ph.data);
-                stmtFile.run([ph.id, ph.name, ph.type || 'jpg', 'photo', `media/${filename}`]);
-                p.photos[i].savedPath = `media/${filename}`; ph.savedPath = `media/${filename}`; 
-                delete ph.data; 
-            } else if (p.photos[i].savedPath) {
-                 stmtFile.run([ph.id, ph.name, ph.type || 'jpg', 'photo', p.photos[i].savedPath]);
-                 delete ph.data;
-            }
-        }
-        
-        for (let i = 0; i < pCopy.documents.length; i++) {
-            const doc = pCopy.documents[i];
-            if (doc.data && doc.data.startsWith('data:')) {
-                const cleanName = doc.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-                const filename = `${p.id.replace(/@/g, '')}_doc_${i}_${cleanName}`;
-                await writeBase64ToFile(docsDir, filename, doc.data);
-                stmtFile.run([doc.id, doc.name, doc.type || 'pdf', 'doc', `docs/${filename}`]);
-                p.documents[i].savedPath = `docs/${filename}`; doc.savedPath = `docs/${filename}`;
-                delete doc.data;
-            } else if (p.documents[i].savedPath) {
-                 stmtFile.run([doc.id, doc.name, doc.type || 'pdf', 'doc', p.documents[i].savedPath]);
-                 delete doc.data;
-            }
-        }
-
-        const dataJson = JSON.stringify({
-            fams: pCopy.fams, events: pCopy.events, sources: pCopy.sources,
-            addresses: pCopy.addresses, occupations: pCopy.occupations || [], notes: pCopy.notes,
-            photos: pCopy.photos, documents: pCopy.documents,
-            x: pCopy.x, y: pCopy.y
-        });
-
-        stmtPerson.run([
-            p.id, p.title || "", p.firstName || "", p.middleName || "", p.lastName || "", p.birthName || "",
-            p.gender || "U", p.birthDate || "", p.birthPlace || "", p.birthCountry || "",
-            p.deathDate || "", p.deathPlace || "", p.famc || "", dataJson
-        ]);
-    }
-    stmtPerson.free();
-    stmtFile.free();
-
-    const stmtFam = db.prepare(`INSERT INTO families VALUES (?, ?, ?, ?, ?)`);
-    Object.values(treeData.families).forEach(f => {
-        stmtFam.run([ f.id, f.husbandId || "", f.wifeId || "", f.marrDate || "", JSON.stringify({ children: f.children }) ]);
-    });
-    stmtFam.free();
-
-    const dbData = db.export();
-    const dbBlob = new Blob([dbData], { type: 'application/x-sqlite3' });
-    
-    let targetDbName = treeData.fileName || "rodokmen.sqlite";
-    if (!targetDbName.endsWith('.sqlite')) targetDbName = targetDbName.replace(/\.[^/.]+$/, "") + ".sqlite";
-    
-    const dbFileHandle = await dirHandle.getFileHandle(targetDbName, { create: true });
-    const writableDb = await dbFileHandle.createWritable();
-    await writableDb.write(dbBlob);
-    await writableDb.close();
-
-    showToast("Projekt bol úspešne uložený do vybranej zložky.", "success");
-  } catch(e) {
-      console.error(e);
-      if (e.name !== 'AbortError') showToast("Chyba pri ukladaní SQLite zložky: " + e.message, "error");
-  }
-}
-
 function savePersonForm(e) {
   e.preventDefault(); const personId = document.getElementById('editPersonId').value; const isNew = !personId;
   const id = isNew ? generateId("I") : personId; const p = isNew ? createPersonObj(id) : treeData.persons[id];
@@ -1839,6 +1625,19 @@ function showDocumentsList() {
 }
 
 async function saveGedzipTree() {
+  if (treeSource === 'server') {
+    if (hydratePromise) { showToast('Čakám na stiahnutie príloh zo servera...', 'info'); try { await hydratePromise; } catch (e) {} }
+    let missing = 0;
+    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) missing++; }));
+    if (missing > 0) {
+      showConfirm('Chýbajú prílohy', 'Nepodarilo sa stiahnuť ' + missing + ' príloh zo servera. Export GEDZIP by ich neobsahoval. Pokračovať aj tak?', () => saveGedzipTreeInternal());
+      return;
+    }
+  }
+  return saveGedzipTreeInternal();
+}
+
+async function saveGedzipTreeInternal() {
   showToast(t('msgPrepGdz'), "info");
   try {
     const zip = new JSZip(); const orderedPersonIds = []; const visitedPersons = new Set();
@@ -1910,7 +1709,7 @@ async function saveGedzipTree() {
       try {
         const fileHandle = await window.showSaveFilePicker({ suggestedName: defaultName, types: [{ description: 'GEDZIP Archív', accept: { 'application/zip': ['.gdz', '.gedzip', '.zip'] } }], });
         const writable = await fileHandle.createWritable(); await writable.write(content); await writable.close();
-        treeData.fileName = fileHandle.name; updateSidebarTreeLabels(); showToast(t('msgGdzOk'), "success"); return;
+        if (treeSource === 'local') { treeData.fileName = fileHandle.name; updateSidebarTreeLabels(); } showToast(t('msgGdzOk'), "success"); return;
       } catch (err) { if (err.name === 'AbortError') return; }
     }
 
@@ -2051,6 +1850,7 @@ function updateDbStatusUI() {
 }
 
 async function openDbModal(mode) {
+  if (mode === 'save' && treeSource !== 'server') { showToast('Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP.', 'error'); return; }
   dbModalMode = mode;
   hideDbError();
   if (!isBackendConfigured()) {
@@ -2250,6 +2050,7 @@ async function hydrateFiles(session) {
 
 
 async function putTreeData(session) {
+  if (treeSource !== 'server') throw new Error('Tento rodokmeň nebol načítaný zo servera, preto sa nedá nahrať na server. Môžete ho uložiť iba do lokálneho súboru GEDZIP.');
   const persons = Object.values(treeData.persons);
 
   if (persons.length === 0) {
@@ -2341,6 +2142,7 @@ async function putTreeData(session) {
 
 
 async function saveToServer() {
+  if (treeSource !== 'server') { showToast('Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP (Menu → Uložiť súbor Gedzip).', 'error'); return; }
   if (!dbConnection) { openDbModal('save'); return; }
   if (dbBusy) return;
   dbBusy = true; showToast(t('msgDbSaving'), 'info');
@@ -2367,15 +2169,16 @@ function loadTreeFromServer(data, session) {
     families[raw.id] = { id: raw.id, husbandId: raw.husbandId || null, wifeId: raw.wifeId || null, marrDate: raw.marrDate || "", children: Array.isArray(raw.children) ? raw.children : [] };
   });
   if (Object.keys(persons).length === 0) {
-    createNewTree(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
+    createNewTree(); treeSource = 'server'; treeVersion = Number(data.version); updateSourceUI(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
+  treeSource = 'server'; updateSourceUI();
   autoLayoutTree(true);
   dbConnection = session; updateDbStatusUI();
-  hydrateFiles(session);
+  hydratePromise = hydrateFiles(session);
   showToast(t('msgDbLoaded').replace('{X}', Object.keys(persons).length), 'success');
 }
 
