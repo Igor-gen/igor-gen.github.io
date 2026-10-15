@@ -726,7 +726,6 @@ function setLanguage(lang) {
 const LAYOUT = { bw: 200, bh: 72, gapX: 40, gapY: 48, spouseGap: 110 }; 
 
 let treeData = { fileName: "rodokmen.gdz", persons: {}, families: {}, files: {} };
-let originalTreeData = null;
 let treeVersion = 0;
 let originalTreeData = null;
 // Pôvod aktuálneho rodokmeňa: 'server' = načítaný zo servera (možno ukladať na server aj do GEDZIP), 'local' = lokálny súbor/ukážka/nový (iba lokálne ukladanie)
@@ -778,7 +777,6 @@ function loadSampleTree() {
 
   treeData = { fileName: "Ukazkovy_Rodokmen.gdz", persons: { "@I1@": p1, "@I2@": p2, "@I3@": p3, "@I4@": p4, "@I5@": p5, "@I6@": p6 }, families: { "@F1@": fam1, "@F2@": fam2 }, files: {} };
   originalTreeData = JSON.parse(JSON.stringify(treeData));
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@", "@I2@", "@I3@", "@I4@", "@I5@"];
   launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success");
 }
@@ -786,7 +784,6 @@ function loadSampleTree() {
 function createNewTree() {
   const p1 = createPersonObj("@I1@", "", "Zakladateľ", "Rodiny", "M", "01.01.1970", "Bratislava", "Slovensko", "", ""); p1.x = 400; p1.y = 120;
   treeData = { fileName: "Novy_Rodokmen.gdz", persons: { "@I1@": p1 }, families: {}, files: {} };
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success");
 }
@@ -1642,7 +1639,7 @@ function renderMediaGallery() {
         <span class="absolute top-2 left-2 w-7 h-7 rounded-full bg-white/95 shadow flex items-center justify-center"><input type="checkbox" ${sel ? 'checked' : ''} onchange="galleryToggle('${f.id}', this.checked)" class="w-4 h-4 accent-indigo-600 cursor-pointer"></span>
         ${star}
       </div>
-      <input type="text" maxlength="300" value="${esc(f.caption || \'\')}" placeholder="${esc(captionPlaceholder())}" onchange="galleryCaption(\'${f.id}\', this.value)" onkeyup="galleryCaption(\'${f.id}\', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+      <input type="text" maxlength="300" value="${esc(f.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="galleryCaption('${f.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
     </div>`;
   }).join('');
   document.getElementById('mediaSelectAll').checked = galleryItems.length > 0 && gallerySelected.size === galleryItems.length;
@@ -2191,15 +2188,151 @@ async function fetchTreeData(session) {
   });
 
   if (!res.ok) {
+    const err = await backendError(res, 'msgDbSessionExpired');
+    if (res.status === 401) err.sessionExpired = true;
+    throw err;
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error(t('msgDbErrData'));
+  }
+
+  if (
+    !data ||
+    !Array.isArray(data.persons) ||
+    !Number.isSafeInteger(Number(data.version)) ||
+    Number(data.version) < 0
+  ) {
+    throw new Error(t('msgDbErrData'));
+  }
+
+  return data;
+}
+
+
+// --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč ---
+function fileList(p) { return (p.photos || []).map(f => [f, 'photo']).concat((p.documents || []).map(f => [f, 'doc'])); }
+
+async function uploadPendingFiles(session) {
+  const pending = [];
+  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f, kind]) => { if (f.data && !f.key) pending.push([f, kind]); }));
+  let done = 0;
+  for (const [f, kind] of pending) {
+    showToast(t('msgFileUploading').replace('{X}', done + 1).replace('{N}', pending.length), 'info');
+    try {
+      const blob = await (await fetch(f.data)).blob();
+      const mime = (blob.type || (f.data.match(/^data:([^;,]+)/) || [])[1] || 'application/octet-stream');
+      const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ action: 'upload', kind, name: f.name, mime, size: blob.size }) });
+      if (!r.ok) { const err = await backendError(r, 'msgDbSessionExpired'); if (r.status === 401) err.sessionExpired = true; throw err; }
+      const up = await r.json();
+      const put = await backendFetch(up.url, 'PUT', { headers: up.headers, body: blob, timeout: 300000, absolute: true });
+      if (!put.ok) throw new Error(t('msgDbErrServer') + ' (' + put.status + ')');
+      f.key = up.key; f.mime = up.mime || mime; f.size = blob.size;
+      done++;
+    } catch (err) {
+      if (err.sessionExpired) throw err;
+      throw new Error(t('msgFileUploadFail') + ': ' + (f.name || '') + (err.message ? ' – ' + err.message : ''));
+    }
+  }
+}
+
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
+
+// Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
+async function hydrateFiles(session) {
+  const todo = [];
+  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) todo.push(f); }));
+  if (!todo.length) return;
+  const treeRef = treeData;
+  try {
+    for (let i = 0; i < todo.length; i += 50) {
+      const chunk = todo.slice(i, i + 50);
+      const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ action: 'download', keys: chunk.map(f => f.key) }) });
+      if (!r.ok) return;
+      const urls = (await r.json()).urls || {};
+      let idx = 0;
+      const worker = async () => {
+        while (idx < chunk.length) {
+          const f = chunk[idx++]; const u = urls[f.key]; if (!u) continue;
+          try {
+            const res = await fetch(u, { cache: 'no-store' }); if (!res.ok) continue;
+            const blob = await res.blob();
+            f.data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+            if (treeRef === treeData) drawTree();
+          } catch (e) { /* jeden súbor nesmie zastaviť ostatné */ }
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+    }
+  } catch (e) { /* načítanie súborov je doplnkové */ }
+}
+
+
+async function putTreeData(session) {
+  if (treeSource !== 'server') throw new Error('Tento rodokmeň nebol načítaný zo servera, preto sa nedá nahrať na server. Môžete ho uložiť iba do lokálneho súboru GEDZIP.');
+  const persons = Object.values(treeData.persons);
+
+  if (persons.length === 0) {
+    throw new Error(t('msgDbEmptyTree'));
+  }
+
+  if (
+    !Number.isSafeInteger(treeVersion) ||
+    treeVersion < 0
+  ) {
+    throw new Error('Chýba platná verzia rodokmeňa. Najprv rodokmeň načítaj zo servera.');
+  }
+
+  await uploadPendingFiles(session);
+
+  const slim = persons.map((p) =>
+    Object.assign({}, p, {
+      photos: (p.photos || []).map(slimFile),
+      documents: (p.documents || []).map(slimFile)
+    })
+  );
+
+  const body = JSON.stringify({
+    version: treeVersion,
+    fileName: treeData.fileName || 'rodokmen',
+    persons: slim,
+    families: Object.values(treeData.families)
+  });
+
+  if (new Blob([body]).size > MAX_PAYLOAD_BYTES) {
+    throw new Error(t('msgDbTooLarge'));
+  }
+
+  const res = await backendFetch('/api/tree', 'PUT', {
+    headers: await clerkAuthHeaders({
+      'Content-Type': 'application/json'
+    }),
+    body,
+    timeout: 120000
+  });
+
+  if (!res.ok) {
     if (res.status === 409) {
-      showToast('Zistili sa zmeny od iného používateľa. Zlučujem dáta...', 'info');
-      
-      const serverTree = await fetchTreeData(session);
-      autoMergeTrees(serverTree);
-      
-      treeVersion = Number(serverTree.version);
-      
-      return putTreeData(session); 
+      let conflictData = {};
+
+      try {
+        conflictData = await res.json();
+      } catch (e) {
+        // Použijeme všeobecnú správu o konflikte.
+      }
+
+      const err = new Error(
+        'Rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny neboli uložené. Najprv načítaj aktuálny rodokmeň zo servera.'
+      );
+
+      err.versionConflict = true;
+      err.currentVersion = conflictData.currentVersion;
+      throw err;
     }
 
     const err = await backendError(res, 'msgDbSessionExpired');
@@ -2229,7 +2362,6 @@ async function fetchTreeData(session) {
   }
 
   treeVersion = Number(result.version);
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
 }
 
 
@@ -2265,7 +2397,6 @@ function loadTreeFromServer(data, session) {
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
-  originalTreeData = JSON.parse(JSON.stringify(treeData));
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
