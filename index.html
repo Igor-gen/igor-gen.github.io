@@ -845,7 +845,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
           else if (tagOrId === "NOTE") { currentEntity.notes.push(value); }
           else if (tagOrId === "OBJE") { currentEntity._obje = currentEntity._obje || []; currentEntity._obje.push({ file: "", main: false }); }
         } else if (level === 2) {
-          if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); }
+          if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); else if (tagOrId === "TITL") lo.title = value; }
           else if (currentSubTag === "NOTE" && (tagOrId === "CONT" || tagOrId === "CONC") && currentEntity.notes.length) { currentEntity.notes[currentEntity.notes.length - 1] += (tagOrId === "CONT" ? "\n" : "") + value; }
           else if (currentSubTag === "BIRT") { if (tagOrId === "DATE") currentEntity.birthDate = value; if (tagOrId === "PLAC") currentEntity.birthPlace = value; } 
           else if (currentSubTag === "DEAT") { if (tagOrId === "DATE") currentEntity.deathDate = value; if (tagOrId === "PLAC") currentEntity.deathPlace = value; } 
@@ -867,6 +867,8 @@ function parseGedcomString(text, fileName, attachedFiles) {
             if (tagOrId === "TYPE" && currentSubTag === "EDUC") { if (value.toLowerCase().includes("základná") || value.toLowerCase().includes("elementary")) lastEv.type = "EDUC_ZS"; else if (value.toLowerCase().includes("stredná") || value.toLowerCase().includes("high")) lastEv.type = "EDUC_SS"; else if (value.toLowerCase().includes("vysoká") || value.toLowerCase().includes("uni")) lastEv.type = "EDUC_VS"; }
             if (tagOrId === "TYPE" && currentSubTag === "EVEN") lastEv.title = value;
           }
+        } else if (level === 3 && currentSubTag === "OBJE" && tagOrId === "TITL" && currentEntity._obje && currentEntity._obje.length) {
+          currentEntity._obje[currentEntity._obje.length - 1].title = value;
         }
       } else if (currentEntity.husbandId !== undefined) {
         if (level === 1) { currentSubTag = tagOrId; if (tagOrId === "HUSB") currentEntity.husbandId = value; else if (tagOrId === "WIFE") currentEntity.wifeId = value; else if (tagOrId === "CHIL") currentEntity.children.push(value); } 
@@ -883,8 +885,8 @@ function parseGedcomString(text, fileName, attachedFiles) {
       const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext);
       const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
       const uid = Math.random().toString(36).slice(2, 9);
-      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main });
-      else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext });
+      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main, caption: ref.title || '' });
+      else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext, caption: ref.title || '' });
     });
     if (per.photos.length && !per.photos.some(ph => ph.isMain)) per.photos[0].isMain = true;
   });
@@ -1550,6 +1552,7 @@ function handleSpecificFilesAttach(input, targetType) {
         data: e.target.result, 
         type: isPhoto ? 'photo' : ext, 
         isTargetType: targetType,
+        caption: '',
         isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain) 
       }); 
       renderAttachedFilesList(); 
@@ -1559,12 +1562,25 @@ function handleSpecificFilesAttach(input, targetType) {
   input.value = "";
 }
 
+function captionPlaceholder() {
+  return ({ sk: 'Popis (zobrazí sa pod súborom)...', cs: 'Popis (zobrazí se pod souborem)...', en: 'Caption (shown below the file)...', de: 'Beschreibung (unter der Datei angezeigt)...' })[currentLang] || 'Popis...';
+}
+function setFileCaption(fileId, value) {
+  const f = tempAttachedFiles.find(x => x.id === fileId);
+  if (f) f.caption = String(value || '').replace(/[\r\n]+/g, ' ').slice(0, 300);
+}
 function renderAttachedFilesList() {
   const list = document.getElementById('attachedFilesList'); list.innerHTML = "";
   if (tempAttachedFiles.length === 0) { list.innerHTML = `<span class="text-slate-400 italic text-[11px] col-span-2 p-2">${t('tNoFiles')}</span>`; return; }
   tempAttachedFiles.forEach(file => {
     const isPhoto = (file.isTargetType === 'photo' || file.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(file.type));
-    list.innerHTML += `<div class="flex items-center justify-between p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs"><div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${file.type}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${esc(file.name)}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div><button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1"><i class="ph-bold ph-trash"></i></button></div>`;
+    list.innerHTML += `<div class="flex flex-col gap-2 p-2 rounded-xl border ${file.isMain ? 'border-amber-400 bg-amber-50/50' : 'border-slate-200 bg-white'} text-xs">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 truncate">${isPhoto ? `<img src="${file.data}" class="w-8 h-8 rounded-lg object-cover">` : `<div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase text-[9px]">${esc(file.type)}</div>`}<div class="truncate"><p class="font-medium text-slate-800 truncate text-[11px]">${esc(file.name)}</p>${isPhoto ? `<label class="inline-flex items-center gap-1 cursor-pointer text-[10px] text-amber-700 font-semibold"><input type="radio" name="mainPhotoRadio" ${file.isMain ? 'checked' : ''} onchange="setMainPhoto('${file.id}')"> ${t('tMainPhoto')}</label>` : `<span class="text-[10px] text-slate-400">${t('tDoc')}</span>`}</div></div>
+        <button type="button" onclick="removeTempFile('${file.id}')" class="text-rose-500 hover:text-rose-700 p-1 flex-none"><i class="ph-bold ph-trash"></i></button>
+      </div>
+      <input type="text" maxlength="300" value="${esc(file.caption || '')}" placeholder="${esc(captionPlaceholder())}" oninput="setFileCaption('${file.id}', this.value)" class="w-full p-2 rounded-lg border border-slate-300 bg-slate-50 text-[11px] focus:ring-2 focus:ring-indigo-500 outline-none">
+    </div>`;
   });
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
@@ -1684,7 +1700,7 @@ function showPhotoSlider() {
   isMosaicActive = false; document.getElementById('mosaicBtnText').innerText = t('btnMosaic'); document.getElementById('photoSliderView').classList.remove('hidden'); document.getElementById('photoMosaicView').classList.add('hidden');
   const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { document.getElementById('activePhotoImg').src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
-  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerText = `${cur.name} ${cur.isMain ? t('tMainPhLbl') : ''}`; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
+  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = (cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : '') + `<span class="block ${cur.caption ? 'text-[10px] sm:text-xs text-slate-400 mt-0.5' : ''}">${esc(cur.name)} ${cur.isMain ? t('tMainPhLbl') : ''}</span>`; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
 }
 
 function nextPhoto() { const p = treeData.persons[activeMediaPersonId]; if (!p || !p.photos.length) return; currentPhotoIndex = (currentPhotoIndex + 1) % p.photos.length; showPhotoSlider(); }
@@ -1695,13 +1711,13 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${esc(ph.name)}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>`; });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end"><p class="text-[10px] sm:text-xs text-white font-medium truncate">${esc(ph.name)}</p>${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${esc(doc.name)}</h4><p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold">${esc(doc.name)}</h4>${doc.caption ? `<p class="text-[11px] sm:text-xs text-slate-200 mt-0.5 break-words">${esc(doc.caption)}</p>` : `<p class="text-[10px] sm:text-xs text-slate-400">${t('tSafeDoc')}</p>`}</div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
@@ -1768,8 +1784,8 @@ async function saveGedzipTreeInternal() {
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
 
-      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
-      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${dc.caption ? '3 TITL ' + String(dc.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
     });
 
     Object.keys(treeData.families).forEach(oldFamId => {
@@ -2128,7 +2144,7 @@ async function uploadPendingFiles(session) {
   }
 }
 
-function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, key: f.key, mime: f.mime || '', size: f.size || 0 }; }
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
 
 // Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
 async function hydrateFiles(session) {
