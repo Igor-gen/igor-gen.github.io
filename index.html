@@ -1743,7 +1743,7 @@ function openMediaGallery(type) {
   document.getElementById('mediaSaveLbl').innerText = gt('save');
   document.getElementById('mediaSelectAllLbl').innerText = gt('selectAll');
   document.getElementById('mediaAddLbl').innerText = gt(type === 'photo' ? 'addPhotos' : 'addDocs');
-  document.getElementById('mediaAddInput').accept = type === 'photo' ? 'image/*' : '.pdf,.doc,.docx,.txt,.xls,.xlsx';
+  document.getElementById('mediaAddInput').accept = type === 'photo' ? 'image/*,.heic,.heif' : '.pdf,.doc,.docx,.txt,.xls,.xlsx,.odt,.ods,.rtf,.csv';
   document.getElementById('mediaSelectAll').checked = false;
   document.getElementById('mediaEditModal').classList.remove('hidden');
   renderMediaGallery();
@@ -1783,14 +1783,96 @@ function galleryDeleteSelected() {
     renderMediaGallery(); showToast(gt('deletedHint'), 'info');
   });
 }
+// ===== Príprava súborov na nahratie: limit veľkosti, HEIC → JPEG, zmenšenie fotografií =====
+const FILE_LIMIT_MB = 10;
+const FILE_LIMIT_BYTES = FILE_LIMIT_MB * 1024 * 1024;
+// Na server (Backblaze) sa nikdy nenahrávajú HTML a SVG (môžu obsahovať skripty); musí zodpovedať files.js
+const UPLOAD_BANNED_EXT = BANNED_EXTENSIONS.concat(['html', 'htm', 'svg']);
+const PHOTO_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+const FILE_I18N = {
+  sk: { tooBigFile: 'Súbor "{N}" je príliš veľký ({S} MB). Maximum je {M} MB.', tooBigPhoto: 'Fotografiu "{N}" sa nepodarilo zmenšiť pod {M} MB (pôvodne {S} MB).', tooBigShort: 'Súbor je príliš veľký ({S} MB, maximum je {M} MB).',
+    bannedWeb: 'Súbor "{N}" sa nedá priložiť: súbory HTML a SVG sú z bezpečnostných dôvodov zakázané.', bannedShort: 'Tento typ súboru (HTML, SVG alebo spustiteľný) nie je povolený.',
+    badImage: 'Súbor "{N}" nie je podporovaná fotografia (povolené: JPEG, PNG, WebP, GIF, HEIC).', badImageShort: 'Nepodporovaný formát fotografie (povolené: JPEG, PNG, WebP, GIF).',
+    heicNo: 'Váš prehliadač nevie otvoriť formát HEIC. Fotografiu "{N}" preveďte na JPEG.', shrunk: 'Fotografia "{N}" bola zmenšená na {S} MB.', heicConv: 'Fotografia "{N}" bola prevedená z HEIC na JPEG.', working: 'Spracúvam fotografiu "{N}"…' },
+  cs: { tooBigFile: 'Soubor "{N}" je příliš velký ({S} MB). Maximum je {M} MB.', tooBigPhoto: 'Fotografii "{N}" se nepodařilo zmenšit pod {M} MB (původně {S} MB).', tooBigShort: 'Soubor je příliš velký ({S} MB, maximum je {M} MB).',
+    bannedWeb: 'Soubor "{N}" nelze přiložit: soubory HTML a SVG jsou z bezpečnostních důvodů zakázány.', bannedShort: 'Tento typ souboru (HTML, SVG nebo spustitelný) není povolen.',
+    badImage: 'Soubor "{N}" není podporovaná fotografie (povoleno: JPEG, PNG, WebP, GIF, HEIC).', badImageShort: 'Nepodporovaný formát fotografie (povoleno: JPEG, PNG, WebP, GIF).',
+    heicNo: 'Váš prohlížeč neumí otevřít formát HEIC. Fotografii "{N}" převeďte na JPEG.', shrunk: 'Fotografie "{N}" byla zmenšena na {S} MB.', heicConv: 'Fotografie "{N}" byla převedena z HEIC na JPEG.', working: 'Zpracovávám fotografii "{N}"…' },
+  en: { tooBigFile: 'File "{N}" is too large ({S} MB). The maximum is {M} MB.', tooBigPhoto: 'Photo "{N}" could not be reduced below {M} MB (originally {S} MB).', tooBigShort: 'The file is too large ({S} MB, maximum {M} MB).',
+    bannedWeb: 'File "{N}" cannot be attached: HTML and SVG files are blocked for security reasons.', bannedShort: 'This file type (HTML, SVG or executable) is not allowed.',
+    badImage: 'File "{N}" is not a supported photo (allowed: JPEG, PNG, WebP, GIF, HEIC).', badImageShort: 'Unsupported photo format (allowed: JPEG, PNG, WebP, GIF).',
+    heicNo: 'Your browser cannot open HEIC. Please convert photo "{N}" to JPEG.', shrunk: 'Photo "{N}" was reduced to {S} MB.', heicConv: 'Photo "{N}" was converted from HEIC to JPEG.', working: 'Processing photo "{N}"…' },
+  de: { tooBigFile: 'Datei "{N}" ist zu groß ({S} MB). Maximum: {M} MB.', tooBigPhoto: 'Foto "{N}" konnte nicht unter {M} MB verkleinert werden (ursprünglich {S} MB).', tooBigShort: 'Die Datei ist zu groß ({S} MB, Maximum {M} MB).',
+    bannedWeb: 'Datei "{N}" kann nicht angehängt werden: HTML- und SVG-Dateien sind aus Sicherheitsgründen gesperrt.', bannedShort: 'Dieser Dateityp (HTML, SVG oder ausführbar) ist nicht erlaubt.',
+    badImage: 'Datei "{N}" ist kein unterstütztes Foto (erlaubt: JPEG, PNG, WebP, GIF, HEIC).', badImageShort: 'Nicht unterstütztes Fotoformat (erlaubt: JPEG, PNG, WebP, GIF).',
+    heicNo: 'Ihr Browser kann HEIC nicht öffnen. Bitte wandeln Sie das Foto "{N}" in JPEG um.', shrunk: 'Foto "{N}" wurde auf {S} MB verkleinert.', heicConv: 'Foto "{N}" wurde von HEIC in JPEG umgewandelt.', working: 'Foto "{N}" wird verarbeitet…' }
+};
+function ft(key, n, size) {
+  const d = FILE_I18N[currentLang] || FILE_I18N.sk;
+  return (d[key] || FILE_I18N.sk[key] || key).replace('{N}', n == null ? '' : n).replace('{S}', size == null ? '' : fileMb(size)).replace('{M}', FILE_LIMIT_MB);
+}
+function fileMb(bytes) { return (Math.round(bytes / 1048576 * 10) / 10).toString().replace('.', ','); }
+function fileExtOf(name) { return String(name || '').split('.').pop().toLowerCase(); }
+function readAsDataUrl(blob) { return new Promise((ok, no) => { const r = new FileReader(); r.onload = e => ok(e.target.result); r.onerror = no; r.readAsDataURL(blob); }); }
+async function decodeImageFile(file) {
+  if (window.createImageBitmap) { try { return await createImageBitmap(file); } catch (e) { /* skúsi <img> */ } }
+  return new Promise((ok, no) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); ok(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); no(new Error('decode')); };
+    img.src = url;
+  });
+}
+// Zakóduje obrázok do JPEG tak, aby bol najviac limitBytes; postupne znižuje kvalitu a rozmer.
+async function encodeJpegUnder(src, w0, h0, limitBytes) {
+  let maxDim = Math.min(3600, Math.max(w0, h0));
+  for (let round = 0; round < 10; round++) {
+    const sc = Math.min(1, maxDim / Math.max(w0, h0)), w = Math.max(1, Math.round(w0 * sc)), h = Math.max(1, Math.round(h0 * sc));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(src, 0, 0, w, h);
+    for (const q of [0.9, 0.8, 0.7, 0.6]) {
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+      if (blob && blob.size <= limitBytes) return blob;
+    }
+    maxDim = Math.round(maxDim * 0.8);
+  }
+  return null;
+}
+// Vráti { name, data (data URL), type } alebo null (a zobrazí dôvod).
+async function prepareFileForUpload(file, kind) {
+  const ext = fileExtOf(file.name), mime = String(file.type || '').toLowerCase();
+  const banned = (treeSource === 'server' ? UPLOAD_BANNED_EXT : BANNED_EXTENSIONS).includes(ext);
+  if (banned) { showToast(UPLOAD_BANNED_EXT.includes(ext) && !BANNED_EXTENSIONS.includes(ext) ? ft('bannedWeb', file.name) : `Súbor "${file.name}" ${t('tFileBanned')}`, 'error'); return null; }
+  if (kind !== 'photo') {
+    if (file.size > FILE_LIMIT_BYTES) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }
+    return { name: file.name, data: await readAsDataUrl(file), type: ext };
+  }
+  const isHeic = /hei[cf]/.test(ext) || /hei[cf]/.test(mime);
+  const okType = isHeic || PHOTO_EXT.includes(ext) || /^image\/(jpeg|png|webp|gif)$/.test(mime);
+  if (!okType) { showToast(ft('badImage', file.name), 'error'); return null; }
+  const isGif = ext === 'gif' || mime === 'image/gif';
+  const tooBig = file.size > FILE_LIMIT_BYTES;
+  if (!isHeic && !tooBig) return { name: file.name, data: await readAsDataUrl(file), type: 'photo' };
+  if (isGif) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }   // animáciu nemožno bezpečne zmenšiť
+  showToast(ft('working', file.name), 'info');
+  let src;
+  try { src = await decodeImageFile(file); }
+  catch (e) { showToast(isHeic ? ft('heicNo', file.name) : ft('badImage', file.name), 'error'); return null; }
+  const blob = await encodeJpegUnder(src, src.width || src.naturalWidth, src.height || src.naturalHeight, FILE_LIMIT_BYTES);
+  if (src.close) { try { src.close(); } catch (e) { /* nie je kritické */ } }
+  if (!blob) { showToast(ft('tooBigPhoto', file.name, file.size), 'error'); return null; }
+  showToast(isHeic && !tooBig ? ft('heicConv', file.name) : ft('shrunk', file.name, blob.size), 'success');
+  return { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', data: await readAsDataUrl(blob), type: 'photo' };
+}
+
 async function galleryHandleFiles(input) {
   const files = Array.from(input.files || []); if (!files.length) return;
   const isPh = galleryType === 'photo';
   for (const file of files) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`Súbor "${file.name}" ${t('tFileBanned')}`, 'error'); continue; }
-    const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = e => ok(e.target.result); r.onerror = no; r.readAsDataURL(file); });
-    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: file.name, data, type: isPh ? 'photo' : ext, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
+    let prepared = null;
+    try { prepared = await prepareFileForUpload(file, isPh ? 'photo' : 'doc'); } catch (e) { showToast(String(e && e.message || e), 'error'); }
+    if (!prepared) continue;
+    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
   }
   input.value = '';
   renderMediaGallery();
@@ -2327,9 +2409,20 @@ async function uploadPendingFiles(session) {
       const generic = m => !m || m === 'application/octet-stream';
       const mime = (!generic(byExt) ? byExt : '') || (!generic(raw.type) ? raw.type : '') || (f.data.match(/^data:([^;,]+)/) || [])[1] || 'application/octet-stream';
       let blob = new Blob([raw], { type: mime });
+      if (UPLOAD_BANNED_EXT.includes(ext)) throw new Error(ft('bannedShort'));
+      if (raw.size > FILE_LIMIT_BYTES) throw new Error(ft('tooBigShort', '', raw.size));
       const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: 'upload', kind, name: f.name, mime, size: blob.size }) });
-      if (!r.ok) { const err = await backendError(r, 'msgDbSessionExpired'); if (r.status === 401) err.sessionExpired = true; throw err; }
+      if (!r.ok) {
+        // Chyby súboru sa nesmú tváriť ako „rodokmeň je príliš veľký“
+        if (r.status === 413) throw new Error(ft('tooBigShort', '', raw.size));
+        if (r.status === 400) {
+          let j = {}; try { j = await r.clone().json(); } catch (e) { /* všeobecná chyba nižšie */ }
+          if (j.error === 'banned extension') throw new Error(ft('bannedShort'));
+          if (j.error === 'bad image type') throw new Error(ft('badImageShort'));
+        }
+        const err = await backendError(r, 'msgDbSessionExpired'); if (r.status === 401) err.sessionExpired = true; throw err;
+      }
       const up = await r.json();
       // Telo musí mať presne ten Content-Type, ktorý server podpísal do URL (inak Backblaze odmietne PUT bez CORS hlavičiek).
       const signedType = (up.headers && (up.headers['Content-Type'] || up.headers['content-type'])) || up.mime || mime;
