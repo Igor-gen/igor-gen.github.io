@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Genealogy - Rodokmeň</title>
+  <title>Genealogy – Rodokmeň</title>
   <!-- Clerk authentication (invite-only users are managed in Clerk Dashboard) -->
   <script defer crossorigin="anonymous" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js"></script>
   <script defer crossorigin="anonymous" data-clerk-publishable-key="pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
@@ -1199,6 +1199,51 @@ function autoLayoutTree(andFitToView = true) {
   if (andFitToView) fitTreeToView(); else drawTree();
 }
 
+// --- PATriliniové rozloženie: hlavná pokrvná os zhora nadol a hrebeň súrodencov doľava ---
+function autoLayoutTree(andFitToView = true) {
+  const P=treeData.persons||{}, F=treeData.families||{}, people=Object.values(P);
+  if(!people.length) return;
+  const parentFam=id=>P[id]&&P[id].famc&&F[P[id].famc]||null;
+  const parents=id=>{const f=parentFam(id);return f?[f.husbandId,f.wifeId].filter(x=>P[x]):[]};
+  const spouses=id=>{const out=[];(P[id].fams||[]).forEach(fid=>{const f=F[fid];if(!f)return;const other=f.husbandId===id?f.wifeId:f.husbandId;if(other&&P[other])out.push({id:other,fam:f});});return out;};
+  const children=id=>{const out=[];(P[id].fams||[]).forEach(fid=>{const f=F[fid];if(f)(f.children||[]).forEach(cid=>{if(P[cid]&&!out.includes(cid))out.push(cid);});});return out;};
+  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  let root=people.find(p=>norm(p.firstName)==='igor'&&norm(p.lastName)==='sklencar');
+  if(!root){const ancestors=people.filter(p=>parents(p.id).length===0);let best=-1;for(const p of (ancestors.length?ancestors:people)){let count=0,seen=new Set(),q=[p.id];while(q.length){const id=q.pop();if(seen.has(id))continue;seen.add(id);count++;q.push(...children(id));}if(count>best){best=count;root=p;}}}
+  if(!root)root=people[0];
+  // Nájdeme najstaršieho dostupného predka koreňa a odtiaľ pokračujeme po dedičskej línii.
+  let top=root,guard=0;while(parents(top.id).length&&guard++<100){const ps=parents(top.id);top=P[ps.find(id=>P[id]&&P[id].gender==='M')||ps[0]]||top;}
+  const spine=[],visited=new Set();let cur=top;guard=0;
+  while(cur&&guard++<200&&!visited.has(cur.id)){visited.add(cur.id);spine.push(cur.id);const kids=children(cur.id);if(!kids.length)break;
+    const sons=kids.filter(id=>P[id].gender==='M');
+    // Ak existuje syn, pokračuje najstarší syn; inak pokračuje najstaršia dcéra.
+    const next=(sons.length?sons:kids).slice().sort((a,b)=>{const da=String(P[a].birthDate||''),db=String(P[b].birthDate||'');return da.localeCompare(db)||kids.indexOf(a)-kids.indexOf(b);})[0];cur=P[next];
+  }
+  // Ak sa našiel zakladateľ Igor, začíname jeho vetvou (predkovia zostávajú nad ním).
+  const rootIndex=spine.indexOf(root.id);if(rootIndex>0)spine.splice(0,rootIndex);
+  const centerX=700, topY=110, rowGap=LAYOUT.bh+Math.max(46,LAYOUT.gapY), placed=new Set(), couplePairs=new Set();
+  function set(id,x,y){if(!P[id]||placed.has(id))return;P[id].x=x;P[id].y=y;placed.add(id);}
+  // Os: starší hore, mladší dole.
+  spine.forEach((id,i)=>{set(id,centerX,topY+i*rowGap);});
+  // Partneri ústrednej línie vždy vpravo, s dostatočným odstupom pre svadobný štítok.
+  spine.forEach((id,i)=>{const p=P[id],y=p.y;const sp=spouses(id).sort((a,b)=>(a.fam.marrDate||'').localeCompare(b.fam.marrDate||''))[0];if(sp&&!placed.has(sp.id)){const gap=Math.max(210,personBubbleW(p)/2+personBubbleW(P[sp.id])/2+76);set(sp.id,centerX+gap,y);couplePairs.add([id,sp.id].sort().join('|'));}});
+  // Súrodenci sa radia doľava od člena hlavnej línie; mladší sú vždy ďalej doľava.
+  spine.forEach(id=>{const fam=parentFam(id);if(!fam)return;const sibs=(fam.children||[]).filter(s=>P[s]&&s!==id);const ordered=sibs.slice().sort((a,b)=>{const da=String(P[a].birthDate||''),db=String(P[b].birthDate||'');return db.localeCompare(da)||(fam.children||[]).indexOf(b)-(fam.children||[]).indexOf(a);});let x=centerX-personBubbleW(P[id])/2-70;
+    ordered.forEach(sid=>{const sib=P[sid];if(placed.has(sid))return;const w=personBubbleW(sib);x-=w/2;set(sid,x,sib.y||P[id].y);x-=w/2+48;
+      const sp=spouses(sid).find(o=>!placed.has(o.id));if(sp){const sx=sib.x+personBubbleW(sib)/2+Math.max(210,personBubbleW(P[sp.id])/2+80);set(sp.id,sx,sib.y);couplePairs.add([sid,sp.id].sort().join('|'));}
+    });
+  });
+  // Ostatné osoby (vrátane vetiev partnerov) umiestnime do generácie podľa rodičov, bez prekrytia.
+  let maxY=Math.max(...spine.map(id=>P[id].y));const rowLists=new Map();
+  people.filter(p=>!placed.has(p.id)).forEach(p=>{const ps=parents(p.id);const y=ps.length?Math.max(...ps.map(id=>P[id]?P[id].y:topY))+rowGap:(maxY+rowGap);if(!rowLists.has(y))rowLists.set(y,[]);rowLists.get(y).push(p);});
+  rowLists.forEach((list,y)=>{list.sort((a,b)=>String(a.lastName||'').localeCompare(String(b.lastName||''))||String(a.firstName||'').localeCompare(String(b.firstName||'')));let x=80;list.forEach(p=>{if(placed.has(p.id))return;set(p.id,x+personBubbleW(p)/2,y);x+=personBubbleW(p)+80;});});
+  // Zaručíme minimálny rozostup kariet v každej generácii; posuny sa prenesú aj na partnerov.
+  const rows=new Map();people.forEach(p=>{const k=Math.round(p.y);if(!rows.has(k))rows.set(k,[]);rows.get(k).push(p);});
+  rows.forEach(list=>{list.sort((a,b)=>a.x-b.x);for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],need=personBubbleW(a)/2+personBubbleW(b)/2+38;if(b.x-a.x<need)b.x=a.x+need;}});
+  // Zosúladíme deti na úrovniach pod rodičmi, bez posúvania do staršej generácie.
+  if(andFitToView)fitTreeToView();else drawTree();
+}
+
 function fitTreeToView() {
   const persons = Object.values(treeData.persons); if (persons.length === 0 || !canvas) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1311,7 +1356,7 @@ function vykresliRodinneSpojniceSVG() {
       cesta(`M ${x1} ${hubY} H ${x2}`, '#e11d48', 2.4);
       el('circle',{cx:hubX,cy:hubY,r:5.5,fill:'#e11d48',stroke:'#fff','stroke-width':2});
       const m=marrInfo(fam);
-      if(m){const bw=m.w+18,bh=19,bx=hubX-bw/2,by=hubY-34;el('rect',{x:bx,y:by,width:bw,height:bh,rx:9.5,fill:'#fff',stroke:'#e11d48','stroke-width':1.2});const t=el('text',{x:hubX,y:by+13,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9f1239'});t.textContent='∞ '+fam.marrDate;}
+      if(m){const bw=m.w+34,bh=22,bx=hubX-bw/2,by=hubY-37;el('rect',{x:bx,y:by,width:bw,height:bh,rx:9.5,fill:'#fff',stroke:'#cbd5e1','stroke-width':1.2});const t=el('text',{x:hubX,y:by+13,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#1e293b'});t.textContent='∞  '+fam.marrDate+'  ';}
     } else {hubX=partneri[0].x;hubY=partneri[0].y+LAYOUT.bh/2;}
     const deti=(fam.children||[]).map(id=>P[id]).filter(Boolean);
     if(deti.length){
