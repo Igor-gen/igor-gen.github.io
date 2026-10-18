@@ -909,7 +909,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
     refs.forEach(ref => {
       const key = Object.keys(attachedFiles).find(k => k === ref.file || k.replace(/\\/g, '/') === ref.file);
       if (!key) return;
-      const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext);
+      const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext) && !/^docs\//.test(String(ref.file).replace(/\\/g, '/'));
       const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
       const uid = Math.random().toString(36).slice(2, 9);
       if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main, caption: ref.title || '' });
@@ -1891,7 +1891,7 @@ function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id 
 function removeTempFile(fileId) { 
   showConfirm(t('confirmTitle'), t('confirmDelFile'), () => {
     tempAttachedFiles = tempAttachedFiles.filter(f => f.id !== fileId); 
-    const photo = tempAttachedFiles.find(f => f.isTargetType === 'photo' || f.type === 'photo' || ['jpg', 'png', 'webp'].includes(f.type)); 
+    const photo = tempAttachedFiles.find(isPhotoFile); 
     if (photo && !tempAttachedFiles.some(f => f.isMain)) photo.isMain = true; 
     renderAttachedFilesList(); 
   });
@@ -1923,8 +1923,8 @@ function savePersonForm(e) {
   p.occupations = []; document.querySelectorAll('.occupation-row').forEach(row => { const oc = { id: generateId("O"), title: row.querySelector('.occupation-title').value.trim(), city: row.querySelector('.occupation-city').value.trim(), dateFrom: row.querySelector('.occupation-from').value.trim(), dateTo: row.querySelector('.occupation-to').value.trim() }; if (oc.title || oc.city || oc.dateFrom || oc.dateTo) p.occupations.push(oc); });
 
   keepItemIds(__oldItems.events, p.events, ['type', 'title', 'date', 'place']); keepItemIds(__oldItems.addresses, p.addresses, ['type', 'address', 'dateFrom', 'dateTo']); keepItemIds(__oldItems.occupations, p.occupations, ['title', 'city', 'dateFrom', 'dateTo']);
-  p.photos = tempAttachedFiles.filter(f => f.isTargetType === 'photo' || f.type === 'photo' || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(f.type)); 
-  p.documents = tempAttachedFiles.filter(f => f.isTargetType === 'doc' || (!p.photos.includes(f)));
+  p.photos = tempAttachedFiles.filter(isPhotoFile);   // obrázok pridaný medzi dokumenty (sken) zostáva dokumentom
+  p.documents = tempAttachedFiles.filter(f => !isPhotoFile(f));
   if (isNew) { p.x = 400 + Math.random() * 150; p.y = 250 + Math.random() * 100; treeData.persons[id] = p; }
 
   const fatherId = document.getElementById('editFatherSelect').value || ""; const motherId = document.getElementById('editMotherSelect').value || "";
