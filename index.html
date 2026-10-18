@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Genealogy – Rodokmeň</title>
+  <title>Genealogy - Rodokmeň</title>
   <!-- Clerk authentication (invite-only users are managed in Clerk Dashboard) -->
   <script defer crossorigin="anonymous" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js"></script>
   <script defer crossorigin="anonymous" data-clerk-publishable-key="pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
@@ -294,12 +294,7 @@
     </button>
     
     <div id="canvasBgTint" class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle at 50% 50%, #1a2a3a 0%, #0d131a 100%); opacity: 0.2;"></div>
-    <canvas id="familyCanvas" class="w-full h-full block relative" style="position:absolute;inset:0;"></canvas>
-    <svg id="familyLinesSvg" aria-label="Rodinné spojnice" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:2"></svg>
-    <div id="rodovaNavigacia" style="position:absolute;top:12px;right:12px;z-index:10;display:none;gap:8px;align-items:center;background:#fff9;border:1px solid #fed7aa;border-radius:14px;padding:7px 10px;font-size:12px;box-shadow:0 4px 14px #0002;backdrop-filter:blur(8px)">
-      <span id="rodovaNavigaciaText">Vedľajšia rodová vetva</span>
-      <button type="button" onclick="navratNaHlavnyRodokmen()" style="cursor:pointer;border-radius:9px;padding:5px 9px;background:#ffedd5;color:#9a3412;font-weight:700">← Hlavný rodokmeň</button>
-    </div>
+    <canvas id="familyCanvas" class="w-full h-full block relative"></canvas>
     
     <div class="absolute bottom-4 left-4 right-4 md:right-auto bg-white/95 backdrop-blur-md px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl shadow-lg border border-slate-200/80 text-[10px] sm:text-xs text-slate-600 hidden sm:flex items-center justify-center md:justify-start gap-3 sm:gap-4 pointer-events-none">
       <div class="flex items-center gap-1 sm:gap-1.5"><span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-maleBg border-2 border-maleBorder"></span><span class="font-medium" data-i18n="legendMale">Muž</span></div>
@@ -757,7 +752,6 @@ let recentEditedIds = []; let currentSelectedPersonId = null;
 
 // Canvas states
 let canvas, ctx; let scale = 1.0; let panX = 100; let panY = 100;
-let rodovaVetvaOsobaId = null; let povodnyPohladRodokmena = null; let svgRodinnychSpojnic = null;
 let isDragging = false; let dragStartX = 0; let dragStartY = 0; let draggedPersonId = null;
 let lastPinchDist = null; let canvasReady = false; let dbConnection = null; let dbModalMode = 'load'; let dbBusy = false;
 const cachedImages = {};
@@ -1199,51 +1193,6 @@ function autoLayoutTree(andFitToView = true) {
   if (andFitToView) fitTreeToView(); else drawTree();
 }
 
-// --- PATriliniové rozloženie: hlavná pokrvná os zhora nadol a hrebeň súrodencov doľava ---
-function autoLayoutTree(andFitToView = true) {
-  const P=treeData.persons||{}, F=treeData.families||{}, people=Object.values(P);
-  if(!people.length) return;
-  const parentFam=id=>P[id]&&P[id].famc&&F[P[id].famc]||null;
-  const parents=id=>{const f=parentFam(id);return f?[f.husbandId,f.wifeId].filter(x=>P[x]):[]};
-  const spouses=id=>{const out=[];(P[id].fams||[]).forEach(fid=>{const f=F[fid];if(!f)return;const other=f.husbandId===id?f.wifeId:f.husbandId;if(other&&P[other])out.push({id:other,fam:f});});return out;};
-  const children=id=>{const out=[];(P[id].fams||[]).forEach(fid=>{const f=F[fid];if(f)(f.children||[]).forEach(cid=>{if(P[cid]&&!out.includes(cid))out.push(cid);});});return out;};
-  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-  let root=people.find(p=>norm(p.firstName)==='igor'&&norm(p.lastName)==='sklencar');
-  if(!root){const ancestors=people.filter(p=>parents(p.id).length===0);let best=-1;for(const p of (ancestors.length?ancestors:people)){let count=0,seen=new Set(),q=[p.id];while(q.length){const id=q.pop();if(seen.has(id))continue;seen.add(id);count++;q.push(...children(id));}if(count>best){best=count;root=p;}}}
-  if(!root)root=people[0];
-  // Nájdeme najstaršieho dostupného predka koreňa a odtiaľ pokračujeme po dedičskej línii.
-  let top=root,guard=0;while(parents(top.id).length&&guard++<100){const ps=parents(top.id);top=P[ps.find(id=>P[id]&&P[id].gender==='M')||ps[0]]||top;}
-  const spine=[],visited=new Set();let cur=top;guard=0;
-  while(cur&&guard++<200&&!visited.has(cur.id)){visited.add(cur.id);spine.push(cur.id);const kids=children(cur.id);if(!kids.length)break;
-    const sons=kids.filter(id=>P[id].gender==='M');
-    // Ak existuje syn, pokračuje najstarší syn; inak pokračuje najstaršia dcéra.
-    const next=(sons.length?sons:kids).slice().sort((a,b)=>{const da=String(P[a].birthDate||''),db=String(P[b].birthDate||'');return da.localeCompare(db)||kids.indexOf(a)-kids.indexOf(b);})[0];cur=P[next];
-  }
-  // Ak sa našiel zakladateľ Igor, začíname jeho vetvou (predkovia zostávajú nad ním).
-  const rootIndex=spine.indexOf(root.id);if(rootIndex>0)spine.splice(0,rootIndex);
-  const centerX=700, topY=110, rowGap=LAYOUT.bh+Math.max(46,LAYOUT.gapY), placed=new Set(), couplePairs=new Set();
-  function set(id,x,y){if(!P[id]||placed.has(id))return;P[id].x=x;P[id].y=y;placed.add(id);}
-  // Os: starší hore, mladší dole.
-  spine.forEach((id,i)=>{set(id,centerX,topY+i*rowGap);});
-  // Partneri ústrednej línie vždy vpravo, s dostatočným odstupom pre svadobný štítok.
-  spine.forEach((id,i)=>{const p=P[id],y=p.y;const sp=spouses(id).sort((a,b)=>(a.fam.marrDate||'').localeCompare(b.fam.marrDate||''))[0];if(sp&&!placed.has(sp.id)){const gap=Math.max(210,personBubbleW(p)/2+personBubbleW(P[sp.id])/2+76);set(sp.id,centerX+gap,y);couplePairs.add([id,sp.id].sort().join('|'));}});
-  // Súrodenci sa radia doľava od člena hlavnej línie; mladší sú vždy ďalej doľava.
-  spine.forEach(id=>{const fam=parentFam(id);if(!fam)return;const sibs=(fam.children||[]).filter(s=>P[s]&&s!==id);const ordered=sibs.slice().sort((a,b)=>{const da=String(P[a].birthDate||''),db=String(P[b].birthDate||'');return db.localeCompare(da)||(fam.children||[]).indexOf(b)-(fam.children||[]).indexOf(a);});let x=centerX-personBubbleW(P[id])/2-70;
-    ordered.forEach(sid=>{const sib=P[sid];if(placed.has(sid))return;const w=personBubbleW(sib);x-=w/2;set(sid,x,sib.y||P[id].y);x-=w/2+48;
-      const sp=spouses(sid).find(o=>!placed.has(o.id));if(sp){const sx=sib.x+personBubbleW(sib)/2+Math.max(210,personBubbleW(P[sp.id])/2+80);set(sp.id,sx,sib.y);couplePairs.add([sid,sp.id].sort().join('|'));}
-    });
-  });
-  // Ostatné osoby (vrátane vetiev partnerov) umiestnime do generácie podľa rodičov, bez prekrytia.
-  let maxY=Math.max(...spine.map(id=>P[id].y));const rowLists=new Map();
-  people.filter(p=>!placed.has(p.id)).forEach(p=>{const ps=parents(p.id);const y=ps.length?Math.max(...ps.map(id=>P[id]?P[id].y:topY))+rowGap:(maxY+rowGap);if(!rowLists.has(y))rowLists.set(y,[]);rowLists.get(y).push(p);});
-  rowLists.forEach((list,y)=>{list.sort((a,b)=>String(a.lastName||'').localeCompare(String(b.lastName||''))||String(a.firstName||'').localeCompare(String(b.firstName||'')));let x=80;list.forEach(p=>{if(placed.has(p.id))return;set(p.id,x+personBubbleW(p)/2,y);x+=personBubbleW(p)+80;});});
-  // Zaručíme minimálny rozostup kariet v každej generácii; posuny sa prenesú aj na partnerov.
-  const rows=new Map();people.forEach(p=>{const k=Math.round(p.y);if(!rows.has(k))rows.set(k,[]);rows.get(k).push(p);});
-  rows.forEach(list=>{list.sort((a,b)=>a.x-b.x);for(let i=1;i<list.length;i++){const a=list[i-1],b=list[i],need=personBubbleW(a)/2+personBubbleW(b)/2+38;if(b.x-a.x<need)b.x=a.x+need;}});
-  // Zosúladíme deti na úrovniach pod rodičmi, bez posúvania do staršej generácie.
-  if(andFitToView)fitTreeToView();else drawTree();
-}
-
 function fitTreeToView() {
   const persons = Object.values(treeData.persons); if (persons.length === 0 || !canvas) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1323,89 +1272,7 @@ function getPersonAt(x, y) {
 }
 
 function drawTree() {
-  if (!ctx) return;
-  ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid();
-  ctx.translate(panX, panY); ctx.scale(scale, scale);
-  Object.values(treeData.persons).forEach(person => drawPersonBubble(person));
-  ctx.restore();
-  vykresliRodinneSpojniceSVG();
-}
-
-// SVG vrstva používa výhradne pravouhlé spojnice. Každá rodina má vlastnú úroveň zbernice,
-// aby sa zvislé vetvy nepretínali s kartami osôb. Klikateľné oranžové uzly otvárajú izolovaný pohľad.
-function vykresliRodinneSpojniceSVG() {
-  const svg = document.getElementById('familyLinesSvg'); if (!svg || !canvas) return;
-  const NS = 'http://www.w3.org/2000/svg';
-  svg.setAttribute('viewBox', `0 0 ${canvas.width} ${canvas.height}`);
-  svg.innerHTML = '';
-  const group = document.createElementNS(NS, 'g');
-  group.setAttribute('transform', `translate(${panX} ${panY}) scale(${scale})`);
-  svg.appendChild(group);
-  const P = treeData.persons, F = treeData.families;
-  const zobrazeneRodoveTlacidla = new Set();
-  const el = (tag, attrs, parent=group) => { const n=document.createElementNS(NS,tag); Object.entries(attrs||{}).forEach(([k,v])=>n.setAttribute(k,String(v))); parent.appendChild(n); return n; };
-  const cesta = (d, farba='#64748b', sirka=2) => el('path',{d,fill:'none',stroke:farba,'stroke-width':sirka,'stroke-linecap':'round','stroke-linejoin':'round'});
-  Object.values(F).forEach((fam, index) => {
-    const h=P[fam.husbandId], w=P[fam.wifeId]; const partneri=[h,w].filter(Boolean);
-    if (!partneri.length) return;
-    let hubX, hubY;
-    if (h && w) {
-      const L=h.x<=w.x?h:w, R=L===h?w:h;
-      const x1=L.x+personBubbleW(L)/2, x2=R.x-personBubbleW(R)/2;
-      hubX=(x1+x2)/2; hubY=L.y;
-      cesta(`M ${x1} ${hubY} H ${x2}`, '#e11d48', 2.4);
-      el('circle',{cx:hubX,cy:hubY,r:5.5,fill:'#e11d48',stroke:'#fff','stroke-width':2});
-      const m=marrInfo(fam);
-      if(m){const bw=m.w+34,bh=22,bx=hubX-bw/2,by=hubY-37;el('rect',{x:bx,y:by,width:bw,height:bh,rx:9.5,fill:'#fff',stroke:'#cbd5e1','stroke-width':1.2});const t=el('text',{x:hubX,y:by+13,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#1e293b'});t.textContent='∞  '+fam.marrDate+'  ';}
-    } else {hubX=partneri[0].x;hubY=partneri[0].y+LAYOUT.bh/2;}
-    const deti=(fam.children||[]).map(id=>P[id]).filter(Boolean);
-    if(deti.length){
-      const rodicY=Math.max(...partneri.map(p=>p.y+LAYOUT.bh/2));
-      const detiY=Math.min(...deti.map(p=>p.y-LAYOUT.bh/2));
-      const busY=rodicY+Math.max(24,Math.min(48,(detiY-rodicY)/2));
-      const xs=deti.map(p=>p.x); const minX=Math.min(...xs,hubX), maxX=Math.max(...xs,hubX);
-      cesta(`M ${hubX} ${hubY} V ${busY} H ${minX===maxX?hubX:minX}`,'#64748b',1.8);
-      if(maxX!==minX)cesta(`M ${minX} ${busY} H ${maxX}`,'#64748b',1.8);
-      deti.forEach(ch=>{const top=ch.y-LAYOUT.bh/2;cesta(`M ${ch.x} ${busY} V ${top}`,'#64748b',1.8);el('circle',{cx:ch.x,cy:top,r:3,fill:'#64748b'});});
-    }
-    // Vedľajší rod partnera: tlačidlo sa zobrazí, ak má partner evidovaného otca alebo rodičov.
-    const ciel = rodovaVetvaOsobaId && P[rodovaVetvaOsobaId] ? P[rodovaVetvaOsobaId] : (w || h);
-    if(ciel && !zobrazeneRodoveTlacidla.has(ciel.id) && ciel.famc && F[ciel.famc]){
-      zobrazeneRodoveTlacidla.add(ciel.id);
-      const pf=F[ciel.famc], otec=P[pf.husbandId]||P[pf.wifeId];
-      if(otec){
-        const bx=ciel.x+personBubbleW(ciel)/2+14, by=ciel.y-13, bw=Math.max(116,Math.min(210,measureTxt('bold 11px system-ui',`Rod + ${otec.lastName||'neznámy'}`)+26));
-        cesta(`M ${ciel.x+personBubbleW(ciel)/2} ${ciel.y} H ${bx}`,'#f97316',2);
-        const g=el('g',{transform:`translate(${bx} ${by})`,style:'pointer-events:all;cursor:pointer'});
-        el('rect',{x:0,y:0,width:bw,height:27,rx:13.5,fill:'#ffedd5',stroke:'#f97316','stroke-width':1.5},g);
-        const tx=el('text',{x:bw/2,y:17,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9a3412'},g);tx.textContent=`Rod + ${otec.lastName||'neznámy'}`;
-        g.addEventListener('click',(ev)=>{ev.stopPropagation(); otvorRodovuVetvu(ciel.id);});
-      }
-    }
-  });
-  if(rodovaVetvaOsobaId && P[rodovaVetvaOsobaId]){
-    const osoba=P[rodovaVetvaOsobaId], bx=osoba.x-personBubbleW(osoba)/2-150, by=osoba.y-13;
-    const g=el('g',{transform:`translate(${bx} ${by})`,style:'pointer-events:all;cursor:pointer'});
-    el('rect',{x:0,y:0,width:136,height:27,rx:13.5,fill:'#ffedd5',stroke:'#f97316','stroke-width':1.5},g);
-    const tx=el('text',{x:68,y:17,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9a3412'},g);tx.textContent=`Rod + ${(osoba.lastName||'pôvodný rod')}`;
-    g.addEventListener('click',(ev)=>{ev.stopPropagation();navratNaHlavnyRodokmen();});
-  }
-}
-
-function otvorRodovuVetvu(osobaId){
-  const osoba=treeData.persons[osobaId]; if(!osoba)return;
-  if(!rodovaVetvaOsobaId)povodnyPohladRodokmena={panX,panY,scale};
-  rodovaVetvaOsobaId=osobaId;
-  const nav=document.getElementById('rodovaNavigacia'); if(nav){nav.style.display='flex';document.getElementById('rodovaNavigaciaText').textContent='Rodová vetva: '+personNameStr(osoba);}
-  // Plynulý posun pohľadu na samostatnú vetvu; dáta a hlavné rozloženie zostávajú zachované.
-  if(canvas){canvas.style.transition='transform 420ms ease';const svg=document.getElementById('familyLinesSvg');if(svg)svg.style.transition='transform 420ms ease';canvas.style.transform='translateX(-18px)';if(svg)svg.style.transform='translateX(-18px)';}
-  scale=Math.max(scale,0.65); panX=canvas.width/2-osoba.x*scale; panY=canvas.height/2-osoba.y*scale; drawTree();
-  setTimeout(()=>{if(canvas)canvas.style.transform='';const svg=document.getElementById('familyLinesSvg');if(svg)svg.style.transform='';},430);
-}
-function navratNaHlavnyRodokmen(){
-  rodovaVetvaOsobaId=null; const nav=document.getElementById('rodovaNavigacia');if(nav)nav.style.display='none';
-  if(povodnyPohladRodokmena){panX=povodnyPohladRodokmena.panX;panY=povodnyPohladRodokmena.panY;scale=povodnyPohladRodokmena.scale;}
-  povodnyPohladRodokmena=null;drawTree();
+  if (!ctx) return; ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid(); ctx.translate(panX, panY); ctx.scale(scale, scale); drawCombConnections(); Object.values(treeData.persons).forEach(person => drawPersonBubble(person)); ctx.restore();
 }
 
 function drawSubtleGrid() {
@@ -3360,7 +3227,6 @@ function openFanChartModal() {
   document.body.classList.add('overflow-hidden');
   FAN.history = [];
   FAN.rootId = fanDefaultRoot();
-  document.getElementById('fanGensSelect').value = String(FAN.gens);
   fanInitSvg();
   fanRender(true);
 }
@@ -3469,6 +3335,166 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeFanChartModal();
 });
 
+// ===================== PATRILINIOVY GRAF – nový horizontálny hrebeň =====================
+// Pôvodné vejárové rozloženie je nahradené patriliniovou osou a bočnými rodinnými vetvami.
+FAN.branchOpen = FAN.branchOpen || new Set();
+FAN.panX = 0;
+
+function patYear(p) {
+  const m = String((p && p.birthDate) || '').match(/\d{3,4}/);
+  return m ? Number(m[0]) : 99999;
+}
+function patGender(p) { return (p && String(p.gender || 'U').toUpperCase().startsWith('F')) ? 'F' : (p && String(p.gender || 'U').toUpperCase().startsWith('M')) ? 'M' : 'U'; }
+function patSpouses(p, famId) {
+  const out = [];
+  (p.fams || []).forEach(fid => {
+    if (fid === famId) return;
+    const f = treeData.families[fid]; if (!f) return;
+    const id = f.husbandId === p.id ? f.wifeId : f.husbandId;
+    if (id && treeData.persons[id] && !out.some(x => x.person.id === id)) out.push({person:treeData.persons[id], family:f});
+  });
+  return out;
+}
+function patChildren(p) {
+  const ids = [];
+  (p.fams || []).forEach(fid => { const f=treeData.families[fid]; if (f) (f.children||[]).forEach(id=>{ if(treeData.persons[id]&&!ids.includes(id)) ids.push(id); }); });
+  return ids.map(id=>treeData.persons[id]).sort((a,b)=>patYear(a)-patYear(b)||fanName(a).localeCompare(fanName(b),'sk'));
+}
+function patOldestAncestor(p) {
+  let cur=p, seen=new Set();
+  while(cur && !seen.has(cur.id)) { seen.add(cur.id); const par=getParentsOf(cur.id); const next=par.father||par.mother; if(!next) break; cur=next; }
+  return cur || p;
+}
+function patChooseHeir(children) {
+  const boys=children.filter(p=>patGender(p)==='M');
+  if (boys.length) return boys.sort((a,b)=>patYear(a)-patYear(b))[0];
+  const girls=children.filter(p=>patGender(p)==='F');
+  return (girls.length ? girls : children).sort((a,b)=>patYear(a)-patYear(b))[0] || null;
+}
+function patMarriageDate(f) { return (f && f.marrDate) ? String(f.marrDate) : ''; }
+function patNodeWidth(p) { const n=fanName(p); return Math.max(190, Math.min(290, n.length*8.1+92)); }
+function patDrawPerson(g,p,x,y,opts={}) {
+  const w=patNodeWidth(p), h=94, gender=patGender(p), stroke=gender==='M'?'#2684d8':gender==='F'?'#e56a9a':'#8995a3';
+  const selected=p.id===currentSelectedPersonId || p.id===FAN.rootId;
+  const ng='patclip_'+String(p.id).replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+Math.round(x)+'_'+Math.round(y);
+  const defs=g.append('defs'); defs.append('clipPath').attr('id',ng).append('circle').attr('cx',x+43).attr('cy',y+46).attr('r',29);
+  const group=g.append('g').attr('class','pat-person').style('cursor','pointer').on('click',(e)=>{e.stopPropagation(); if(typeof selectPerson==='function') { selectPerson(p.id); fanRender(false); }});
+  group.append('title').text(fanTooltip(p));
+  group.append('rect').attr('x',x).attr('y',y).attr('width',w).attr('height',h).attr('rx',17).attr('fill','#fffdf8').attr('stroke',stroke).attr('stroke-width',selected?4:2.4).attr('filter',selected?'drop-shadow(0 0 5px rgba(245,158,11,.45))':null);
+  const ph=(p.photos||[]).find(a=>a.isMain)||(p.photos||[])[0];
+  if(ph&&ph.data) group.append('image').attr('href',ph.data).attr('x',x+14).attr('y',y+17).attr('width',58).attr('height',58).attr('preserveAspectRatio','xMidYMid slice').attr('clip-path',`url(#${ng})`);
+  else {
+    group.append('circle').attr('cx',x+43).attr('cy',y+46).attr('r',29).attr('fill',gender==='M'?'#e7f3ff':gender==='F'?'#ffe8f0':'#edf0f3').attr('stroke',stroke).attr('stroke-width',1.5);
+    group.append('text').attr('x',x+43).attr('y',y+54).attr('text-anchor','middle').attr('font-size',25).attr('fill',stroke).text(gender==='M'?'♂':gender==='F'?'♀':'?');
+  }
+  const tx=x+82, maxText=w-94;
+  const name=fanName(p);
+  group.append('text').attr('x',tx).attr('y',y+37).attr('font-family','Arial,sans-serif').attr('font-size',14).attr('font-weight',700).attr('fill','#18212b').text(name.length>28?name.slice(0,27)+'…':name);
+  const dates=[p.birthDate?('* '+p.birthDate):'',p.deathDate?('† '+p.deathDate):''].filter(Boolean).join('  ');
+  if(dates) group.append('text').attr('x',tx).attr('y',y+60).attr('font-family','Arial,sans-serif').attr('font-size',11).attr('fill','#5d6874').text(dates);
+  return {x,y,w,h,cx:x+w/2,cy:y+h/2,right:x+w,left:x};
+}
+function patDrawMarriage(g,x,y,date) {
+  const w=Math.max(84,(date||'').length*6.5+24),h=28;
+  g.append('rect').attr('x',x-w/2).attr('y',y-h/2).attr('width',w).attr('height',h).attr('rx',14).attr('fill','#fff4d6').attr('stroke','#d5a23c').attr('stroke-width',1.5);
+  g.append('text').attr('x',x).attr('y',y+4).attr('text-anchor','middle').attr('font-family','Arial,sans-serif').attr('font-size',11).attr('font-weight',700).attr('fill','#78551b').text(date||'sobáš');
+  return w;
+}
+function patRenderBranch(g,person,family,x,y,branchKey) {
+  const a=patDrawPerson(g,person,x,y);
+  const spouseList=patSpouses(person,family && family.id);
+  // Rodinný partner z aktuálnej rodiny je zobrazený ako druhá bublina.
+  let spouse=family ? treeData.persons[family.husbandId===person.id?family.wifeId:family.husbandId] : null;
+  let sf=family;
+  if(!spouse && spouseList.length){ spouse=spouseList[0].person; sf=spouseList[0].family; }
+  let end=a.right;
+  if(spouse && spouse.id!==person.id){
+    const sx=end+118, b=patDrawPerson(g,spouse,sx,y);
+    g.append('path').attr('d',`M${a.right},${a.cy} H${a.right+34} H${sx-45} H${sx}`).attr('fill','none').attr('stroke','#8492a0').attr('stroke-width',2);
+    const mid=(a.right+sx)/2; patDrawMarriage(g,mid,a.cy,patMarriageDate(sf));
+    const btnX=b.right+16, btnY=y+30, bw=130, bh=34;
+    const bg=g.append('g').style('cursor','pointer').on('click',e=>{e.stopPropagation();patOpenPartnerBranch(spouse.id,branchKey);});
+    bg.append('rect').attr('x',btnX).attr('y',btnY).attr('width',bw).attr('height',bh).attr('rx',17).attr('fill','#f59e0b').attr('stroke','#b96a08').attr('stroke-width',1.4);
+    const label='Rod + '+((getParentsOf(spouse.id).father||{}).lastName||spouse.lastName||'priezvisko');
+    bg.append('text').attr('x',btnX+bw/2).attr('y',btnY+21).attr('text-anchor','middle').attr('font-size',11).attr('font-weight',700).attr('font-family','Arial,sans-serif').attr('fill','#492b05').text(label.length>20?label.slice(0,19)+'…':label);
+    bg.append('title').text('Zobraziť vedľajšiu líniu rodu '+label.replace(/^Rod \+ /,''));
+    end=btnX+bw;
+  }
+  return end;
+}
+function patOpenPartnerBranch(partnerId,key) {
+  if(!FAN.branchOpen.has(partnerId)) FAN.branchOpen.add(partnerId); else FAN.branchOpen.delete(partnerId);
+  FAN.panX = FAN.branchOpen.size ? 500 : 0;
+  fanRender(false);
+  // Ponechať pohľad na rozšírenú časť plátna.
+  const svg=document.getElementById('fanSvg'); if(svg && FAN.zoom){ const r=svg.getBoundingClientRect(); d3.select(svg).transition().duration(300).call(FAN.zoom.transform,d3.zoomIdentity.translate(-FAN.panX+30,45).scale(0.85)); }
+}
+function fanRender(refit) {
+  fanInitSvg();
+  const svgEl=document.getElementById('fanSvg'), g=d3.select('#fanZoom'); g.selectAll('*').remove();
+  const all=treeData.persons||{}; let root=all[FAN.rootId];
+  if(!root){root=fanDefaultRoot()&&all[fanDefaultRoot()];}
+  if(!root){document.getElementById('fanChartTitle').textContent='Patriliniový rodokmeň'; g.append('text').attr('x',80).attr('y',100).text('Rodokmeň neobsahuje žiadne osoby.'); return;}
+  root=patOldestAncestor(root); FAN.rootId=root.id;
+  document.getElementById('fanChartTitle').textContent='Patriliniový rodokmeň – '+fanName(root);
+  const baseX=100+FAN.panX, mainX=baseX+300, startY=100, stepY=180;
+  const lineage=[], seen=new Set(); let cur=root, gen=0;
+  while(cur&&!seen.has(cur.id)&&gen<100){seen.add(cur.id);lineage.push({p:cur,gen});const children=patChildren(cur);cur=patChooseHeir(children);gen++;}
+  const usedBranchIds=new Set(lineage.map(n=>n.p.id));
+  let maxX=mainX+300, maxY=startY+lineage.length*stepY;
+  // Zvislá patriliniová os.
+  if(lineage.length>1) g.append('path').attr('d',`M${mainX},${startY+47} V${startY+(lineage.length-1)*stepY+47}`).attr('stroke','#526576').attr('stroke-width',3).attr('fill','none');
+  lineage.forEach((n,i)=>{
+    const y=startY+i*stepY, node=patDrawPerson(g,n.p,mainX-100,y);
+    g.append('circle').attr('cx',mainX).attr('cy',y+47).attr('r',5).attr('fill','#526576');
+    const children=patChildren(n.p), heir=patChooseHeir(children);
+    const sibs=children.filter(p=>!heir||p.id!==heir.id);
+    // Bočný hrebeň: každý súrodenec má vlastný riadok s partnerom a dátumom sobáša.
+    const branchX=mainX+190; let row=0;
+    sibs.forEach((sib,j)=>{
+      if(usedBranchIds.has(sib.id)) return;
+      const by=y+j*112; const fam=(sib.fams||[]).map(id=>treeData.families[id]).find(f=>f && (f.husbandId===sib.id||f.wifeId===sib.id));
+      usedBranchIds.add(sib.id);
+      g.append('path').attr('d',`M${mainX},${y+47} H${branchX-24} V${by+47} H${branchX}`).attr('fill','none').attr('stroke','#8b9aa8').attr('stroke-width',2);
+      const end=patRenderBranch(g,sib,fam,branchX,by,'sib_'+sib.id); maxX=Math.max(maxX,end+30); maxY=Math.max(maxY,by+120); row++;
+    });
+    // Rozbalená vedľajšia línia predkov partnera sa zobrazí ako samostatná vetva napravo.
+    const spouses=patSpouses(n.p,n.p.famc);
+    spouses.forEach((sp,j)=>{
+      const key=sp.person.id; if(!FAN.branchOpen.has(key)) return;
+      const sx=mainX+700+FAN.panX, sy=y+j*130;
+      g.append('path').attr('d',`M${mainX+100},${y+47} H${sx-30} V${sy+47} H${sx}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none').attr('stroke-dasharray','5 4');
+      let anc=patOldestAncestor(sp.person), yy=sy, ax=sx;
+      const chain=[]; let z=anc, guard=new Set(); while(z&&!guard.has(z.id)&&chain.length<12){guard.add(z.id);chain.push(z);z=patChooseHeir(patChildren(z));}
+      chain.forEach((person,k)=>{const q=patDrawPerson(g,person,ax,yy+k*stepY); if(k) g.append('path').attr('d',`M${ax+patNodeWidth(person)/2},${yy+(k-1)*stepY+94} V${yy+k*stepY}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none'); maxX=Math.max(maxX,ax+q.w+20); maxY=Math.max(maxY,yy+k*stepY+120);});
+    });
+    maxX=Math.max(maxX,node.right+40);
+  });
+  // Každé stlačené oranžové tlačidlo otvorí samostatnú predkovskú líniu partnera.
+  FAN.branchOpen.forEach(partnerId=>{
+    const partner=all[partnerId]; if(!partner) return;
+    const sx=mainX+Math.max(760,FAN.panX+760), sy=startY;
+    const anc=patOldestAncestor(partner), chain=[]; let z=anc, guard=new Set();
+    while(z&&!guard.has(z.id)&&chain.length<12){guard.add(z.id);chain.push(z);z=patChooseHeir(patChildren(z));}
+    g.append('text').attr('x',sx).attr('y',sy-22).attr('font-family','Arial,sans-serif').attr('font-size',13).attr('font-weight',700).attr('fill','#a45a06').text('Vedľajší rod: '+fanName(partner));
+    chain.forEach((person,k)=>{const yy=sy+k*stepY; const q=patDrawPerson(g,person,sx,yy); if(k) g.append('path').attr('d',`M${sx+patNodeWidth(person)/2},${sy+(k-1)*stepY+94} V${yy}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none'); maxX=Math.max(maxX,sx+q.w+30); maxY=Math.max(maxY,yy+120);});
+  });
+  // Prispôsobiteľná šírka SVG plátna; uzly sa neorezávajú pri rozšírení vetvy.
+  FAN.extent=Math.max(maxX+100,maxY+100);
+  svgEl.setAttribute('viewBox',`0 0 ${Math.max(1200,maxX+100)} ${Math.max(700,maxY+100)}`);
+  if(refit) fanChartFit(false);
+}
+function fanChartFit(animate) {
+  const svg=document.getElementById('fanSvg'); if(!svg||!FAN.ready)return;
+  const r=svg.getBoundingClientRect(), W=r.width,H=r.height; if(!W||!H)return;
+  const vb=svg.viewBox.baseVal, k=Math.min((W-40)/vb.width,(H-90)/vb.height,1);
+  const tr=d3.zoomIdentity.translate(20,65).scale(k);
+  const sel=d3.select(svg); (animate?sel.transition().duration(350):sel).call(FAN.zoom.transform,tr);
+}
+function fanSetRoot(id,pushHistory){ if(!treeData.persons[id])return; if(pushHistory&&FAN.rootId&&FAN.rootId!==id)FAN.history.push(FAN.rootId); FAN.rootId=id; FAN.branchOpen.clear(); FAN.panX=0; document.getElementById('fanChartMenu').classList.add('hidden'); fanRender(true); }
+function fanSetGens(v){ FAN.gens=Math.min(100,Math.max(2,parseInt(v,10)||20)); fanRender(true); }
+
+
 setLanguage('sk');
 
   console.log('HLAVNY SCRIPT SA NACITAL');
@@ -3509,12 +3535,7 @@ setLanguage('sk');
         <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" placeholder="Hľadať osobu..." class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
         <div id="fanRootList" class="mt-1.5 max-h-56 overflow-y-auto custom-scroll space-y-0.5"></div>
       </div>
-      <div class="flex items-center justify-between gap-2">
-        <label for="fanGensSelect" class="text-xs font-semibold text-[#4a3420]">Počet generácií</label>
-        <select id="fanGensSelect" onchange="fanSetGens(this.value)" class="px-2 py-1.5 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420]">
-          <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
-        </select>
-      </div>
+      <p class="text-[11px] leading-relaxed text-[#6b4f2f]">Zvislá os zobrazuje hlavnú patriliniovú líniu. Oranžové tlačidlo otvorí vedľajší rod partnera.</p>
       <div class="border-t border-[#c9a96e] pt-2 space-y-0.5">
         <button onclick="fanChartGoBack()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
           <i class="ph-bold ph-arrow-left text-lg"></i> Späť o jeden krok
