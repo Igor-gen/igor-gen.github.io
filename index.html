@@ -294,7 +294,12 @@
     </button>
     
     <div id="canvasBgTint" class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle at 50% 50%, #1a2a3a 0%, #0d131a 100%); opacity: 0.2;"></div>
-    <canvas id="familyCanvas" class="w-full h-full block relative"></canvas>
+    <canvas id="familyCanvas" class="w-full h-full block relative" style="position:absolute;inset:0;"></canvas>
+    <svg id="familyLinesSvg" aria-label="Rodinné spojnice" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:2"></svg>
+    <div id="rodovaNavigacia" style="position:absolute;top:12px;right:12px;z-index:10;display:none;gap:8px;align-items:center;background:#fff9;border:1px solid #fed7aa;border-radius:14px;padding:7px 10px;font-size:12px;box-shadow:0 4px 14px #0002;backdrop-filter:blur(8px)">
+      <span id="rodovaNavigaciaText">Vedľajšia rodová vetva</span>
+      <button type="button" onclick="navratNaHlavnyRodokmen()" style="cursor:pointer;border-radius:9px;padding:5px 9px;background:#ffedd5;color:#9a3412;font-weight:700">← Hlavný rodokmeň</button>
+    </div>
     
     <div class="absolute bottom-4 left-4 right-4 md:right-auto bg-white/95 backdrop-blur-md px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl shadow-lg border border-slate-200/80 text-[10px] sm:text-xs text-slate-600 hidden sm:flex items-center justify-center md:justify-start gap-3 sm:gap-4 pointer-events-none">
       <div class="flex items-center gap-1 sm:gap-1.5"><span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-maleBg border-2 border-maleBorder"></span><span class="font-medium" data-i18n="legendMale">Muž</span></div>
@@ -752,6 +757,7 @@ let recentEditedIds = []; let currentSelectedPersonId = null;
 
 // Canvas states
 let canvas, ctx; let scale = 1.0; let panX = 100; let panY = 100;
+let rodovaVetvaOsobaId = null; let povodnyPohladRodokmena = null; let svgRodinnychSpojnic = null;
 let isDragging = false; let dragStartX = 0; let dragStartY = 0; let draggedPersonId = null;
 let lastPinchDist = null; let canvasReady = false; let dbConnection = null; let dbModalMode = 'load'; let dbBusy = false;
 const cachedImages = {};
@@ -1272,7 +1278,89 @@ function getPersonAt(x, y) {
 }
 
 function drawTree() {
-  if (!ctx) return; ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid(); ctx.translate(panX, panY); ctx.scale(scale, scale); drawCombConnections(); Object.values(treeData.persons).forEach(person => drawPersonBubble(person)); ctx.restore();
+  if (!ctx) return;
+  ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid();
+  ctx.translate(panX, panY); ctx.scale(scale, scale);
+  Object.values(treeData.persons).forEach(person => drawPersonBubble(person));
+  ctx.restore();
+  vykresliRodinneSpojniceSVG();
+}
+
+// SVG vrstva používa výhradne pravouhlé spojnice. Každá rodina má vlastnú úroveň zbernice,
+// aby sa zvislé vetvy nepretínali s kartami osôb. Klikateľné oranžové uzly otvárajú izolovaný pohľad.
+function vykresliRodinneSpojniceSVG() {
+  const svg = document.getElementById('familyLinesSvg'); if (!svg || !canvas) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  svg.setAttribute('viewBox', `0 0 ${canvas.width} ${canvas.height}`);
+  svg.innerHTML = '';
+  const group = document.createElementNS(NS, 'g');
+  group.setAttribute('transform', `translate(${panX} ${panY}) scale(${scale})`);
+  svg.appendChild(group);
+  const P = treeData.persons, F = treeData.families;
+  const zobrazeneRodoveTlacidla = new Set();
+  const el = (tag, attrs, parent=group) => { const n=document.createElementNS(NS,tag); Object.entries(attrs||{}).forEach(([k,v])=>n.setAttribute(k,String(v))); parent.appendChild(n); return n; };
+  const cesta = (d, farba='#64748b', sirka=2) => el('path',{d,fill:'none',stroke:farba,'stroke-width':sirka,'stroke-linecap':'round','stroke-linejoin':'round'});
+  Object.values(F).forEach((fam, index) => {
+    const h=P[fam.husbandId], w=P[fam.wifeId]; const partneri=[h,w].filter(Boolean);
+    if (!partneri.length) return;
+    let hubX, hubY;
+    if (h && w) {
+      const L=h.x<=w.x?h:w, R=L===h?w:h;
+      const x1=L.x+personBubbleW(L)/2, x2=R.x-personBubbleW(R)/2;
+      hubX=(x1+x2)/2; hubY=L.y;
+      cesta(`M ${x1} ${hubY} H ${x2}`, '#e11d48', 2.4);
+      el('circle',{cx:hubX,cy:hubY,r:5.5,fill:'#e11d48',stroke:'#fff','stroke-width':2});
+      const m=marrInfo(fam);
+      if(m){const bw=m.w+18,bh=19,bx=hubX-bw/2,by=hubY-34;el('rect',{x:bx,y:by,width:bw,height:bh,rx:9.5,fill:'#fff',stroke:'#e11d48','stroke-width':1.2});const t=el('text',{x:hubX,y:by+13,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9f1239'});t.textContent='∞ '+fam.marrDate;}
+    } else {hubX=partneri[0].x;hubY=partneri[0].y+LAYOUT.bh/2;}
+    const deti=(fam.children||[]).map(id=>P[id]).filter(Boolean);
+    if(deti.length){
+      const rodicY=Math.max(...partneri.map(p=>p.y+LAYOUT.bh/2));
+      const detiY=Math.min(...deti.map(p=>p.y-LAYOUT.bh/2));
+      const busY=rodicY+Math.max(24,Math.min(48,(detiY-rodicY)/2));
+      const xs=deti.map(p=>p.x); const minX=Math.min(...xs,hubX), maxX=Math.max(...xs,hubX);
+      cesta(`M ${hubX} ${hubY} V ${busY} H ${minX===maxX?hubX:minX}`,'#64748b',1.8);
+      if(maxX!==minX)cesta(`M ${minX} ${busY} H ${maxX}`,'#64748b',1.8);
+      deti.forEach(ch=>{const top=ch.y-LAYOUT.bh/2;cesta(`M ${ch.x} ${busY} V ${top}`,'#64748b',1.8);el('circle',{cx:ch.x,cy:top,r:3,fill:'#64748b'});});
+    }
+    // Vedľajší rod partnera: tlačidlo sa zobrazí, ak má partner evidovaného otca alebo rodičov.
+    const ciel = rodovaVetvaOsobaId && P[rodovaVetvaOsobaId] ? P[rodovaVetvaOsobaId] : (w || h);
+    if(ciel && !zobrazeneRodoveTlacidla.has(ciel.id) && ciel.famc && F[ciel.famc]){
+      zobrazeneRodoveTlacidla.add(ciel.id);
+      const pf=F[ciel.famc], otec=P[pf.husbandId]||P[pf.wifeId];
+      if(otec){
+        const bx=ciel.x+personBubbleW(ciel)/2+14, by=ciel.y-13, bw=Math.max(116,Math.min(210,measureTxt('bold 11px system-ui',`Rod + ${otec.lastName||'neznámy'}`)+26));
+        cesta(`M ${ciel.x+personBubbleW(ciel)/2} ${ciel.y} H ${bx}`,'#f97316',2);
+        const g=el('g',{transform:`translate(${bx} ${by})`,style:'pointer-events:all;cursor:pointer'});
+        el('rect',{x:0,y:0,width:bw,height:27,rx:13.5,fill:'#ffedd5',stroke:'#f97316','stroke-width':1.5},g);
+        const tx=el('text',{x:bw/2,y:17,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9a3412'},g);tx.textContent=`Rod + ${otec.lastName||'neznámy'}`;
+        g.addEventListener('click',(ev)=>{ev.stopPropagation(); otvorRodovuVetvu(ciel.id);});
+      }
+    }
+  });
+  if(rodovaVetvaOsobaId && P[rodovaVetvaOsobaId]){
+    const osoba=P[rodovaVetvaOsobaId], bx=osoba.x-personBubbleW(osoba)/2-150, by=osoba.y-13;
+    const g=el('g',{transform:`translate(${bx} ${by})`,style:'pointer-events:all;cursor:pointer'});
+    el('rect',{x:0,y:0,width:136,height:27,rx:13.5,fill:'#ffedd5',stroke:'#f97316','stroke-width':1.5},g);
+    const tx=el('text',{x:68,y:17,'text-anchor':'middle','font-size':11,'font-family':'system-ui,sans-serif','font-weight':700,fill:'#9a3412'},g);tx.textContent=`Rod + ${(osoba.lastName||'pôvodný rod')}`;
+    g.addEventListener('click',(ev)=>{ev.stopPropagation();navratNaHlavnyRodokmen();});
+  }
+}
+
+function otvorRodovuVetvu(osobaId){
+  const osoba=treeData.persons[osobaId]; if(!osoba)return;
+  if(!rodovaVetvaOsobaId)povodnyPohladRodokmena={panX,panY,scale};
+  rodovaVetvaOsobaId=osobaId;
+  const nav=document.getElementById('rodovaNavigacia'); if(nav){nav.style.display='flex';document.getElementById('rodovaNavigaciaText').textContent='Rodová vetva: '+personNameStr(osoba);}
+  // Plynulý posun pohľadu na samostatnú vetvu; dáta a hlavné rozloženie zostávajú zachované.
+  if(canvas){canvas.style.transition='transform 420ms ease';const svg=document.getElementById('familyLinesSvg');if(svg)svg.style.transition='transform 420ms ease';canvas.style.transform='translateX(-18px)';if(svg)svg.style.transform='translateX(-18px)';}
+  scale=Math.max(scale,0.65); panX=canvas.width/2-osoba.x*scale; panY=canvas.height/2-osoba.y*scale; drawTree();
+  setTimeout(()=>{if(canvas)canvas.style.transform='';const svg=document.getElementById('familyLinesSvg');if(svg)svg.style.transform='';},430);
+}
+function navratNaHlavnyRodokmen(){
+  rodovaVetvaOsobaId=null; const nav=document.getElementById('rodovaNavigacia');if(nav)nav.style.display='none';
+  if(povodnyPohladRodokmena){panX=povodnyPohladRodokmena.panX;panY=povodnyPohladRodokmena.panY;scale=povodnyPohladRodokmena.scale;}
+  povodnyPohladRodokmena=null;drawTree();
 }
 
 function drawSubtleGrid() {
