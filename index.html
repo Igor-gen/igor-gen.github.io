@@ -323,6 +323,9 @@
         <button onclick="centerOnPerson(currentSelectedPersonId)" class="hidden md:inline-block p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg">
           <i class="ph-bold ph-crosshair text-base"></i>
         </button>
+        <button onclick="hrebenNastavKoren(currentSelectedPersonId)" title="Zobraziť rodokmeň od tejto osoby (koreň)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg">
+          <i class="ph-bold ph-tree-structure text-base"></i>
+        </button>
         <button onclick="openPersonEditor(currentSelectedPersonId)" class="px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1">
           <i class="ph-bold ph-pencil-simple"></i> <span data-i18n="btnEdit">Upraviť</span>
         </button>
@@ -1005,204 +1008,344 @@ function marrInfo(fam) {
 // Voľné miesto medzi bublinami partnerov: bublina s dátumom + po jednom znaku odstup z každej strany.
 function coupleGap(fam) { const m = marrInfo(fam); return m ? Math.max(44, m.w + 2 * m.cw) : 64; }
 
-// Geometria rodiny: uzol (hub) je presne v strede medzery medzi bublinami partnerov.
-function famGeom(fam) {
-  const P = treeData.persons, h = P[fam.husbandId], w = P[fam.wifeId];
-  if (h && w) {
-    const L = h.x <= w.x ? h : w, R = (L === h) ? w : h;
-    const x1 = L.x + personBubbleW(L) / 2, x2 = R.x - personBubbleW(R) / 2;
-    return { type: 'couple', L, R, x1, x2, hubX: (x1 + x2) / 2, hubY: L.y };
+// ===== HREBEŇOVÝ DIAGRAM: prísny patrilineárny systém s posuvnými pod-plátnami =====
+// Zóna 1: os = priama otcovská línia od koreňa nahor; súrodenci každého predka na hrebeni VĽAVO, partneri VPRAVO od osoby,
+// potomkovia súrodencov smerom nadol (prvorodený pod uzlom rodičov, ďalší súrodenci doľava).
+// Rody partnerov sa kreslia do samostatných pod-plátien (zóny 2+), na ktoré sa prechádza oranžovou bublinou "Rod + priezvisko".
+const HREBEN = { GENERACII: 5, zony: [], aktualna: null, koren: null, cesta: [], animacia: null, cislo: 0, medzera: 40, vyskaOdkazu: 30, FARBY_PODLA_ROLE: true };
+const FONT_ODKAZ = 'bold 12px system-ui, sans-serif';
+const HREBEN_SLOVO_ROD = { sk: 'Rod', cs: 'Rod', en: 'Family', de: 'Familie' };
+function hrebenSlovoRod() { return HREBEN_SLOVO_ROD[currentLang] || 'Rod'; }
+
+function hrebenRok(p) { const m = String(p.birthDate || '').match(/(\d{4})/); return m ? +m[1] : Infinity; }
+function hrebenDeti(fam) {
+  const P = treeData.persons;
+  return (fam.children || []).filter(id => P[id]).map((id, i) => ({ id, i, r: hrebenRok(P[id]) }))
+    .sort((a, b) => (a.r - b.r) || (a.i - b.i)).map(x => P[x.id]);
+}
+function hrebenRodiny(p) { const F = treeData.families; return (p.fams || []).map(id => F[id]).filter(Boolean); }
+function hrebenPartner(fam, p) { const P = treeData.persons; const id = fam.husbandId === p.id ? fam.wifeId : fam.husbandId; return (id && id !== p.id && P[id]) ? P[id] : null; }
+function hrebenRodicia(p) {
+  const F = treeData.families, P = treeData.persons, f = p.famc && F[p.famc]; if (!f) return null;
+  const otec = (f.husbandId && P[f.husbandId]) || null, matka = (f.wifeId && P[f.wifeId]) || null;
+  return (otec || matka) ? { fam: f, otec, matka } : null;
+}
+// Osoba na osi nad danou osobou: otec, inak matka
+function hrebenOsovyRodic(p) { const r = hrebenRodicia(p); return r ? { fam: r.fam, rodic: r.otec || r.matka } : null; }
+function hrebenTextOdkazu(priezvisko) { return hrebenSlovoRod() + ' + ' + (priezvisko || '?'); }
+function hrebenSirkaOdkazu(text) { return Math.ceil(measureTxt(FONT_ODKAZ, text)) + 30; }
+function hrebenRodinaMedzi(a, b) {
+  const F = treeData.families;
+  for (const f of hrebenRodiny(a)) if ((f.husbandId === a.id && f.wifeId === b.id) || (f.husbandId === b.id && f.wifeId === a.id)) return f;
+  return { id: '_' + a.id + '_' + b.id, husbandId: a.gender === 'F' ? b.id : a.id, wifeId: a.gender === 'F' ? a.id : b.id, marrDate: '', children: [] };
+}
+
+// Blok osoby = osoba + jej partneri vpravo + potomkovia pod nimi; tvar = pre každý riadok [ľavý, pravý okraj] voči stredu osoby
+function hrebenBlok(os, ctx, o) {
+  o = o || {};
+  const med = HREBEN.medzera;
+  const b = { os, rola: o.rola || 'krv', w: personBubbleW(os), rodiny: [], tvar: new Map() };
+  const pridaj = (tv, r, l, rr) => { const c = tv.get(r); if (!c) tv.set(r, [l, rr]); else { if (l < c[0]) c[0] = l; if (rr > c[1]) c[1] = rr; } };
+  pridaj(b.tvar, 0, -b.w / 2, b.w / 2);
+  let pravy = b.w / 2;
+  const predch = new Map();
+  ctx.cesta.add(os.id);
+  (o.rodiny || hrebenRodiny(os)).forEach((fam, k) => {
+    const partner = hrebenPartner(fam, os), m = marrInfo(fam), cg = coupleGap(fam);
+    const preskoc = o.preskocDeti === fam.id;
+    const dieta = preskoc ? [] : hrebenDeti(fam).filter(d => d.id !== os.id && !ctx.cesta.has(d.id));
+    const bloky = [], tvarD = new Map(), lok = new Map();
+    dieta.forEach((d, i) => {
+      const kb = hrebenBlok(d, ctx, { rola: 'krv' });
+      let kx = 0;
+      if (i > 0) { kx = Infinity; kb.tvar.forEach(([l, r], ro) => { const lm = lok.get(ro); if (lm !== undefined) kx = Math.min(kx, lm - med - r); }); if (!isFinite(kx)) kx = 0; }
+      bloky.push({ blok: kb, dx: kx });
+      kb.tvar.forEach(([l, r], ro) => { const cur = lok.get(ro); lok.set(ro, cur === undefined ? kx + l : Math.min(cur, kx + l)); pridaj(tvarD, ro + 1, kx + l, kx + r); });
+    });
+    pridaj(tvarD, 1, 0, 0);
+    const hubMin = (zakl) => {
+      let h = zakl;
+      tvarD.forEach(([l], r) => {
+        const p = predch.get(r); if (p) h = Math.max(h, p[1] + med - l);
+        if (o.abs) { const mr = ctx.maxR.get(o.abs.riadok + r); if (mr !== undefined) h = Math.max(h, mr + med - l); }
+      });
+      return h;
+    };
+    let hubDx, spL = 0, seg = 0;
+    if (partner) {
+      if (k === 0) { hubDx = pravy + cg / 2; spL = pravy + cg; }
+      else { seg = Math.max(44, m ? m.w + 14 : 0); hubDx = hubMin(pravy + 24); spL = hubDx + seg; }
+    } else { hubDx = k === 0 ? 0 : hubMin(pravy + 24); pravy = Math.max(pravy, hubDx); pridaj(b.tvar, 0, Math.min(0, hubDx), Math.max(0, hubDx)); }
+    const rec = { fam, k, hubDx, partner, preskoc, bloky, seg, m, spDx: null, spW: 0, odkaz: null };
+    if (partner) {
+      rec.spW = personBubbleW(partner); rec.spDx = spL + rec.spW / 2;
+      pridaj(b.tvar, 0, spL, spL + rec.spW); pravy = spL + rec.spW;
+      const pr = hrebenRodicia(partner);
+      if (pr && !o.bezOdkazov) {
+        const text = hrebenTextOdkazu(((pr.otec || pr.matka).lastName) || ((pr.otec || pr.matka).birthName)), w = hrebenSirkaOdkazu(text);
+        rec.odkaz = { dx: pravy + 22 + w / 2, w, text };
+        pravy += 22 + w; pridaj(b.tvar, 0, rec.odkaz.dx - w / 2, pravy);
+      }
+    }
+    tvarD.forEach(([l, r], ro) => { pridaj(predch, ro, hubDx + l, hubDx + r); pridaj(b.tvar, ro, hubDx + l, hubDx + r); });
+    b.rodiny.push(rec);
+  });
+  ctx.cesta.delete(os.id);
+  return b;
+}
+
+function hrebenZapis(ctx, r, l, rr) {
+  const a = ctx.minL.get(r); if (a === undefined || l < a) ctx.minL.set(r, l);
+  const c = ctx.maxR.get(r); if (c === undefined || rr > c) ctx.maxR.set(r, rr);
+}
+// Premietne blok do zóny (absolútne súradnice x; riadok = generácia, osa predkov má záporné riadky)
+function hrebenUloz(z, ctx, b, ax, r) {
+  z.uzly.push({ os: b.os, x: ax, riadok: r, w: b.w, rola: b.rola });
+  hrebenZapis(ctx, r, ax - b.w / 2, ax + b.w / 2);
+  b.rodiny.forEach(rc => {
+    const rec = { fam: rc.fam, k: rc.k, vlastnik: b.os, vx: ax, vw: b.w, hubX: ax + rc.hubDx, riadok: r, seg: rc.seg, m: rc.m, partner: rc.partner, spX: null, spW: rc.spW, deti: [] };
+    if (rc.partner) {
+      rec.spX = ax + rc.spDx;
+      z.uzly.push({ os: rc.partner, x: rec.spX, riadok: r, w: rc.spW, rola: 'partner' });
+      hrebenZapis(ctx, r, rec.spX - rc.spW / 2, rec.spX + rc.spW / 2);
+      if (rc.odkaz) {
+        const ox = ax + rc.odkaz.dx;
+        z.odkazy.push({ typ: 'dopredu', x: ox, riadok: r, w: rc.odkaz.w, text: rc.odkaz.text, ustredna: rc.partner.id, spat: b.os.id, kotvaX: rec.spX + rc.spW / 2 });
+        hrebenZapis(ctx, r, ox - rc.odkaz.w / 2, ox + rc.odkaz.w / 2);
+      }
+    }
+    hrebenZapis(ctx, r, Math.min(ax, rec.hubX), rec.hubX);   // spojnica k uzlu rodiny nad riadkom bublín
+    const mr = ctx.maxR.get(r + 1); if (mr === undefined || rec.hubX > mr) ctx.maxR.set(r + 1, rec.hubX);
+    rc.bloky.forEach(kd => { const kx = rec.hubX + kd.dx; rec.deti.push({ x: kx, riadok: r + 1 }); hrebenUloz(z, ctx, kd.blok, kx, r + 1); });
+    if (rc.preskoc) rec.deti = ctx.detiOs[rc.fam.id] || [];
+    z.rodiny.push(rec);
+  });
+}
+
+function hrebenY(z, r) { return 120 + (r - z.minR) * (LAYOUT.bh + LAYOUT.gapY); }
+
+// Z rozmiestnených uzlov vytvorí čiary (iba kolmé úseky), bodky, štítky a hranice zóny
+function hrebenDokonci(z) {
+  z.minR = Math.min.apply(null, z.uzly.map(u => u.riadok));
+  z.uzly.forEach(u => { u.y = hrebenY(z, u.riadok); });
+  z.odkazy.forEach(o => { o.y = hrebenY(z, o.riadok); });
+  z.ciary = []; z.bodky = []; z.stitky = [];
+  const bh = LAYOUT.bh;
+  z.rodiny.forEach(rc => {
+    const y = hrebenY(z, rc.riadok), vrch = y - bh / 2, spodok = y + bh / 2, id = rc.fam.id;
+    const hrana = (typ, x1, y1, x2, y2) => { if (x1 !== x2 || y1 !== y2) z.ciary.push({ typ, id, x1, y1, x2, y2 }); };
+    let hubY = y;
+    const kolaj = () => {                       // vedľajšie manželstvá: spojnica nad riadkom bublín (neprekrýva sa s hrebeňom ani zubami)
+      const rx = rc.vx + Math.max(4, 20 - 8 * (rc.k - 1)), ry = vrch - Math.min(22, 12 + 4 * (rc.k - 1));
+      hrana('man', rx, vrch, rx, ry); hrana('man', rx, ry, rc.hubX, ry); hrana('man', rc.hubX, ry, rc.hubX, y);
+    };
+    if (rc.partner) {
+      const lx = rc.spX - rc.spW / 2;
+      if (rc.k === 0) hrana('man', rc.vx + rc.vw / 2, y, lx, y);
+      else { kolaj(); hrana('man', rc.hubX, y, lx, y); }
+      z.bodky.push({ x: rc.hubX, y, r: 6.5, farba: '#e11d48', biely: true });
+      if (rc.m) { const cx = rc.k === 0 ? rc.hubX : rc.hubX + rc.seg / 2; z.stitky.push({ x: cx, y: y - 11 - 9, w: rc.m.w, text: rc.fam.marrDate }); }
+    } else {
+      if (rc.k === 0) hubY = spodok; else kolaj();
+      z.bodky.push({ x: rc.hubX, y: hubY, r: 5, farba: '#475569' });
+    }
+    if (rc.deti.length) {
+      const xs = rc.deti.map(d => d.x), kr = rc.deti[0].riadok, vrchDeti = hrebenY(z, kr) - bh / 2, busY = vrchDeti - LAYOUT.gapY / 2;
+      hrana('det', rc.hubX, hubY, rc.hubX, busY);
+      hrana('det', Math.min.apply(null, xs.concat([rc.hubX])), busY, Math.max.apply(null, xs.concat([rc.hubX])), busY);
+      xs.forEach(x => { hrana('det', x, busY, x, vrchDeti); z.bodky.push({ x, y: vrchDeti, r: 3.5, farba: '#475569' }); });
+    }
+  });
+  z.odkazy.forEach(o => {
+    if (o.typ === 'dopredu') z.ciary.push({ typ: 'odk', id: 'odk', x1: o.kotvaX, y1: o.y, x2: o.x - o.w / 2, y2: o.y });
+    else z.ciary.push({ typ: 'odk', id: 'odk', x1: o.x + o.w / 2, y1: o.y, x2: o.kotvaX, y2: o.y });
+  });
+  let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+  z.uzly.forEach(u => { mnX = Math.min(mnX, u.x - u.w / 2); mxX = Math.max(mxX, u.x + u.w / 2); mnY = Math.min(mnY, u.y - bh / 2); mxY = Math.max(mxY, u.y + bh / 2); });
+  z.odkazy.forEach(o => { mnX = Math.min(mnX, o.x - o.w / 2); mxX = Math.max(mxX, o.x + o.w / 2); });
+  z.hr = { minX: mnX, maxX: mxX, minY: mnY - 24, maxY: mxY };
+}
+
+function hrebenZostav(ustrednaId, spatId, odId) {
+  const P = treeData.persons, C = P[ustrednaId]; if (!C) return null;
+  const z = { id: ++HREBEN.cislo, kluc: ustrednaId + '|' + (spatId || ''), ustredna: ustrednaId, spat: spatId || null, od: odId || null, uzly: [], odkazy: [], rodiny: [], dx: 0, minR: 0 };
+  const ctx = { cesta: new Set(), minL: new Map(), maxR: new Map(), detiOs: {} };
+  const os = [C], rod = [];
+  for (let g = 0; g < HREBEN.GENERACII; g++) {
+    const r = hrebenOsovyRodic(os[g]); if (!r || os.includes(r.rodic)) break;
+    rod.push(r); os.push(r.rodic);
   }
-  const s = h || w;
-  if (s) return { type: 'single', s, hubX: s.x, hubY: s.y + LAYOUT.bh / 2 };
+  const Pspat = spatId && P[spatId];
+  const b0 = hrebenBlok(C, ctx, Pspat ? { rodiny: [], abs: { riadok: 0 } } : { abs: { riadok: 0 } });
+  hrebenUloz(z, ctx, b0, 0, 0);
+  if (Pspat) {                                  // pôvodný pokrvný potomok z predošlej zóny: partner NAĽAVO od ústrednej postavy
+    const fam = hrebenRodinaMedzi(Pspat, C), cg = coupleGap(fam), wP = personBubbleW(Pspat);
+    const xP = -(b0.w / 2 + cg + wP / 2);
+    z.uzly.push({ os: Pspat, x: xP, riadok: 0, w: wP, rola: 'partner' }); hrebenZapis(ctx, 0, xP - wP / 2, xP + wP / 2);
+    z.rodiny.push({ fam, k: 0, vlastnik: Pspat, vx: xP, vw: wP, hubX: -(b0.w / 2 + cg / 2), riadok: 0, seg: 0, m: marrInfo(fam), partner: C, spX: 0, spW: b0.w, deti: [] });
+    const text = hrebenTextOdkazu(Pspat.lastName || Pspat.birthName), w = hrebenSirkaOdkazu(text), ox = xP - wP / 2 - 22 - w / 2;
+    z.odkazy.push({ typ: 'spat', x: ox, riadok: 0, w, text, kotvaX: xP - wP / 2, zonaId: odId });
+    hrebenZapis(ctx, 0, ox - w / 2, ox + w / 2);
+  }
+  for (let g = 0; g < rod.length; g++) {
+    const fam = rod[g].fam, sus = hrebenDeti(fam).filter(d => d.id !== os[g].id), deti = [{ x: 0, riadok: -g }];
+    sus.forEach(s => {                          // hrebeň súrodencov: najstarší najbližšie k osi, ďalší vľavo
+      const kb = hrebenBlok(s, ctx, { rola: 'krv' });
+      let ax = Infinity; kb.tvar.forEach(([l, r], ro) => { const lm = ctx.minL.get(-g + ro); if (lm !== undefined) ax = Math.min(ax, lm - HREBEN.medzera - r); });
+      if (!isFinite(ax)) ax = -400;
+      hrebenUloz(z, ctx, kb, ax, -g); deti.push({ x: ax, riadok: -g });
+    });
+    ctx.detiOs[fam.id] = deti;
+    const rodinyA = [fam].concat(hrebenRodiny(os[g + 1]).filter(f => f.id !== fam.id));
+    const ba = hrebenBlok(os[g + 1], ctx, { rodiny: rodinyA, preskocDeti: fam.id, abs: { riadok: -(g + 1) } });
+    hrebenUloz(z, ctx, ba, 0, -(g + 1));
+  }
+  hrebenDokonci(z);
+  return z;
+}
+
+function hrebenPridajZonu(z) {
+  const sirka = z.hr.maxX - z.hr.minX;
+  let zaciatok = 0;
+  HREBEN.zony.forEach(o => { zaciatok = Math.max(zaciatok, o.dx + o.hr.maxX + 700); });
+  z.dx = zaciatok - z.hr.minX;
+  HREBEN.zony.push(z);
+}
+
+// Predvolený koreň: osoba s najdlhšou otcovskou líniou nahor (pri zhode najmladšia)
+function hrebenPredvolenyKoren() {
+  const P = treeData.persons; let najlepsi = null, nd = -1, nr = -Infinity;
+  Object.values(P).forEach(p => {
+    let d = 0, c = p; const videl = new Set([p.id]);
+    while (d < HREBEN.GENERACII) { const r = hrebenOsovyRodic(c); if (!r || videl.has(r.rodic.id)) break; videl.add(r.rodic.id); c = r.rodic; d++; }
+    const rok = hrebenRok(p) === Infinity ? -Infinity : hrebenRok(p);
+    if (d > nd || (d === nd && rok > nr)) { najlepsi = p; nd = d; nr = rok; }
+  });
+  return najlepsi ? najlepsi.id : null;
+}
+
+function hrebenCestaAktualnej() {
+  const cesta = []; let z = HREBEN.aktualna;
+  while (z) { cesta.unshift({ ustredna: z.ustredna, spat: z.spat }); z = z.od ? HREBEN.zony.find(q => q.id === z.od) : null; }
+  return cesta;
+}
+
+function hrebenOtvorZonu(ustrednaId, spatId, odId, okamzite) {
+  const kluc = ustrednaId + '|' + (spatId || '');
+  let z = HREBEN.zony.find(q => q.kluc === kluc);
+  if (!z) { z = hrebenZostav(ustrednaId, spatId, odId); if (!z) return null; hrebenPridajZonu(z); }
+  else if (odId) z.od = odId;
+  HREBEN.aktualna = z;
+  HREBEN.cesta = hrebenCestaAktualnej();
+  hrebenPrejdiNa(z, okamzite);
+  return z;
+}
+
+function hrebenObnov() {
+  const P = treeData.persons;
+  const cesta = HREBEN.cesta || [];
+  HREBEN.zony = []; HREBEN.aktualna = null;
+  if (!Object.keys(P).length) { HREBEN.cesta = []; return; }
+  if (!HREBEN.koren || !P[HREBEN.koren]) { HREBEN.koren = hrebenPredvolenyKoren(); }
+  const hl = hrebenZostav(HREBEN.koren, null, null); if (!hl) return;
+  hrebenPridajZonu(hl); HREBEN.aktualna = hl;
+  let predch = hl;
+  for (const s of cesta.slice(1)) {             // znovu otvorí pod-plátna, v ktorých používateľ bol (ak ešte platia)
+    const o = P[s.spat], c = P[s.ustredna];
+    if (!o || !c || !hrebenRodiny(o).some(f => f.husbandId === c.id || f.wifeId === c.id)) break;
+    const z = hrebenZostav(s.ustredna, s.spat, predch.id); if (!z) break;
+    hrebenPridajZonu(z); HREBEN.aktualna = z; predch = z;
+  }
+  HREBEN.cesta = hrebenCestaAktualnej();
+}
+
+// --- POHĽAD A ANIMÁCIA ---
+function hrebenPohlad(z) {
+  const pad = 50, minX = z.hr.minX + z.dx - pad, maxX = z.hr.maxX + z.dx + pad, minY = z.hr.minY - pad, maxY = z.hr.maxY + pad;
+  const sc = Math.min(Math.max(0.2, Math.min(canvas.width / (maxX - minX), canvas.height / (maxY - minY))), 1.2);
+  return { scale: sc, panX: (canvas.width - (maxX - minX) * sc) / 2 - minX * sc, panY: (canvas.height - (maxY - minY) * sc) / 2 - minY * sc };
+}
+function hrebenPrejdiNa(z, okamzite) {
+  if (!canvas || !z) return;
+  const cl = hrebenPohlad(z);
+  if (HREBEN.animacia) { cancelAnimationFrame(HREBEN.animacia); HREBEN.animacia = null; }
+  if (okamzite) { scale = cl.scale; panX = cl.panX; panY = cl.panY; drawTree(); return; }
+  const s0 = { scale, panX, panY }, t0 = performance.now(), D = 700;
+  const krok = (t) => {
+    const u = Math.min(1, (t - t0) / D), e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    scale = s0.scale + (cl.scale - s0.scale) * e; panX = s0.panX + (cl.panX - s0.panX) * e; panY = s0.panY + (cl.panY - s0.panY) * e;
+    drawTree();
+    HREBEN.animacia = u < 1 ? requestAnimationFrame(krok) : null;
+  };
+  HREBEN.animacia = requestAnimationFrame(krok);
+}
+function hrebenOdkazV(x, y) {
+  const z = HREBEN.aktualna; if (!z) return null;
+  const lx = x - z.dx;
+  for (const o of z.odkazy) { const nx = (lx - o.x) / (o.w / 2), ny = (y - o.y) / (HREBEN.vyskaOdkazu / 2); if (nx * nx + ny * ny <= 1) return o; }
+  return null;
+}
+function hrebenKlikOdkaz(o) {
+  const z = HREBEN.aktualna; if (!z) return;
+  if (o.typ === 'spat') { const cl = HREBEN.zony.find(q => q.id === z.od); if (cl) { HREBEN.aktualna = cl; HREBEN.cesta = hrebenCestaAktualnej(); hrebenPrejdiNa(cl, false); } }
+  else hrebenOtvorZonu(o.ustredna, o.spat, z.id, false);
+}
+function hrebenNastavKoren(id) {
+  if (!treeData.persons[id]) return;
+  HREBEN.koren = id; HREBEN.cesta = [];
+  hrebenObnov();
+  if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true);
+  selectPerson(id, false);
+}
+
+// --- KRESLENIE ---
+function hrebenNakresli(c, z) {
+  const bh = LAYOUT.bh;
+  c.save(); c.translate(z.dx, 0);
+  c.lineCap = 'butt'; c.lineJoin = 'miter';
+  z.ciary.forEach(l => {
+    c.beginPath(); c.moveTo(l.x1, l.y1); c.lineTo(l.x2, l.y2);
+    c.strokeStyle = l.typ === 'man' ? '#e11d48' : l.typ === 'odk' ? '#f97316' : '#475569';
+    c.lineWidth = l.typ === 'man' ? 2.5 : 2; c.stroke();
+  });
+  z.bodky.forEach(b => {
+    c.beginPath(); c.fillStyle = b.farba; c.arc(b.x, b.y, b.r, 0, Math.PI * 2); c.fill();
+    if (b.biely) { c.lineWidth = 2; c.strokeStyle = '#ffffff'; c.stroke(); }
+  });
+  z.stitky.forEach(s => {
+    c.beginPath(); c.roundRect(s.x - s.w / 2, s.y - 9, s.w, 18, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 1; c.strokeStyle = '#e11d48'; c.stroke();
+    c.font = FONT_MARR; c.fillStyle = '#9f1239'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s.text, s.x, s.y + 0.5);
+  });
+  z.uzly.forEach(u => { const q = Object.create(u.os); q.x = u.x; q.y = u.y; drawPersonBubble(q, c, false, u.rola); });
+  z.odkazy.forEach(o => {
+    c.beginPath(); c.ellipse(o.x, o.y, o.w / 2, HREBEN.vyskaOdkazu / 2, 0, 0, Math.PI * 2);
+    c.fillStyle = '#fb923c'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#c2410c'; c.stroke();
+    c.font = FONT_ODKAZ; c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(o.text, o.x, o.y + 0.5);
+  });
+  c.restore();
+}
+function hrebenOsobaV(x, y) {
+  const z = HREBEN.aktualna; if (!z) return null;
+  const lx = x - z.dx;
+  for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) return u.os; }
   return null;
 }
 
-// --- AUTOMATICKÉ ROZMIESTNENIE ---
-// Riadky = generácie (predkovia hore, potomkovia dole), partneri vždy v jednom riadku vedľa seba,
-// šírka bublín podľa mena, deti vycentrované pod uzlom rodičov. Bubliny sú uzamknuté (nedajú sa ťahať).
+// Hlavný vstup: prepočíta všetky zóny a (voliteľne) prispôsobí pohľad
 function autoLayoutTree(andFitToView = true) {
-  const P = treeData.persons, F = treeData.families;
-  const persons = Object.values(P); if (persons.length === 0) return;
-  const N = persons.length;
-  const validParents = fam => [fam.husbandId, fam.wifeId].filter(id => id && P[id]);
-
-  // 1) Generácie
-  const depth = {}; persons.forEach(p => depth[p.id] = 0);
-  let changed = true, guard = 0;
-  while (changed && guard++ < 300) {
-    changed = false;
-    Object.values(F).forEach(fam => {
-      const ps = validParents(fam); if (!ps.length) return;
-      const m = Math.max(...ps.map(id => depth[id]));
-      ps.forEach(id => { if (depth[id] < m) { depth[id] = m; changed = true; } });
-      (fam.children || []).forEach(cId => { if (P[cId] && depth[cId] < m + 1 && m + 1 <= N) { depth[cId] = m + 1; changed = true; } });
-    });
-  }
-
-  // 2) Zhluky = osoby spojené manželstvom (jeden riadok)
-  const uf = {}; persons.forEach(p => uf[p.id] = p.id);
-  const find = x => { while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; } return x; };
-  Object.values(F).forEach(fam => { if (fam.husbandId && fam.wifeId && P[fam.husbandId] && P[fam.wifeId]) uf[find(fam.husbandId)] = find(fam.wifeId); });
-  const byRoot = {}, clusters = [], clOf = {};
-  persons.forEach(p => { const r = find(p.id); if (!byRoot[r]) { byRoot[r] = { members: [] }; clusters.push(byRoot[r]); } byRoot[r].members.push(p.id); });
-  clusters.forEach(cl => { const d = Math.max(...cl.members.map(id => depth[id])); cl.members.forEach(id => { depth[id] = d; clOf[id] = cl; }); });
-
-  // Predkov nižšie k ich potomkom (kratšie spojnice), len smerom nadol
-  let moved = true; guard = 0;
-  while (moved && guard++ < 200) {
-    moved = false;
-    clusters.forEach(cl => {
-      let minChild = Infinity;
-      cl.members.forEach(id => (P[id].fams || []).forEach(fId => { const fam = F[fId]; if (fam) (fam.children || []).forEach(cId => { if (P[cId]) minChild = Math.min(minChild, depth[cId]); }); }));
-      if (minChild !== Infinity && minChild - 1 > depth[cl.members[0]]) { cl.members.forEach(id => depth[id] = minChild - 1); moved = true; }
-    });
-  }
-
-  // 3) Vnútorné usporiadanie zhluku (partneri vedľa seba, muž vľavo, žena vpravo)
-  const famBetween = (a, b) => { for (const fId of (P[a].fams || [])) { const f = F[fId]; if (f && ((f.husbandId === a && f.wifeId === b) || (f.husbandId === b && f.wifeId === a))) return f; } return null; };
-  const spousesOfId = id => { const res = []; (P[id].fams || []).forEach(fId => { const f = F[fId]; if (!f) return; const o = f.husbandId === id ? f.wifeId : f.husbandId; if (o && o !== id && P[o]) res.push({ id: o, isHusband: f.husbandId === o }); }); return res; };
-  function orderCluster(ids) {
-    if (ids.length === 1) return ids.slice();
-    let pivot = ids[0], best = -1; ids.forEach(id => { const d = spousesOfId(id).length; if (d > best) { best = d; pivot = id; } });
-    const placed = new Set([pivot]), left = [], right = [];
-    let pivotL = false, pivotR = false;
-    (function expand(id, side) {
-      spousesOfId(id).forEach(sp => {
-        if (placed.has(sp.id)) return; placed.add(sp.id);
-        let s = side;
-        if (!s) {
-          s = sp.isHusband ? 'L' : 'R';
-          if (s === 'L' && pivotL && !pivotR) s = 'R'; else if (s === 'R' && pivotR && !pivotL) s = 'L';
-          if (s === 'L') pivotL = true; else pivotR = true;
-        }
-        if (s === 'L') left.unshift(sp.id); else right.push(sp.id);
-        expand(sp.id, s);
-      });
-    })(pivot, null);
-    const out = [...left, pivot, ...right];
-    ids.forEach(id => { if (!placed.has(id)) out.push(id); });
-    return out;
-  }
-  clusters.forEach(cl => {
-    cl.depth = depth[cl.members[0]];
-    cl.order = orderCluster(cl.members);
-    cl.ws = cl.order.map(id => personBubbleW(P[id]));
-    let x = 0; const centers = [];
-    cl.order.forEach((id, i) => { centers.push(x + cl.ws[i] / 2); x += cl.ws[i]; if (i < cl.order.length - 1) { const fam = famBetween(id, cl.order[i + 1]); x += fam ? coupleGap(fam) : 64; } });
-    cl.width = x; cl.offC = centers.map(c => c - x / 2); cl.idx = {}; cl.order.forEach((id, i) => cl.idx[id] = i);
-  });
-  // vodorovná poloha uzla rodiny voči stredu zhluku
-  function hubOffset(cl, fam) {
-    const a = cl.idx[fam.husbandId], b = cl.idx[fam.wifeId];
-    if (a !== undefined && b !== undefined) { const i = Math.min(a, b), j = Math.max(a, b); return ((cl.offC[i] + cl.ws[i] / 2) + (cl.offC[j] - cl.ws[j] / 2)) / 2; }
-    const s = a !== undefined ? a : b; return s !== undefined ? cl.offC[s] : 0;
-  }
-
-  // 4) Riadky
-  const maxD = Math.max(...clusters.map(c => c.depth));
-  const rows = []; for (let d = 0; d <= maxD; d++) rows.push([]);
-  clusters.forEach(cl => rows[cl.depth].push(cl));
-  const nbrs = cl => {
-    const res = [];
-    cl.members.forEach(id => {
-      (P[id].fams || []).forEach(fId => { const f = F[fId]; if (f) (f.children || []).forEach(cId => { if (P[cId]) res.push(clOf[cId]); }); });
-      const pf = P[id].famc && F[P[id].famc]; if (pf) validParents(pf).forEach(pid => res.push(clOf[pid]));
-    });
-    return res;
-  };
-  const seen = new Set(), row0 = [];
-  function dfsVisit(cl) { if (seen.has(cl)) return; seen.add(cl); if (cl.depth === 0) row0.push(cl); nbrs(cl).forEach(dfsVisit); }
-  rows[0].forEach(dfsVisit);
-  rows[0] = row0;
-
-  const famOrder = {}; Object.keys(F).forEach((k, i) => famOrder[k] = i);
-  const sibKey = cl => { let k = Infinity; cl.order.forEach(id => { const fId = P[id].famc; const f = fId && F[fId]; if (f) { const ci = (f.children || []).indexOf(id); k = Math.min(k, (famOrder[fId] || 0) * 1000 + (ci < 0 ? 999 : ci)); } }); return k; };
-  const placedSet = new Set();
-  const rowY = d => 120 + d * (LAYOUT.bh + LAYOUT.gapY);
-  const setPos = cl => cl.order.forEach((id, i) => { P[id].x = cl.cx + cl.offC[i]; P[id].y = rowY(cl.depth); });
-
-  function contribs(cl) {
-    const out = [];
-    cl.order.forEach((id, i) => { const pf = P[id].famc && F[P[id].famc]; if (!pf) return; const parentsPlaced = validParents(pf).every(pid => placedSet.has(clOf[pid])); if (!parentsPlaced) return; const g = famGeom(pf); if (g) out.push(g.hubX - cl.offC[i]); });
-    const seenF = new Set();
-    cl.order.forEach(id => (P[id].fams || []).forEach(fId => {
-      if (seenF.has(fId)) return; seenF.add(fId);
-      const fam = F[fId]; if (!fam) return;
-      const kids = (fam.children || []).filter(cId => P[cId] && placedSet.has(clOf[cId]));
-      if (!kids.length) return;
-      const xs = kids.map(cId => P[cId].x);
-      out.push((Math.min(...xs) + Math.max(...xs)) / 2 - hubOffset(cl, fam));
-    }));
-    return out;
-  }
-
-  // Umiestnenie riadku: zoradenie podľa požadovanej polohy a minimálne vychýlenie (PAV) pri dodržaní odstupov.
-  function placeRow(row, sortOK) {
-    if (!row.length) return;
-    const des = new Map();
-    row.forEach(cl => { const c = contribs(cl); des.set(cl, c.length ? c.reduce((a, b) => a + b, 0) / c.length : null); });
-    if (sortOK) {
-      const keyed = row.map(cl => ({ cl, d: des.get(cl) !== null ? des.get(cl) : (cl.cx !== undefined ? cl.cx : null), s: sibKey(cl) }));
-      if (keyed.every(k => k.d !== null)) {
-        keyed.sort((a, b) => (a.d - b.d) || ((a.cl.cx || 0) - (b.cl.cx || 0)) || (a.s - b.s));
-        row.splice(0, row.length, ...keyed.map(k => k.cl));
-      }
-    }
-    const n = row.length, GAP = LAYOUT.gapX, off = [0];
-    for (let i = 1; i < n; i++) off[i] = off[i - 1] + (row[i - 1].width + row[i].width) / 2 + GAP;
-    const targets = [];
-    row.forEach((cl, i) => {
-      const d = des.get(cl);
-      targets.push(d === null ? (i ? targets[i - 1] : (cl.cx !== undefined ? cl.cx : 0)) : d - off[i]);
-    });
-    // izotonická regresia (nezostupná postupnosť)
-    const blocks = [];
-    targets.forEach((t, i) => {
-      blocks.push({ sum: t, w: 1, s: i, e: i });
-      while (blocks.length > 1) { const b = blocks[blocks.length - 1], a = blocks[blocks.length - 2]; if (a.sum / a.w <= b.sum / b.w) break; a.sum += b.sum; a.w += b.w; a.e = b.e; blocks.pop(); }
-    });
-    blocks.forEach(b => { const q = b.sum / b.w; for (let i = b.s; i <= b.e; i++) row[i].cx = q + off[i]; });
-    row.forEach(cl => { setPos(cl); placedSet.add(cl); });
-  }
-
-  rows.forEach((row, d) => placeRow(row, d > 0));
-  for (let it = 0; it < 8; it++) {
-    const sortOK = it < 4;
-    for (let d = maxD; d >= 0; d--) placeRow(rows[d], sortOK);
-    for (let d = 0; d <= maxD; d++) placeRow(rows[d], sortOK);
-  }
-
-  // Nezávislé rodiny (samostatné komponenty) priblížime k sebe, aby medzi nimi neboli zbytočné diery
-  const comp = new Map(); clusters.forEach(cl => comp.set(cl, cl));
-  const cfind = x => { while (comp.get(x) !== x) { comp.set(x, comp.get(comp.get(x))); x = comp.get(x); } return x; };
-  clusters.forEach(cl => nbrs(cl).forEach(o => { comp.set(cfind(cl), cfind(o)); }));
-  const groups = new Map();
-  persons.forEach(p => { const r = cfind(clOf[p.id]); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(p); });
-  const boxes = [...groups.values()].map(list => ({ list, min: Math.min(...list.map(p => p.x - personBubbleW(p) / 2)), max: Math.max(...list.map(p => p.x + personBubbleW(p) / 2)) })).sort((a, b) => a.min - b.min);
-  let prevMax = -Infinity;
-  boxes.forEach(bx => {
-    if (prevMax > -Infinity && bx.min > prevMax + 80) { const dx = bx.min - (prevMax + 80); bx.list.forEach(p => { p.x -= dx; }); bx.min -= dx; bx.max -= dx; }
-    prevMax = Math.max(prevMax, bx.max);
-  });
-
-  // Posun do kladných súradníc
-  let minLeft = Infinity; persons.forEach(p => { minLeft = Math.min(minLeft, p.x - personBubbleW(p) / 2); });
-  const shift = 100 - minLeft; persons.forEach(p => { p.x += shift; });
-
+  if (!Object.keys(treeData.persons || {}).length) { HREBEN.zony = []; HREBEN.aktualna = null; return; }
+  hrebenObnov();
   if (andFitToView) fitTreeToView(); else drawTree();
 }
-
-function fitTreeToView() {
-  const persons = Object.values(treeData.persons); if (persons.length === 0 || !canvas) return;
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  persons.forEach(p => { const hw = personBubbleW(p) / 2; minX = Math.min(minX, p.x - hw); maxX = Math.max(maxX, p.x + hw); minY = Math.min(minY, p.y - LAYOUT.bh / 2); maxY = Math.max(maxY, p.y + LAYOUT.bh / 2); });
-  const pad = 50; minX -= pad; maxX += pad; minY -= pad; maxY += pad;
-  const contentW = maxX - minX; const contentH = maxY - minY;
-  const scaleX = canvas.width / contentW; const scaleY = canvas.height / contentH;
-  scale = Math.min(Math.max(0.2, Math.min(scaleX, scaleY)), 1.2);
-  panX = (canvas.width - contentW * scale) / 2 - minX * scale; panY = (canvas.height - contentH * scale) / 2 - minY * scale;
-  drawTree();
+function fitTreeToView() { if (!canvas) return; if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
+function centerOnPerson(personId) {
+  const p = treeData.persons[personId]; if (!p || !canvas) return;
+  let z = HREBEN.aktualna, u = z && z.uzly.find(n => n.os.id === personId);
+  if (!u) for (const zz of HREBEN.zony) { u = zz.uzly.find(n => n.os.id === personId); if (u) { z = zz; break; } }
+  if (!u) { hrebenNastavKoren(personId); return; }          // osoba nie je v žiadnej zóne: stane sa koreňom
+  if (z !== HREBEN.aktualna) { HREBEN.aktualna = z; HREBEN.cesta = hrebenCestaAktualnej(); }
+  scale = Math.max(scale, 0.95); panX = canvas.width / 2 - (u.x + z.dx) * scale; panY = canvas.height / 2 - u.y * scale;
+  selectPerson(personId, false); drawTree();
 }
 
 function zoomCanvas(factor) { scale = Math.min(Math.max(0.1, scale * factor), 2.5); drawTree(); }
@@ -1217,6 +1360,7 @@ function initCanvas() {
   canvas.addEventListener('wheel', (e) => { e.preventDefault(); zoomCanvas(e.deltaY < 0 ? 1.08 : 0.92); }, { passive: false });
   canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect(); const mouseX = (e.clientX - rect.left - panX) / scale; const mouseY = (e.clientY - rect.top - panY) / scale;
+    const odk = hrebenOdkazV(mouseX, mouseY); if (odk) { hrebenKlikOdkaz(odk); return; }
     const hitPerson = getPersonAt(mouseX, mouseY);
     if (hitPerson) selectPerson(hitPerson.id); isDragging = true; dragStartX = e.clientX - panX; dragStartY = e.clientY - panY;
   });
@@ -1224,11 +1368,13 @@ function initCanvas() {
     if (isDragging) { panX = e.clientX - dragStartX; panY = e.clientY - dragStartY; drawTree(); }
   });
   window.addEventListener('mouseup', () => { isDragging = false; draggedPersonId = null; });
+  canvas.addEventListener('mousemove', (e) => { if (isDragging) return; const r = canvas.getBoundingClientRect(); canvas.style.cursor = hrebenOdkazV((e.clientX - r.left - panX) / scale, (e.clientY - r.top - panY) / scale) ? 'pointer' : ''; });
   
   canvas.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0]; const rect = canvas.getBoundingClientRect();
       const mouseX = (touch.clientX - rect.left - panX) / scale; const mouseY = (touch.clientY - rect.top - panY) / scale;
+      const odk = hrebenOdkazV(mouseX, mouseY); if (odk) { hrebenKlikOdkaz(odk); return; }
       const hitPerson = getPersonAt(mouseX, mouseY);
       if (hitPerson) selectPerson(hitPerson.id); isDragging = true; dragStartX = touch.clientX - panX; dragStartY = touch.clientY - panY;
     } else if (e.touches.length === 2) {
@@ -1266,13 +1412,12 @@ function initCanvas() {
   canvas.addEventListener('dblclick', (e) => { const rect = canvas.getBoundingClientRect(); const mouseX = (e.clientX - rect.left - panX) / scale; const mouseY = (e.clientY - rect.top - panY) / scale; const hitPerson = getPersonAt(mouseX, mouseY); if (hitPerson) openPersonEditor(hitPerson.id); });
 }
 
-function getPersonAt(x, y) {
-  const persons = Object.values(treeData.persons);
-  for (let i = persons.length - 1; i >= 0; i--) { const p = persons[i]; const hw = personBubbleW(p) / 2; if (x >= p.x - hw && x <= p.x + hw && y >= p.y - LAYOUT.bh / 2 && y <= p.y + LAYOUT.bh / 2) return p; } return null;
-}
+function getPersonAt(x, y) { return hrebenOsobaV(x, y); }
 
 function drawTree() {
-  if (!ctx) return; ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid(); ctx.translate(panX, panY); ctx.scale(scale, scale); drawCombConnections(); Object.values(treeData.persons).forEach(person => drawPersonBubble(person)); ctx.restore();
+  if (!ctx) return; ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid(); ctx.translate(panX, panY); ctx.scale(scale, scale);
+  HREBEN.zony.forEach(z => { const l = (z.hr.minX + z.dx) * scale + panX, r = (z.hr.maxX + z.dx) * scale + panX; if (r < -200 || l > canvas.width + 200) return; hrebenNakresli(ctx, z); });
+  ctx.restore();
 }
 
 function drawSubtleGrid() {
@@ -1280,50 +1425,14 @@ function drawSubtleGrid() {
   ctx.beginPath(); for (let x = offsetX; x < canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); } for (let y = offsetY; y < canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); } ctx.stroke();
 }
 
-function drawCombConnections(c = ctx) {
-  Object.values(treeData.families).forEach(fam => {
-    const g = famGeom(fam); if (!g) return;
-    const children = (fam.children || []).map(id => treeData.persons[id]).filter(Boolean);
-    const hubX = g.hubX, hubY = g.hubY;
-    if (g.type === 'couple') {
-      // spojka medzi bublinami partnerov (hrana – hrana) s uzlom presne v strede
-      c.beginPath(); c.strokeStyle = '#e11d48'; c.lineWidth = 2.5; c.moveTo(g.x1, hubY); c.lineTo(g.x2, hubY); c.stroke();
-      c.beginPath(); c.fillStyle = '#e11d48'; c.arc(hubX, hubY, 6.5, 0, Math.PI * 2); c.fill(); c.lineWidth = 2; c.strokeStyle = '#ffffff'; c.stroke();
-      // malá bublina so svadobným dátumom nad spojkou (jeden znak medzera pred aj za dátumom)
-      const m = marrInfo(fam);
-      if (m) {
-        const bw = m.w, bh = 18, bx = hubX - bw / 2, by = hubY - 11 - bh;
-        c.beginPath(); c.roundRect(bx, by, bw, bh, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 1; c.strokeStyle = '#e11d48'; c.stroke();
-        c.font = FONT_MARR; c.fillStyle = '#9f1239'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(fam.marrDate, hubX, by + bh / 2 + 0.5);
-      }
-    } else {
-      c.beginPath(); c.fillStyle = '#475569'; c.arc(hubX, hubY, 5, 0, Math.PI * 2); c.fill();
-    }
-
-    if (children.length > 0) {
-      const parentY = (g.type === 'couple') ? g.L.y : g.s.y;
-      const rank = (g.type === 'couple' ? [g.L, g.R] : [g.s]).reduce((m, pp) => Math.max(m, (pp.fams || []).indexOf(fam.id)), 0);
-      const busY = parentY + (LAYOUT.bh / 2) + LAYOUT.gapY * [0.5, 0.25, 0.75][Math.max(rank, 0) % 3];
-      c.strokeStyle = '#475569'; c.lineWidth = 2;
-      c.beginPath(); c.moveTo(hubX, hubY); c.lineTo(hubX, busY); c.stroke();
-      const xs = children.map(ch => ch.x); const minChildX = Math.min(...xs, hubX); const maxChildX = Math.max(...xs, hubX);
-      c.beginPath(); c.moveTo(minChildX, busY); c.lineTo(maxChildX, busY); c.stroke();
-      children.forEach(child => {
-        const childTopY = child.y - (LAYOUT.bh / 2);
-        c.beginPath(); c.moveTo(child.x, busY); c.lineTo(child.x, childTopY); c.stroke();
-        c.fillStyle = '#475569'; c.beginPath(); c.arc(child.x, childTopY, 3.5, 0, Math.PI * 2); c.fill();
-      });
-    }
-  });
-}
-
-function drawPersonBubble(p, c = ctx, noSelect = false) {
+function drawPersonBubble(p, c = ctx, noSelect = false, rola = '') {
   const h = LAYOUT.bh; const w = personBubbleW(p);
   const fullNameStr = personNameStr(p);
   const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
   const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
   const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = !noSelect && (p.id === currentSelectedPersonId);
-  const isMale = (p.gender === 'M'); const bgColor = isMale ? '#eff6ff' : '#fdf2f8'; const borderColor = isMale ? '#1e40af' : '#be185d';
+  const isMale = (p.gender === 'M'); let bgColor = isMale ? '#eff6ff' : '#fdf2f8'; let borderColor = isMale ? '#1e40af' : '#be185d';
+  if (rola && HREBEN.FARBY_PODLA_ROLE) { if (rola === 'partner') { bgColor = '#f0fdf4'; borderColor = '#15803d'; } else { bgColor = '#eff6ff'; borderColor = '#1e40af'; } }
   if (isSelected) { c.beginPath(); c.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); c.fillStyle = 'rgba(99, 102, 241, 0.3)'; c.fill(); }
   c.beginPath(); c.roundRect(x, y, w, h, radius); c.fillStyle = bgColor; c.fill(); c.lineWidth = isSelected ? 3.5 : 2.2; c.strokeStyle = borderColor; c.stroke();
   const avatarCenterX = x + 34; const avatarCenterY = y + h / 2; const avatarRadius = 22;
@@ -3227,6 +3336,7 @@ function openFanChartModal() {
   document.body.classList.add('overflow-hidden');
   FAN.history = [];
   FAN.rootId = fanDefaultRoot();
+  document.getElementById('fanGensSelect').value = String(FAN.gens);
   fanInitSvg();
   fanRender(true);
 }
@@ -3335,166 +3445,6 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeFanChartModal();
 });
 
-// ===================== PATRILINIOVY GRAF – nový horizontálny hrebeň =====================
-// Pôvodné vejárové rozloženie je nahradené patriliniovou osou a bočnými rodinnými vetvami.
-FAN.branchOpen = FAN.branchOpen || new Set();
-FAN.panX = 0;
-
-function patYear(p) {
-  const m = String((p && p.birthDate) || '').match(/\d{3,4}/);
-  return m ? Number(m[0]) : 99999;
-}
-function patGender(p) { return (p && String(p.gender || 'U').toUpperCase().startsWith('F')) ? 'F' : (p && String(p.gender || 'U').toUpperCase().startsWith('M')) ? 'M' : 'U'; }
-function patSpouses(p, famId) {
-  const out = [];
-  (p.fams || []).forEach(fid => {
-    if (fid === famId) return;
-    const f = treeData.families[fid]; if (!f) return;
-    const id = f.husbandId === p.id ? f.wifeId : f.husbandId;
-    if (id && treeData.persons[id] && !out.some(x => x.person.id === id)) out.push({person:treeData.persons[id], family:f});
-  });
-  return out;
-}
-function patChildren(p) {
-  const ids = [];
-  (p.fams || []).forEach(fid => { const f=treeData.families[fid]; if (f) (f.children||[]).forEach(id=>{ if(treeData.persons[id]&&!ids.includes(id)) ids.push(id); }); });
-  return ids.map(id=>treeData.persons[id]).sort((a,b)=>patYear(a)-patYear(b)||fanName(a).localeCompare(fanName(b),'sk'));
-}
-function patOldestAncestor(p) {
-  let cur=p, seen=new Set();
-  while(cur && !seen.has(cur.id)) { seen.add(cur.id); const par=getParentsOf(cur.id); const next=par.father||par.mother; if(!next) break; cur=next; }
-  return cur || p;
-}
-function patChooseHeir(children) {
-  const boys=children.filter(p=>patGender(p)==='M');
-  if (boys.length) return boys.sort((a,b)=>patYear(a)-patYear(b))[0];
-  const girls=children.filter(p=>patGender(p)==='F');
-  return (girls.length ? girls : children).sort((a,b)=>patYear(a)-patYear(b))[0] || null;
-}
-function patMarriageDate(f) { return (f && f.marrDate) ? String(f.marrDate) : ''; }
-function patNodeWidth(p) { const n=fanName(p); return Math.max(190, Math.min(290, n.length*8.1+92)); }
-function patDrawPerson(g,p,x,y,opts={}) {
-  const w=patNodeWidth(p), h=94, gender=patGender(p), stroke=gender==='M'?'#2684d8':gender==='F'?'#e56a9a':'#8995a3';
-  const selected=p.id===currentSelectedPersonId || p.id===FAN.rootId;
-  const ng='patclip_'+String(p.id).replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+Math.round(x)+'_'+Math.round(y);
-  const defs=g.append('defs'); defs.append('clipPath').attr('id',ng).append('circle').attr('cx',x+43).attr('cy',y+46).attr('r',29);
-  const group=g.append('g').attr('class','pat-person').style('cursor','pointer').on('click',(e)=>{e.stopPropagation(); if(typeof selectPerson==='function') { selectPerson(p.id); fanRender(false); }});
-  group.append('title').text(fanTooltip(p));
-  group.append('rect').attr('x',x).attr('y',y).attr('width',w).attr('height',h).attr('rx',17).attr('fill','#fffdf8').attr('stroke',stroke).attr('stroke-width',selected?4:2.4).attr('filter',selected?'drop-shadow(0 0 5px rgba(245,158,11,.45))':null);
-  const ph=(p.photos||[]).find(a=>a.isMain)||(p.photos||[])[0];
-  if(ph&&ph.data) group.append('image').attr('href',ph.data).attr('x',x+14).attr('y',y+17).attr('width',58).attr('height',58).attr('preserveAspectRatio','xMidYMid slice').attr('clip-path',`url(#${ng})`);
-  else {
-    group.append('circle').attr('cx',x+43).attr('cy',y+46).attr('r',29).attr('fill',gender==='M'?'#e7f3ff':gender==='F'?'#ffe8f0':'#edf0f3').attr('stroke',stroke).attr('stroke-width',1.5);
-    group.append('text').attr('x',x+43).attr('y',y+54).attr('text-anchor','middle').attr('font-size',25).attr('fill',stroke).text(gender==='M'?'♂':gender==='F'?'♀':'?');
-  }
-  const tx=x+82, maxText=w-94;
-  const name=fanName(p);
-  group.append('text').attr('x',tx).attr('y',y+37).attr('font-family','Arial,sans-serif').attr('font-size',14).attr('font-weight',700).attr('fill','#18212b').text(name.length>28?name.slice(0,27)+'…':name);
-  const dates=[p.birthDate?('* '+p.birthDate):'',p.deathDate?('† '+p.deathDate):''].filter(Boolean).join('  ');
-  if(dates) group.append('text').attr('x',tx).attr('y',y+60).attr('font-family','Arial,sans-serif').attr('font-size',11).attr('fill','#5d6874').text(dates);
-  return {x,y,w,h,cx:x+w/2,cy:y+h/2,right:x+w,left:x};
-}
-function patDrawMarriage(g,x,y,date) {
-  const w=Math.max(84,(date||'').length*6.5+24),h=28;
-  g.append('rect').attr('x',x-w/2).attr('y',y-h/2).attr('width',w).attr('height',h).attr('rx',14).attr('fill','#fff4d6').attr('stroke','#d5a23c').attr('stroke-width',1.5);
-  g.append('text').attr('x',x).attr('y',y+4).attr('text-anchor','middle').attr('font-family','Arial,sans-serif').attr('font-size',11).attr('font-weight',700).attr('fill','#78551b').text(date||'sobáš');
-  return w;
-}
-function patRenderBranch(g,person,family,x,y,branchKey) {
-  const a=patDrawPerson(g,person,x,y);
-  const spouseList=patSpouses(person,family && family.id);
-  // Rodinný partner z aktuálnej rodiny je zobrazený ako druhá bublina.
-  let spouse=family ? treeData.persons[family.husbandId===person.id?family.wifeId:family.husbandId] : null;
-  let sf=family;
-  if(!spouse && spouseList.length){ spouse=spouseList[0].person; sf=spouseList[0].family; }
-  let end=a.right;
-  if(spouse && spouse.id!==person.id){
-    const sx=end+118, b=patDrawPerson(g,spouse,sx,y);
-    g.append('path').attr('d',`M${a.right},${a.cy} H${a.right+34} H${sx-45} H${sx}`).attr('fill','none').attr('stroke','#8492a0').attr('stroke-width',2);
-    const mid=(a.right+sx)/2; patDrawMarriage(g,mid,a.cy,patMarriageDate(sf));
-    const btnX=b.right+16, btnY=y+30, bw=130, bh=34;
-    const bg=g.append('g').style('cursor','pointer').on('click',e=>{e.stopPropagation();patOpenPartnerBranch(spouse.id,branchKey);});
-    bg.append('rect').attr('x',btnX).attr('y',btnY).attr('width',bw).attr('height',bh).attr('rx',17).attr('fill','#f59e0b').attr('stroke','#b96a08').attr('stroke-width',1.4);
-    const label='Rod + '+((getParentsOf(spouse.id).father||{}).lastName||spouse.lastName||'priezvisko');
-    bg.append('text').attr('x',btnX+bw/2).attr('y',btnY+21).attr('text-anchor','middle').attr('font-size',11).attr('font-weight',700).attr('font-family','Arial,sans-serif').attr('fill','#492b05').text(label.length>20?label.slice(0,19)+'…':label);
-    bg.append('title').text('Zobraziť vedľajšiu líniu rodu '+label.replace(/^Rod \+ /,''));
-    end=btnX+bw;
-  }
-  return end;
-}
-function patOpenPartnerBranch(partnerId,key) {
-  if(!FAN.branchOpen.has(partnerId)) FAN.branchOpen.add(partnerId); else FAN.branchOpen.delete(partnerId);
-  FAN.panX = FAN.branchOpen.size ? 500 : 0;
-  fanRender(false);
-  // Ponechať pohľad na rozšírenú časť plátna.
-  const svg=document.getElementById('fanSvg'); if(svg && FAN.zoom){ const r=svg.getBoundingClientRect(); d3.select(svg).transition().duration(300).call(FAN.zoom.transform,d3.zoomIdentity.translate(-FAN.panX+30,45).scale(0.85)); }
-}
-function fanRender(refit) {
-  fanInitSvg();
-  const svgEl=document.getElementById('fanSvg'), g=d3.select('#fanZoom'); g.selectAll('*').remove();
-  const all=treeData.persons||{}; let root=all[FAN.rootId];
-  if(!root){root=fanDefaultRoot()&&all[fanDefaultRoot()];}
-  if(!root){document.getElementById('fanChartTitle').textContent='Patriliniový rodokmeň'; g.append('text').attr('x',80).attr('y',100).text('Rodokmeň neobsahuje žiadne osoby.'); return;}
-  root=patOldestAncestor(root); FAN.rootId=root.id;
-  document.getElementById('fanChartTitle').textContent='Patriliniový rodokmeň – '+fanName(root);
-  const baseX=100+FAN.panX, mainX=baseX+300, startY=100, stepY=180;
-  const lineage=[], seen=new Set(); let cur=root, gen=0;
-  while(cur&&!seen.has(cur.id)&&gen<100){seen.add(cur.id);lineage.push({p:cur,gen});const children=patChildren(cur);cur=patChooseHeir(children);gen++;}
-  const usedBranchIds=new Set(lineage.map(n=>n.p.id));
-  let maxX=mainX+300, maxY=startY+lineage.length*stepY;
-  // Zvislá patriliniová os.
-  if(lineage.length>1) g.append('path').attr('d',`M${mainX},${startY+47} V${startY+(lineage.length-1)*stepY+47}`).attr('stroke','#526576').attr('stroke-width',3).attr('fill','none');
-  lineage.forEach((n,i)=>{
-    const y=startY+i*stepY, node=patDrawPerson(g,n.p,mainX-100,y);
-    g.append('circle').attr('cx',mainX).attr('cy',y+47).attr('r',5).attr('fill','#526576');
-    const children=patChildren(n.p), heir=patChooseHeir(children);
-    const sibs=children.filter(p=>!heir||p.id!==heir.id);
-    // Bočný hrebeň: každý súrodenec má vlastný riadok s partnerom a dátumom sobáša.
-    const branchX=mainX+190; let row=0;
-    sibs.forEach((sib,j)=>{
-      if(usedBranchIds.has(sib.id)) return;
-      const by=y+j*112; const fam=(sib.fams||[]).map(id=>treeData.families[id]).find(f=>f && (f.husbandId===sib.id||f.wifeId===sib.id));
-      usedBranchIds.add(sib.id);
-      g.append('path').attr('d',`M${mainX},${y+47} H${branchX-24} V${by+47} H${branchX}`).attr('fill','none').attr('stroke','#8b9aa8').attr('stroke-width',2);
-      const end=patRenderBranch(g,sib,fam,branchX,by,'sib_'+sib.id); maxX=Math.max(maxX,end+30); maxY=Math.max(maxY,by+120); row++;
-    });
-    // Rozbalená vedľajšia línia predkov partnera sa zobrazí ako samostatná vetva napravo.
-    const spouses=patSpouses(n.p,n.p.famc);
-    spouses.forEach((sp,j)=>{
-      const key=sp.person.id; if(!FAN.branchOpen.has(key)) return;
-      const sx=mainX+700+FAN.panX, sy=y+j*130;
-      g.append('path').attr('d',`M${mainX+100},${y+47} H${sx-30} V${sy+47} H${sx}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none').attr('stroke-dasharray','5 4');
-      let anc=patOldestAncestor(sp.person), yy=sy, ax=sx;
-      const chain=[]; let z=anc, guard=new Set(); while(z&&!guard.has(z.id)&&chain.length<12){guard.add(z.id);chain.push(z);z=patChooseHeir(patChildren(z));}
-      chain.forEach((person,k)=>{const q=patDrawPerson(g,person,ax,yy+k*stepY); if(k) g.append('path').attr('d',`M${ax+patNodeWidth(person)/2},${yy+(k-1)*stepY+94} V${yy+k*stepY}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none'); maxX=Math.max(maxX,ax+q.w+20); maxY=Math.max(maxY,yy+k*stepY+120);});
-    });
-    maxX=Math.max(maxX,node.right+40);
-  });
-  // Každé stlačené oranžové tlačidlo otvorí samostatnú predkovskú líniu partnera.
-  FAN.branchOpen.forEach(partnerId=>{
-    const partner=all[partnerId]; if(!partner) return;
-    const sx=mainX+Math.max(760,FAN.panX+760), sy=startY;
-    const anc=patOldestAncestor(partner), chain=[]; let z=anc, guard=new Set();
-    while(z&&!guard.has(z.id)&&chain.length<12){guard.add(z.id);chain.push(z);z=patChooseHeir(patChildren(z));}
-    g.append('text').attr('x',sx).attr('y',sy-22).attr('font-family','Arial,sans-serif').attr('font-size',13).attr('font-weight',700).attr('fill','#a45a06').text('Vedľajší rod: '+fanName(partner));
-    chain.forEach((person,k)=>{const yy=sy+k*stepY; const q=patDrawPerson(g,person,sx,yy); if(k) g.append('path').attr('d',`M${sx+patNodeWidth(person)/2},${sy+(k-1)*stepY+94} V${yy}`).attr('stroke','#d97706').attr('stroke-width',2).attr('fill','none'); maxX=Math.max(maxX,sx+q.w+30); maxY=Math.max(maxY,yy+120);});
-  });
-  // Prispôsobiteľná šírka SVG plátna; uzly sa neorezávajú pri rozšírení vetvy.
-  FAN.extent=Math.max(maxX+100,maxY+100);
-  svgEl.setAttribute('viewBox',`0 0 ${Math.max(1200,maxX+100)} ${Math.max(700,maxY+100)}`);
-  if(refit) fanChartFit(false);
-}
-function fanChartFit(animate) {
-  const svg=document.getElementById('fanSvg'); if(!svg||!FAN.ready)return;
-  const r=svg.getBoundingClientRect(), W=r.width,H=r.height; if(!W||!H)return;
-  const vb=svg.viewBox.baseVal, k=Math.min((W-40)/vb.width,(H-90)/vb.height,1);
-  const tr=d3.zoomIdentity.translate(20,65).scale(k);
-  const sel=d3.select(svg); (animate?sel.transition().duration(350):sel).call(FAN.zoom.transform,tr);
-}
-function fanSetRoot(id,pushHistory){ if(!treeData.persons[id])return; if(pushHistory&&FAN.rootId&&FAN.rootId!==id)FAN.history.push(FAN.rootId); FAN.rootId=id; FAN.branchOpen.clear(); FAN.panX=0; document.getElementById('fanChartMenu').classList.add('hidden'); fanRender(true); }
-function fanSetGens(v){ FAN.gens=Math.min(100,Math.max(2,parseInt(v,10)||20)); fanRender(true); }
-
-
 setLanguage('sk');
 
   console.log('HLAVNY SCRIPT SA NACITAL');
@@ -3535,7 +3485,12 @@ setLanguage('sk');
         <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" placeholder="Hľadať osobu..." class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
         <div id="fanRootList" class="mt-1.5 max-h-56 overflow-y-auto custom-scroll space-y-0.5"></div>
       </div>
-      <p class="text-[11px] leading-relaxed text-[#6b4f2f]">Zvislá os zobrazuje hlavnú patriliniovú líniu. Oranžové tlačidlo otvorí vedľajší rod partnera.</p>
+      <div class="flex items-center justify-between gap-2">
+        <label for="fanGensSelect" class="text-xs font-semibold text-[#4a3420]">Počet generácií</label>
+        <select id="fanGensSelect" onchange="fanSetGens(this.value)" class="px-2 py-1.5 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420]">
+          <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
+        </select>
+      </div>
       <div class="border-t border-[#c9a96e] pt-2 space-y-0.5">
         <button onclick="fanChartGoBack()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
           <i class="ph-bold ph-arrow-left text-lg"></i> Späť o jeden krok
