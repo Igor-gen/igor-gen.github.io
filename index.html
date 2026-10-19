@@ -1049,10 +1049,12 @@ function hrebenBlok(os, ctx, o) {
   const b = { os, rola: o.rola || 'krv', w: personBubbleW(os), rodiny: [], tvar: new Map() };
   const pridaj = (tv, r, l, rr) => { const c = tv.get(r); if (!c) tv.set(r, [l, rr]); else { if (l < c[0]) c[0] = l; if (rr > c[1]) c[1] = rr; } };
   pridaj(b.tvar, 0, -b.w / 2, b.w / 2);
-  let pravy = b.w / 2;
+  let pravy = b.w / 2, lavy = -b.w / 2;
   const predch = new Map();
   ctx.cesta.add(os.id);
   (o.rodiny || hrebenRodiny(os)).forEach((fam, k) => {
+    // Manželstvá sa spájajú iba vodorovne z boku bubliny: 1. vpravo, 2. vľavo (3. a ďalšie len núdzovo kľučkou nad riadkom)
+    const strana = k === 1 ? 'L' : 'P';
     const partner = hrebenPartner(fam, os), m = marrInfo(fam), cg = coupleGap(fam);
     const preskoc = o.preskocDeti === fam.id;
     const dieta = preskoc ? [] : hrebenDeti(fam).filter(d => d.id !== os.id && !ctx.cesta.has(d.id));
@@ -1065,7 +1067,7 @@ function hrebenBlok(os, ctx, o) {
       kb.tvar.forEach(([l, r], ro) => { const cur = lok.get(ro); lok.set(ro, cur === undefined ? kx + l : Math.min(cur, kx + l)); pridaj(tvarD, ro + 1, kx + l, kx + r); });
     });
     pridaj(tvarD, 1, 0, 0);
-    const hubMin = (zakl) => {
+    const hubMin = (zakl) => {        // uzol rodiny vpravo: deti nesmú zasahovať do detí predošlých rodín
       let h = zakl;
       tvarD.forEach(([l], r) => {
         const p = predch.get(r); if (p) h = Math.max(h, p[1] + med - l);
@@ -1073,22 +1075,39 @@ function hrebenBlok(os, ctx, o) {
       });
       return h;
     };
-    let hubDx, spL = 0, seg = 0;
-    if (partner) {
+    const hubMax = (zakl) => {        // uzol rodiny vľavo
+      let h = zakl;
+      tvarD.forEach(([, rr], r) => {
+        const p = predch.get(r); if (p) h = Math.min(h, p[0] - med - rr);
+        if (o.abs) { const ml = ctx.minL.get(o.abs.riadok + r); if (ml !== undefined) h = Math.min(h, ml - med - rr); }
+      });
+      return h;
+    };
+    let hubDx, spL = 0, seg = 0, spDx = null;
+    const sw = partner ? personBubbleW(partner) : 0;
+    if (strana === 'L') {
+      hubDx = hubMax(lavy - (partner ? cg / 2 : 24));
+      const spR = 2 * hubDx - lavy;                                  // pravý okraj partnera; uzol je v strede spojnice
+      if (partner) { spDx = spR - sw / 2; pridaj(b.tvar, 0, spR - sw, lavy); }
+      else pridaj(b.tvar, 0, hubDx, lavy);
+    } else if (partner) {
       if (k === 0) { hubDx = pravy + cg / 2; spL = pravy + cg; }
       else { seg = Math.max(44, m ? m.w + 14 : 0); hubDx = hubMin(pravy + 24); spL = hubDx + seg; }
+      spDx = spL + sw / 2;
     } else { hubDx = k === 0 ? 0 : hubMin(pravy + 24); pravy = Math.max(pravy, hubDx); pridaj(b.tvar, 0, Math.min(0, hubDx), Math.max(0, hubDx)); }
-    const rec = { fam, k, hubDx, partner, preskoc, bloky, seg, m, spDx: null, spW: 0, odkaz: null };
+    const rec = { fam, k, strana, hubDx, partner, preskoc, bloky, seg, m, spDx, spW: sw, odkaz: null };
     if (partner) {
-      rec.spW = personBubbleW(partner); rec.spDx = spL + rec.spW / 2;
-      pridaj(b.tvar, 0, spL, spL + rec.spW); pravy = spL + rec.spW;
       const pr = hrebenRodicia(partner);
-      if (pr && !o.bezOdkazov) {
-        const text = hrebenTextOdkazu(((pr.otec || pr.matka).lastName) || ((pr.otec || pr.matka).birthName)), w = hrebenSirkaOdkazu(text);
-        rec.odkaz = { dx: pravy + 22 + w / 2, w, text };
-        pravy += 22 + w; pridaj(b.tvar, 0, rec.odkaz.dx - w / 2, pravy);
+      let text = null, w = 0;
+      if (pr && !o.bezOdkazov) { text = hrebenTextOdkazu(((pr.otec || pr.matka).lastName) || ((pr.otec || pr.matka).birthName)); w = hrebenSirkaOdkazu(text); }
+      if (strana === 'L') {
+        lavy = spDx - sw / 2;
+        if (text) { rec.odkaz = { dx: lavy - 22 - w / 2, w, text, smer: -1 }; lavy -= 22 + w; pridaj(b.tvar, 0, lavy, rec.odkaz.dx + w / 2); }
+      } else {
+        pridaj(b.tvar, 0, spL, spL + sw); pravy = spL + sw;
+        if (text) { rec.odkaz = { dx: pravy + 22 + w / 2, w, text, smer: 1 }; pravy += 22 + w; pridaj(b.tvar, 0, rec.odkaz.dx - w / 2, pravy); }
       }
-    }
+    } else if (strana === 'L') lavy = hubDx;
     tvarD.forEach(([l, r], ro) => { pridaj(predch, ro, hubDx + l, hubDx + r); pridaj(b.tvar, ro, hubDx + l, hubDx + r); });
     b.rodiny.push(rec);
   });
@@ -1105,14 +1124,14 @@ function hrebenUloz(z, ctx, b, ax, r) {
   z.uzly.push({ os: b.os, x: ax, riadok: r, w: b.w, rola: b.rola });
   hrebenZapis(ctx, r, ax - b.w / 2, ax + b.w / 2);
   b.rodiny.forEach(rc => {
-    const rec = { fam: rc.fam, k: rc.k, vlastnik: b.os, vx: ax, vw: b.w, hubX: ax + rc.hubDx, riadok: r, seg: rc.seg, m: rc.m, partner: rc.partner, spX: null, spW: rc.spW, deti: [] };
+    const rec = { fam: rc.fam, k: rc.k, strana: rc.strana, vlastnik: b.os, vx: ax, vw: b.w, hubX: ax + rc.hubDx, riadok: r, seg: rc.seg, m: rc.m, partner: rc.partner, spX: null, spW: rc.spW, deti: [] };
     if (rc.partner) {
       rec.spX = ax + rc.spDx;
       z.uzly.push({ os: rc.partner, x: rec.spX, riadok: r, w: rc.spW, rola: 'partner' });
       hrebenZapis(ctx, r, rec.spX - rc.spW / 2, rec.spX + rc.spW / 2);
       if (rc.odkaz) {
         const ox = ax + rc.odkaz.dx;
-        z.odkazy.push({ typ: 'dopredu', x: ox, riadok: r, w: rc.odkaz.w, text: rc.odkaz.text, ustredna: rc.partner.id, spat: b.os.id, kotvaX: rec.spX + rc.spW / 2 });
+        z.odkazy.push({ typ: 'dopredu', smer: rc.odkaz.smer, x: ox, riadok: r, w: rc.odkaz.w, text: rc.odkaz.text, ustredna: rc.partner.id, spat: b.os.id, kotvaX: rec.spX + rc.odkaz.smer * rc.spW / 2 });
         hrebenZapis(ctx, r, ox - rc.odkaz.w / 2, ox + rc.odkaz.w / 2);
       }
     }
@@ -1141,14 +1160,16 @@ function hrebenDokonci(z) {
       const rx = rc.vx + Math.max(4, 20 - 8 * (rc.k - 1)), ry = vrch - Math.min(22, 12 + 4 * (rc.k - 1));
       hrana('man', rx, vrch, rx, ry); hrana('man', rx, ry, rc.hubX, ry); hrana('man', rc.hubX, ry, rc.hubX, y);
     };
+    const stred = rc.k === 0 || rc.strana === 'L';
     if (rc.partner) {
-      const lx = rc.spX - rc.spW / 2;
-      if (rc.k === 0) hrana('man', rc.vx + rc.vw / 2, y, lx, y);
-      else { kolaj(); hrana('man', rc.hubX, y, lx, y); }
+      if (rc.strana === 'L') hrana('man', rc.spX + rc.spW / 2, y, rc.vx - rc.vw / 2, y);
+      else if (rc.k === 0) hrana('man', rc.vx + rc.vw / 2, y, rc.spX - rc.spW / 2, y);
+      else { kolaj(); hrana('man', rc.hubX, y, rc.spX - rc.spW / 2, y); }
       z.bodky.push({ x: rc.hubX, y, r: 6.5, farba: '#e11d48', biely: true });
-      if (rc.m) { const cx = rc.k === 0 ? rc.hubX : rc.hubX + rc.seg / 2; z.stitky.push({ x: cx, y: y - 11 - 9, w: rc.m.w, text: rc.fam.marrDate }); }
+      if (rc.m) { const cx = stred ? rc.hubX : rc.hubX + rc.seg / 2; z.stitky.push({ x: cx, y: y - 11 - 9, w: rc.m.w, text: rc.fam.marrDate }); }
     } else {
-      if (rc.k === 0) hubY = spodok; else kolaj();
+      if (rc.strana === 'L') hrana('man', rc.hubX, y, rc.vx - rc.vw / 2, y);
+      else if (rc.k === 0) hubY = spodok; else kolaj();
       z.bodky.push({ x: rc.hubX, y: hubY, r: 5, farba: '#475569' });
     }
     if (rc.deti.length) {
@@ -1159,8 +1180,7 @@ function hrebenDokonci(z) {
     }
   });
   z.odkazy.forEach(o => {
-    if (o.typ === 'dopredu') z.ciary.push({ typ: 'odk', id: 'odk', x1: o.kotvaX, y1: o.y, x2: o.x - o.w / 2, y2: o.y });
-    else z.ciary.push({ typ: 'odk', id: 'odk', x1: o.x + o.w / 2, y1: o.y, x2: o.kotvaX, y2: o.y });
+    z.ciary.push({ typ: 'odk', id: 'odk', x1: o.kotvaX, y1: o.y, x2: o.x - o.smer * o.w / 2, y2: o.y });
   });
   let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
   z.uzly.forEach(u => { mnX = Math.min(mnX, u.x - u.w / 2); mxX = Math.max(mxX, u.x + u.w / 2); mnY = Math.min(mnY, u.y - bh / 2); mxY = Math.max(mxY, u.y + bh / 2); });
@@ -1191,7 +1211,7 @@ function hrebenZostav(ustrednaId, spatId, odId) {
     z.uzly.push({ os: Pspat, x: xP, riadok: 0, w: wP, rola: 'partner' }); hrebenZapis(ctx, 0, xP - wP / 2, xP + wP / 2);
     z.rodiny.push({ fam, k: 0, vlastnik: Pspat, vx: xP, vw: wP, hubX: -(b0.w / 2 + cg / 2), riadok: 0, seg: 0, m: marrInfo(fam), partner: C, spX: 0, spW: b0.w, deti: [] });
     const text = hrebenTextOdkazu(Pspat.lastName || Pspat.birthName), w = hrebenSirkaOdkazu(text), ox = xP - wP / 2 - 22 - w / 2;
-    z.odkazy.push({ typ: 'spat', x: ox, riadok: 0, w, text, kotvaX: xP - wP / 2, zonaId: odId });
+    z.odkazy.push({ typ: 'spat', smer: -1, x: ox, riadok: 0, w, text, kotvaX: xP - wP / 2, zonaId: odId });
     hrebenZapis(ctx, 0, ox - w / 2, ox + w / 2);
   }
   for (let g = 0; g < rod.length; g++) {
@@ -1290,7 +1310,7 @@ function hrebenOdkazV(x, y) {
   const z = HREBEN.aktualna; if (!z) return null;
   const lx = x - z.dx;
   for (const o of z.odkazy) {
-    const sm = o.typ === 'spat' ? -1 : 1, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
+    const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
     if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
   }
   return null;
@@ -1336,7 +1356,7 @@ function hrebenNakresli(c, z) {
     const q = Object.create(u.os); q.x = u.x; q.y = u.y; drawPersonBubble(q, c, false, u.rola);
   });
   z.odkazy.forEach(o => {
-    const sm = o.typ === 'spat' ? -1 : 1, h2 = HREBEN.vyskaOdkazu / 2, hr = HREBEN_HROT, l = o.x - sm * o.w / 2, r = o.x + sm * o.w / 2;   // šípka smeruje doprava (návratová doľava)
+    const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, hr = HREBEN_HROT, l = o.x - sm * o.w / 2, r = o.x + sm * o.w / 2;   // šípka smeruje doprava (návratová doľava)
     c.beginPath(); c.moveTo(l, o.y - h2); c.lineTo(r - sm * hr, o.y - h2); c.lineTo(r, o.y); c.lineTo(r - sm * hr, o.y + h2); c.lineTo(l, o.y + h2); c.closePath();
     c.fillStyle = '#fb923c'; c.fill(); c.lineWidth = 2; c.lineJoin = 'round'; c.strokeStyle = '#c2410c'; c.stroke();
     c.font = FONT_ODKAZ; c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(o.text, o.x - sm * hr / 2, o.y + 0.5);
