@@ -989,6 +989,7 @@ function personDatesStr(p) { return (p.birthDate ? `* ${p.birthDate}` : '* ?') +
 // Šírka bubliny sa prispôsobuje dĺžke mena a priezviska (a dátumov).
 const personWCache = new Map();
 function personBubbleW(p) {
+  if (p.fiktivna) return 110;
   const name = personNameStr(p), dates = personDatesStr(p), key = name + '\u0001' + dates;
   let w = personWCache.get(key);
   if (w === undefined) {
@@ -1012,10 +1013,10 @@ function coupleGap(fam) { const m = marrInfo(fam); return m ? Math.max(44, m.w +
 // Zóna 1: os = priama otcovská línia od koreňa nahor; súrodenci každého predka na hrebeni VĽAVO, partneri VPRAVO od osoby,
 // potomkovia súrodencov smerom nadol (prvorodený pod uzlom rodičov, ďalší súrodenci doľava).
 // Rody partnerov sa kreslia do samostatných pod-plátien (zóny 2+), na ktoré sa prechádza oranžovou bublinou "Rod + priezvisko".
-const HREBEN = { GENERACII: 5, zony: [], aktualna: null, koren: null, cesta: [], animacia: null, cislo: 0, medzera: 40, vyskaOdkazu: 30, FARBY_PODLA_ROLE: true };
+const HREBEN = { GENERACII: 10, zony: [], aktualna: null, koren: null, cesta: [], animacia: null, cislo: 0, medzera: 40, vyskaOdkazu: 30 };
 const FONT_ODKAZ = 'bold 12px system-ui, sans-serif';
-const HREBEN_SLOVO_ROD = { sk: 'Rod', cs: 'Rod', en: 'Family', de: 'Familie' };
-function hrebenSlovoRod() { return HREBEN_SLOVO_ROD[currentLang] || 'Rod'; }
+const HREBEN_SLOVO_ROD = { sk: 'ROD', cs: 'ROD', en: 'FAMILY', de: 'FAMILIE' };
+function hrebenSlovoRod() { return HREBEN_SLOVO_ROD[currentLang] || 'ROD'; }
 
 function hrebenRok(p) { const m = String(p.birthDate || '').match(/(\d{4})/); return m ? +m[1] : Infinity; }
 function hrebenDeti(fam) {
@@ -1032,8 +1033,9 @@ function hrebenRodicia(p) {
 }
 // Osoba na osi nad danou osobou: otec, inak matka
 function hrebenOsovyRodic(p) { const r = hrebenRodicia(p); return r ? { fam: r.fam, rodic: r.otec || r.matka } : null; }
-function hrebenTextOdkazu(priezvisko) { return hrebenSlovoRod() + ' + ' + (priezvisko || '?'); }
-function hrebenSirkaOdkazu(text) { return Math.ceil(measureTxt(FONT_ODKAZ, text)) + 30; }
+function hrebenTextOdkazu(priezvisko) { return hrebenSlovoRod() + ': ' + (priezvisko || '?'); }
+const HREBEN_HROT = 14;
+function hrebenSirkaOdkazu(text) { return Math.ceil(measureTxt(FONT_ODKAZ, text)) + 30 + HREBEN_HROT; }
 function hrebenRodinaMedzi(a, b) {
   const F = treeData.families;
   for (const f of hrebenRodiny(a)) if ((f.husbandId === a.id && f.wifeId === b.id) || (f.husbandId === b.id && f.wifeId === a.id)) return f;
@@ -1175,6 +1177,11 @@ function hrebenZostav(ustrednaId, spatId, odId) {
     const r = hrebenOsovyRodic(os[g]); if (!r || os.includes(r.rodic)) break;
     rod.push(r); os.push(r.rodic);
   }
+  // Fiktívna osoba nad najstarším členom rodu: zachová jeho súrodencov (ak sú v rodine) a viditeľne označí koniec línie
+  const horny = os[os.length - 1], realna = rod.length >= HREBEN.GENERACII ? hrebenRodicia(horny) : null;
+  const fik = { id: '_fikt_' + horny.id, fiktivna: true, firstName: '', lastName: horny.lastName || horny.birthName || '', gender: 'M', fams: [], famc: null, photos: [], birthDate: '', deathDate: '' };
+  const fikFam = realna ? { id: realna.fam.id, husbandId: fik.id, wifeId: null, marrDate: '', children: realna.fam.children || [] } : { id: '_fikt_f_' + horny.id, husbandId: fik.id, wifeId: null, marrDate: '', children: [horny.id] };
+  rod.push({ fam: fikFam, rodic: fik }); os.push(fik);
   const Pspat = spatId && P[spatId];
   const b0 = hrebenBlok(C, ctx, Pspat ? { rodiny: [], abs: { riadok: 0 } } : { abs: { riadok: 0 } });
   hrebenUloz(z, ctx, b0, 0, 0);
@@ -1282,7 +1289,10 @@ function hrebenPrejdiNa(z, okamzite) {
 function hrebenOdkazV(x, y) {
   const z = HREBEN.aktualna; if (!z) return null;
   const lx = x - z.dx;
-  for (const o of z.odkazy) { const nx = (lx - o.x) / (o.w / 2), ny = (y - o.y) / (HREBEN.vyskaOdkazu / 2); if (nx * nx + ny * ny <= 1) return o; }
+  for (const o of z.odkazy) {
+    const sm = o.typ === 'spat' ? -1 : 1, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
+    if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
+  }
   return null;
 }
 function hrebenKlikOdkaz(o) {
@@ -1316,18 +1326,27 @@ function hrebenNakresli(c, z) {
     c.beginPath(); c.roundRect(s.x - s.w / 2, s.y - 9, s.w, 18, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 1; c.strokeStyle = '#e11d48'; c.stroke();
     c.font = FONT_MARR; c.fillStyle = '#9f1239'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s.text, s.x, s.y + 0.5);
   });
-  z.uzly.forEach(u => { const q = Object.create(u.os); q.x = u.x; q.y = u.y; drawPersonBubble(q, c, false, u.rola); });
+  z.uzly.forEach(u => {
+    if (u.os.fiktivna) {
+      const w = u.w, h = bh, x = u.x - w / 2, y = u.y - h / 2, pismeno = String(u.os.lastName || '?').trim().charAt(0).toUpperCase() || '?';
+      c.beginPath(); c.roundRect(x, y, w, h, 22); c.fillStyle = '#f8fafc'; c.fill(); c.lineWidth = 2; c.setLineDash([6, 4]); c.strokeStyle = '#94a3b8'; c.stroke(); c.setLineDash([]);
+      c.font = 'bold 39px system-ui, sans-serif'; c.fillStyle = '#475569'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(pismeno, u.x, u.y + 2);
+      return;
+    }
+    const q = Object.create(u.os); q.x = u.x; q.y = u.y; drawPersonBubble(q, c, false, u.rola);
+  });
   z.odkazy.forEach(o => {
-    c.beginPath(); c.ellipse(o.x, o.y, o.w / 2, HREBEN.vyskaOdkazu / 2, 0, 0, Math.PI * 2);
-    c.fillStyle = '#fb923c'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#c2410c'; c.stroke();
-    c.font = FONT_ODKAZ; c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(o.text, o.x, o.y + 0.5);
+    const sm = o.typ === 'spat' ? -1 : 1, h2 = HREBEN.vyskaOdkazu / 2, hr = HREBEN_HROT, l = o.x - sm * o.w / 2, r = o.x + sm * o.w / 2;   // šípka smeruje doprava (návratová doľava)
+    c.beginPath(); c.moveTo(l, o.y - h2); c.lineTo(r - sm * hr, o.y - h2); c.lineTo(r, o.y); c.lineTo(r - sm * hr, o.y + h2); c.lineTo(l, o.y + h2); c.closePath();
+    c.fillStyle = '#fb923c'; c.fill(); c.lineWidth = 2; c.lineJoin = 'round'; c.strokeStyle = '#c2410c'; c.stroke();
+    c.font = FONT_ODKAZ; c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(o.text, o.x - sm * hr / 2, o.y + 0.5);
   });
   c.restore();
 }
 function hrebenOsobaV(x, y) {
   const z = HREBEN.aktualna; if (!z) return null;
   const lx = x - z.dx;
-  for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) return u.os; }
+  for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) return u.os.fiktivna ? null : u.os; }
   return null;
 }
 
@@ -1431,8 +1450,7 @@ function drawPersonBubble(p, c = ctx, noSelect = false, rola = '') {
   const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
   const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
   const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = !noSelect && (p.id === currentSelectedPersonId);
-  const isMale = (p.gender === 'M'); let bgColor = isMale ? '#eff6ff' : '#fdf2f8'; let borderColor = isMale ? '#1e40af' : '#be185d';
-  if (rola && HREBEN.FARBY_PODLA_ROLE) { if (rola === 'partner') { bgColor = '#f0fdf4'; borderColor = '#15803d'; } else { bgColor = '#eff6ff'; borderColor = '#1e40af'; } }
+  const isMale = (p.gender === 'M'); let bgColor = isMale ? '#dbeafe' : '#fce7f3'; let borderColor = isMale ? '#1e40af' : '#be185d';
   if (isSelected) { c.beginPath(); c.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); c.fillStyle = 'rgba(99, 102, 241, 0.3)'; c.fill(); }
   c.beginPath(); c.roundRect(x, y, w, h, radius); c.fillStyle = bgColor; c.fill(); c.lineWidth = isSelected ? 3.5 : 2.2; c.strokeStyle = borderColor; c.stroke();
   const avatarCenterX = x + 34; const avatarCenterY = y + h / 2; const avatarRadius = 22;
@@ -1442,7 +1460,7 @@ function drawPersonBubble(p, c = ctx, noSelect = false, rola = '') {
     let img = cachedImages[mainPhoto.id];
     if (!img) { img = new Image(); img.src = mainPhoto.data; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
     try { c.drawImage(img, avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); } catch { c.fillStyle = isMale ? '#bfdbfe' : '#fbcfe8'; c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); }
-  } else { c.fillStyle = isMale ? '#dbeafe' : '#fce7f3'; c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); c.fillStyle = borderColor; c.font = 'bold 15px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(isMale ? '♂' : '♀', avatarCenterX, avatarCenterY); }
+  } else { c.fillStyle = isMale ? '#bfdbfe' : '#fbcfe8'; c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); c.fillStyle = borderColor; c.font = 'bold 15px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(isMale ? '♂' : '♀', avatarCenterX, avatarCenterY); }
   c.restore();
   c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.lineWidth = 1.5; c.strokeStyle = borderColor; c.stroke();
  const textLeft = x + 66;
