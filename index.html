@@ -3206,11 +3206,34 @@ const FAN = { r0: 72, ringW: 130, gens: 5, history: [], rootId: null, ready: fal
 // Farby rodových vetiev podľa starých rodičov (modrá = otcov otec, zelená = otcova matka, oranžová = matkin otec, červená = matkina matka).
 // Odtieň sa systematicky mení podľa generácie: bližšie k stredu sýtejší, smerom von svetlejší a jemnejší.
 const FAN_VETVY = [{ h: 214 }, { h: 138 }, { h: 28 }, { h: 350 }];
-const FAN_NEUTRAL = '#e5e7eb';   // stred a rodičia centrálnej osoby (nepatria do žiadnej zo štyroch vetiev)
+const FAN_NEUTRAL = '#e5e7eb';   // záloha, keď vetva nie je známa
+// Stred a rodičia už patria do farieb rodu: otec = vetva otcovho otca (modrá), matka = vetva matkinho otca (oranžová).
+// Stred má farbu rodiča, cez ktorého vedie línia ku koreňu rodu Sklenčár v hornej polovici (inak otcovu líniu).
 function fanFill(gen, vetva) {
-  if (gen < 2 || vetva == null) return FAN_NEUTRAL;
-  const i = Math.min(gen - 2, 6);
+  if (vetva == null) return FAN_NEUTRAL;
+  const i = Math.max(-2, Math.min(gen - 2, 6));
   return `hsl(${FAN_VETVY[vetva].h}, ${70 - i * 6}%, ${64 + i * 4.3}%)`;
+}
+// Koreň celého diagramu = najstarší predok vetvy rodiny Sklenčár: muž s priezviskom Sklenčár/Sklencar bez otca v rodokmeni
+// a s najskorším rokom narodenia (bez roku narodenia až na poslednom mieste).
+function fanKorenRodu() {
+  const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  let best = null, bestYear = Infinity;
+  Object.values(treeData.persons || {}).forEach(p => {
+    if (p.gender === 'F' || !/^sklencar/.test(norm(p.lastName))) return;
+    if (getParentsOf(p.id).father) return;
+    const m = String(p.birthDate || '').match(/(\d{4})/), y = m ? +m[1] : Infinity;
+    if (!best || y < bestYear) { best = p; bestYear = y; }
+  });
+  return best ? best.id : null;
+}
+// Vetva stredu (len podľa hornej polovice): 0 = línia cez otca, 2 = línia cez matku k zobrazenému koreňu rodu.
+// Ak koreň v hornej polovici nie je (chýba alebo je mimo zobrazených generácií), sleduje sa línia otca.
+function fanVetvaStredu(root, topNodes) {
+  const koren = fanKorenRodu();
+  if (!koren || koren === root.id) return 0;
+  const n = (topNodes || []).find(x => x.person.id === koren);
+  return n && n.vetva >= 2 ? 2 : 0;
 }
 // Posledný partner = posledný v existujúcom poradí partnerov osoby (rovnaké poradie a filter ako pri zobrazení mien partnerov v segmente).
 function fanLastPartner(p) { const ps = fanPartners(p, null); return ps.length ? ps[ps.length - 1] : null; }
@@ -3297,7 +3320,7 @@ function fanBuildNodes(root, dolu) {
     [[par.father, a0, mid, 0], [par.mother, mid, a1, 1]].forEach(([p, s, e, k]) => {
       if (!p || path.has(p.id)) return;
       // vetva sa určuje podľa skutočného pôvodu: strana rodiča (otec/matka) a jeho rola u starého rodiča
-      const st = gen === 0 ? k : strana, vt = gen === 1 ? strana * 2 + k : vetva;
+      const st = gen === 0 ? k : strana, vt = gen === 0 ? k * 2 : gen === 1 ? strana * 2 + k : vetva;
       const [m0, m1] = mapA(s, e);
       nodes.push({ person: p, gen: gen + 1, a0: m0, a1: m1, childFamId: child.famc, half: dolu ? 'bottom' : 'top', vetva: vt == null ? null : vt,
         inner: FAN.r0 + gen * FAN.ringW, outer: FAN.r0 + (gen + 1) * FAN.ringW });
@@ -3391,7 +3414,7 @@ function fanRender(refit) {
   const rg = g.append('g').attr('class', 'fan-root').style('cursor', 'pointer')
     .on('click', (e) => { e.stopPropagation(); fanSetRoot(root.id, true); });
   rg.append('title').text(fanTooltip(root) + ' — kliknutím ponecháte túto osobu v strede');
-  rg.append('circle').attr('r', FAN.r0).attr('fill', FAN_NEUTRAL).attr('stroke', '#684b2c').attr('stroke-width', 3);
+  rg.append('circle').attr('r', FAN.r0).attr('fill', fanFill(0, fanVetvaStredu(root, topNodes))).attr('stroke', '#684b2c').attr('stroke-width', 3);
   fanDrawLines(rg.append('g'), fanBuildLines(root, { maxW: 116, avail: 104, nameFs: 14, childFamId: null, maxPartners: 2, splitName: true }));
 
   if (topNodes.length === 0) {
