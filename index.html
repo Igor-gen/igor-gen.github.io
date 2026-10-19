@@ -1037,6 +1037,22 @@ function hrebenPriprav() {
     (f.children || []).forEach(c => { if (!v.children.includes(c)) v.children.push(c); });
     mapa[f.id] = v;
   });
+  // Rodina len s jedným rodičom (druhý nie je zapísaný) sa pripojí k jedinej úplnej rodine tohto rodiča: deti potom visia na uzle s dátumom sobáša
+  const jedinci = new Map(), pary = new Map();           // rodič -> rodiny s ním (podľa záznamov rodín, nie podľa zoznamu fams osoby)
+  new Set(Object.values(mapa)).forEach(v => {
+    const h = v.husbandId && P[v.husbandId] ? v.husbandId : null, w = v.wifeId && P[v.wifeId] ? v.wifeId : null;
+    const pridaj = (id, m) => { if (!m.has(id)) m.set(id, []); m.get(id).push(v); };
+    if (h && w) { pridaj(h, pary); pridaj(w, pary); } else if (h || w) pridaj(h || w, jedinci);
+  });
+  jedinci.forEach((zoznam, id) => {
+    const p = pary.get(id); if (!p || p.length !== 1) return;
+    const par = p[0];
+    zoznam.forEach(j => {
+      (j.children || []).forEach(c => { if (!par.children.includes(c)) par.children.push(c); });
+      if (j.marrDate && j.marrDate.length > (par.marrDate || '').length) par.marrDate = j.marrDate;
+      Object.keys(mapa).forEach(k => { if (mapa[k] === j) mapa[k] = par; });
+    });
+  });
   HREBEN.rodinyMapa = mapa;
   const cw = measureTxt(FONT_MARR, '0'); let mx = 0;       // všetky spojnice partnerov majú rovnakú dĺžku: podľa najširšieho dátumu sobáša
   Object.values(mapa).forEach(f => { if (f.marrDate) mx = Math.max(mx, measureTxt(FONT_MARR, f.marrDate)); });
