@@ -1013,7 +1013,7 @@ function coupleGap(fam) { const m = marrInfo(fam); return m ? Math.max(44, m.w +
 // Zóna 1: os = priama otcovská línia od koreňa nahor; súrodenci každého predka na hrebeni VĽAVO, partneri VPRAVO od osoby,
 // potomkovia súrodencov smerom nadol (prvorodený pod uzlom rodičov, ďalší súrodenci doľava).
 // Rody partnerov sa kreslia do samostatných pod-plátien (zóny 2+), na ktoré sa prechádza oranžovou bublinou "Rod + priezvisko".
-const HREBEN = { GENERACII: 10, zony: [], aktualna: null, koren: null, cesta: [], animacia: null, cislo: 0, medzera: 40, vyskaOdkazu: 30 };
+const HREBEN = { spojnica: 64, GENERACII: 10, zony: [], aktualna: null, koren: null, cesta: [], animacia: null, cislo: 0, medzera: 40, vyskaOdkazu: 30 };
 const FONT_ODKAZ = 'bold 12px system-ui, sans-serif';
 const HREBEN_SLOVO_ROD = { sk: 'ROD', cs: 'ROD', en: 'FAMILY', de: 'FAMILIE' };
 function hrebenSlovoRod() { return HREBEN_SLOVO_ROD[currentLang] || 'ROD'; }
@@ -1050,12 +1050,13 @@ function hrebenBlok(os, ctx, o) {
   const pridaj = (tv, r, l, rr) => { const c = tv.get(r); if (!c) tv.set(r, [l, rr]); else { if (l < c[0]) c[0] = l; if (rr > c[1]) c[1] = rr; } };
   pridaj(b.tvar, 0, -b.w / 2, b.w / 2);
   let pravy = b.w / 2, lavy = -b.w / 2;
+  const ax0 = (o.abs && o.abs.ax) || 0;       // absolútna poloha osi bloku (kvôli vzájomným odstupom)
   const predch = new Map();
   ctx.cesta.add(os.id);
   (o.rodiny || hrebenRodiny(os)).forEach((fam, k) => {
     // Manželstvá sa spájajú iba vodorovne z boku bubliny: 1. vpravo, 2. vľavo (3. a ďalšie len núdzovo kľučkou nad riadkom)
     const strana = k === 1 ? 'L' : 'P';
-    const partner = hrebenPartner(fam, os), m = marrInfo(fam), cg = coupleGap(fam);
+    const partner = hrebenPartner(fam, os), m = marrInfo(fam), cg = HREBEN.spojnica;
     const preskoc = o.preskocDeti === fam.id;
     const dieta = preskoc ? [] : hrebenDeti(fam).filter(d => d.id !== os.id && !ctx.cesta.has(d.id));
     const bloky = [], tvarD = new Map(), lok = new Map();
@@ -1071,7 +1072,7 @@ function hrebenBlok(os, ctx, o) {
       let h = zakl;
       tvarD.forEach(([l], r) => {
         const p = predch.get(r); if (p) h = Math.max(h, p[1] + med - l);
-        if (o.abs) { const mr = ctx.maxR.get(o.abs.riadok + r); if (mr !== undefined) h = Math.max(h, mr + med - l); }
+        if (o.abs) { const mr = ctx.maxR.get(o.abs.riadok + r); if (mr !== undefined) h = Math.max(h, mr + med - l - ax0); }
       });
       return h;
     };
@@ -1079,7 +1080,7 @@ function hrebenBlok(os, ctx, o) {
       let h = zakl;
       tvarD.forEach(([, rr], r) => {
         const p = predch.get(r); if (p) h = Math.min(h, p[0] - med - rr);
-        if (o.abs) { const ml = ctx.minL.get(o.abs.riadok + r); if (ml !== undefined) h = Math.min(h, ml - med - rr); }
+        if (o.abs) { const ml = ctx.minL.get(o.abs.riadok + r); if (ml !== undefined) h = Math.min(h, ml - med - rr - ax0); }
       });
       return h;
     };
@@ -1092,7 +1093,7 @@ function hrebenBlok(os, ctx, o) {
       else pridaj(b.tvar, 0, hubDx, lavy);
     } else if (partner) {
       if (k === 0) { hubDx = pravy + cg / 2; spL = pravy + cg; }
-      else { seg = Math.max(44, m ? m.w + 14 : 0); hubDx = hubMin(pravy + 24); spL = hubDx + seg; }
+      else { seg = HREBEN.spojnica; hubDx = hubMin(pravy + 24); spL = hubDx + seg; }
       spDx = spL + sw / 2;
     } else { hubDx = k === 0 ? 0 : hubMin(pravy + 24); pravy = Math.max(pravy, hubDx); pridaj(b.tvar, 0, Math.min(0, hubDx), Math.max(0, hubDx)); }
     const rec = { fam, k, strana, hubDx, partner, preskoc, bloky, seg, m, spDx, spW: sw, odkaz: null };
@@ -1188,8 +1189,15 @@ function hrebenDokonci(z) {
   z.hr = { minX: mnX, maxX: mxX, minY: mnY - 24, maxY: mxY };
 }
 
+// Všetky spojnice partnerov majú rovnakú dĺžku: podľa najširšieho dátumu sobáša v celom rodokmeni
+function hrebenPrepocitajSpojnicu() {
+  const cw = measureTxt(FONT_MARR, '0'); let mx = 0;
+  Object.values(treeData.families || {}).forEach(f => { if (f.marrDate) mx = Math.max(mx, measureTxt(FONT_MARR, f.marrDate)); });
+  HREBEN.spojnica = Math.max(44, Math.ceil(mx + 2 * cw));
+}
 function hrebenZostav(ustrednaId, spatId, odId) {
   const P = treeData.persons, C = P[ustrednaId]; if (!C) return null;
+  hrebenPrepocitajSpojnicu();
   const z = { id: ++HREBEN.cislo, kluc: ustrednaId + '|' + (spatId || ''), ustredna: ustrednaId, spat: spatId || null, od: odId || null, uzly: [], odkazy: [], rodiny: [], dx: 0, minR: 0 };
   const ctx = { cesta: new Set(), minL: new Map(), maxR: new Map(), detiOs: {} };
   const os = [C], rod = [];
@@ -1206,7 +1214,7 @@ function hrebenZostav(ustrednaId, spatId, odId) {
   const b0 = hrebenBlok(C, ctx, Pspat ? { rodiny: [], abs: { riadok: 0 } } : { abs: { riadok: 0 } });
   hrebenUloz(z, ctx, b0, 0, 0);
   if (Pspat) {                                  // pôvodný pokrvný potomok z predošlej zóny: partner NAĽAVO od ústrednej postavy
-    const fam = hrebenRodinaMedzi(Pspat, C), cg = coupleGap(fam), wP = personBubbleW(Pspat);
+    const fam = hrebenRodinaMedzi(Pspat, C), cg = HREBEN.spojnica, wP = personBubbleW(Pspat);
     const xP = -(b0.w / 2 + cg + wP / 2);
     z.uzly.push({ os: Pspat, x: xP, riadok: 0, w: wP, rola: 'partner' }); hrebenZapis(ctx, 0, xP - wP / 2, xP + wP / 2);
     z.rodiny.push({ fam, k: 0, vlastnik: Pspat, vx: xP, vw: wP, hubX: -(b0.w / 2 + cg / 2), riadok: 0, seg: 0, m: marrInfo(fam), partner: C, spX: 0, spW: b0.w, deti: [] });
@@ -1214,8 +1222,9 @@ function hrebenZostav(ustrednaId, spatId, odId) {
     z.odkazy.push({ typ: 'spat', smer: -1, x: ox, riadok: 0, w, text, kotvaX: xP - wP / 2, zonaId: odId });
     hrebenZapis(ctx, 0, ox - w / 2, ox + w / 2);
   }
+  const osX = [0];                              // os sa posúva tak, aby dieťa stálo priamo pod uzlom svojich rodičov (zvislá spojnica)
   for (let g = 0; g < rod.length; g++) {
-    const fam = rod[g].fam, sus = hrebenDeti(fam).filter(d => d.id !== os[g].id), deti = [{ x: 0, riadok: -g }];
+    const fam = rod[g].fam, sus = hrebenDeti(fam).filter(d => d.id !== os[g].id), deti = [{ x: osX[g], riadok: -g }];
     sus.forEach(s => {                          // hrebeň súrodencov: najstarší najbližšie k osi, ďalší vľavo
       const kb = hrebenBlok(s, ctx, { rola: 'krv' });
       let ax = Infinity; kb.tvar.forEach(([l, r], ro) => { const lm = ctx.minL.get(-g + ro); if (lm !== undefined) ax = Math.min(ax, lm - HREBEN.medzera - r); });
@@ -1224,8 +1233,9 @@ function hrebenZostav(ustrednaId, spatId, odId) {
     });
     ctx.detiOs[fam.id] = deti;
     const rodinyA = [fam].concat(hrebenRodiny(os[g + 1]).filter(f => f.id !== fam.id));
-    const ba = hrebenBlok(os[g + 1], ctx, { rodiny: rodinyA, preskocDeti: fam.id, abs: { riadok: -(g + 1) } });
-    hrebenUloz(z, ctx, ba, 0, -(g + 1));
+    const wN = personBubbleW(os[g + 1]), axN = osX[g] - (hrebenPartner(fam, os[g + 1]) ? (wN + HREBEN.spojnica) / 2 : 0);
+    const ba = hrebenBlok(os[g + 1], ctx, { rodiny: rodinyA, preskocDeti: fam.id, abs: { riadok: -(g + 1), ax: axN } });
+    hrebenUloz(z, ctx, ba, axN, -(g + 1)); osX.push(axN);
   }
   hrebenDokonci(z);
   return z;
