@@ -199,7 +199,7 @@
           <span class="text-lg sm:text-xl font-black tracking-tight text-slate-900">Genealogy</span>
         </div>
         <div id="sidebarFamilyName" class="mt-1 text-xs sm:text-sm text-indigo-700 font-bold truncate max-w-[230px]">Rodina Sklenčar</div>
-        <div class="mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[230px]" title="Aktuálny zdroj údajov">
+        <div class="mt-0.5 flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 font-medium truncate max-w-[230px]" title="Aktuálny zdroj údajov" data-i18n-title="srcTitle">
           <i class="ph ph-database text-indigo-500"></i>
           <span id="sidebarFileName" class="truncate">rodokmen.gdz</span>
         </div>
@@ -221,14 +221,14 @@
     <!-- Hamburger menu for local file operations -->
     <div class="px-4 py-3 border-b border-slate-100 bg-slate-50 relative">
       <button type="button" onclick="toggleFileMenu()" aria-expanded="false" id="fileMenuButton" class="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-semibold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-100">
-        <i class="ph-bold ph-list text-lg"></i> Menu
+        <i class="ph-bold ph-list text-lg"></i> <span data-i18n="menuLbl">Menu</span>
       </button>
       <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
-        <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i>Otvoriť zložku Gedzip</button>
-        <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i>Uložiť súbor Gedzip</button>
-        <button id="btnAiInvestigative" onclick="closeFileMenu();spustiAiInvestigativu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-robot mr-2 text-indigo-600"></i>AI investigatíva</button>
+        <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i><span data-i18n="menuOpenGdz">Otvoriť zložku Gedzip</span></button>
+        <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i><span data-i18n="menuSaveGdz">Uložiť súbor Gedzip</span></button>
+        <button id="btnAiInvestigative" onclick="closeFileMenu();spustiAiInvestigativu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-robot mr-2 text-indigo-600"></i><span data-i18n="menuAi">AI investigatíva</span></button>
         <div id="adminMenuSection" class="hidden pt-1 mt-1 border-t border-slate-200">
-          <button id="btnInviteUser" onclick="closeFileMenu();inviteGenealogyUser()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-envelope-simple mr-2 text-emerald-600"></i>Pozvať používateľa</button>
+          <button id="btnInviteUser" onclick="closeFileMenu();inviteGenealogyUser()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-envelope-simple mr-2 text-emerald-600"></i><span data-i18n="menuInvite">Pozvať používateľa</span></button>
         </div>
       </div>
     </div>
@@ -285,7 +285,7 @@
         <div class="p-3 border-t border-slate-200 bg-white">
       <button onclick="openFanChartModal()" class="w-full px-4 py-3 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-sm font-semibold flex items-center justify-center gap-2 transition">
         <i class="ph-bold ph-fan text-amber-700"></i>
-        <span>Vejárový graf</span>
+        <span data-i18n="btnFanChart">Vejárový graf</span>
       </button>
     </div>
   </aside>
@@ -326,7 +326,7 @@
         <button onclick="centerOnPerson(currentSelectedPersonId)" class="hidden md:inline-block p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg">
           <i class="ph-bold ph-crosshair text-base"></i>
         </button>
-        <button onclick="hrebenNastavKoren(currentSelectedPersonId)" title="Zobraziť rodokmeň od tejto osoby (koreň)" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg">
+        <button onclick="hrebenNastavKoren(currentSelectedPersonId)" title="Zobraziť rodokmeň od tejto osoby (koreň)" data-i18n-title="tRootFromPerson" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded-lg">
           <i class="ph-bold ph-tree-structure text-base"></i>
         </button>
         <button onclick="openPersonEditor(currentSelectedPersonId)" class="px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1">
@@ -673,6 +673,62 @@ document.getElementById('btnConfirmOk').addEventListener('click', () => {
 // --- I18N DICTIONARY ---
 const i18n = {
   sk: {
+    pageTitle: "Genealogy - Rodokmeň",
+    familyPrefix: "Rodina",
+    srcTitle: "Aktuálny zdroj údajov",
+    menuLbl: "Menu",
+    menuOpenGdz: "Otvoriť zložku Gedzip",
+    menuSaveGdz: "Uložiť súbor Gedzip",
+    menuAi: "AI investigatíva",
+    menuInvite: "Pozvať používateľa",
+    btnFanChart: "Vejárový graf",
+    tRootFromPerson: "Zobraziť rodokmeň od tejto osoby (koreň)",
+    fanZoomOut: "Zmenšiť",
+    fanZoomIn: "Zväčšiť",
+    fanFit: "Prispôsobiť pohľadu",
+    fanClose: "Zavrieť",
+    fanRootLbl: "Koreň diagramu",
+    fanSearchPh: "Hľadať osobu...",
+    fanGensLbl: "Počet generácií",
+    fanBack: "Späť o jeden krok",
+    fanSavePdf: "Uložiť PDF",
+    fanNoPersons: "Rodokmeň neobsahuje žiadne osoby.",
+    fanNoAncestors: "Osoba nemá zaevidovaných predkov.",
+    fanUnknown: "Neznámy",
+    fanKeepCenter: " — kliknutím ponecháte túto osobu v strede",
+    fanNoPrev: "Žiadny predchádzajúci koreň.",
+    fanNoD3: "Knižnica D3.js sa nenačítala. Skontrolujte pripojenie na internet.",
+    fanNoPdf: "PDF knižnica sa nenačítala.",
+    fanImgErr: "Obrázok grafu sa nepodarilo vytvoriť.",
+    tFileWord: "Súbor",
+    msgAttWait: "Čakám na stiahnutie príloh zo servera...",
+    msgAttMissTitle: "Chýbajú prílohy",
+    msgAttMissBody: "Nepodarilo sa stiahnuť {N} príloh zo servera. Export GEDZIP by ich neobsahoval. Pokračovať aj tak?",
+    msgLocalNoServer: "Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP.",
+    msgNotFromServer: "Tento rodokmeň nebol načítaný zo servera, preto sa nedá nahrať na server. Môžete ho uložiť iba do lokálneho súboru GEDZIP.",
+    msgNoVersion: "Chýba platná verzia rodokmeňa. Najprv rodokmeň načítaj zo servera.",
+    msgVersionConflictErr: "Rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny neboli uložené. Najprv načítaj aktuálny rodokmeň zo servera.",
+    msgVersionConflictToast: "Konflikt pri ukladaní: rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny zostali v aplikácii, ale neboli uložené. Pred ďalším ukladaním načítaj aktuálny rodokmeň zo servera.",
+    msgNoSaveConfirm: "Server nevrátil potvrdenie o uložení rodokmeňa.",
+    msgBadVersion: "Server vrátil neplatnú verziu po uložení.",
+    msgLoginFailed: "Prihlásenie alebo pripojenie zlyhalo.",
+    clerkLoadFail: "Prihlasovanie Clerk sa nepodarilo načítať. Obnov stránku a skús znova.",
+    clerkNoToken: "Nepodarilo sa získať prihlasovací token Clerk.",
+    clerkLoginFirst: "Najprv sa prihlás cez Clerk.",
+    clerkSessionExpired: "Relácia vypršala. Prihlás sa znova.",
+    invAdminOnly: "Pozvánky môže vytvárať iba administrátor.",
+    invAdminFail: "Nepodarilo sa overiť administrátorské oprávnenie.",
+    invPrompt: "Zadaj e-mailovú adresu osoby, ktorú chceš pozvať:",
+    invBadEmail: "Zadaj platnú e-mailovú adresu.",
+    invFail: "Pozvánku sa nepodarilo vytvoriť.",
+    invSent: "Pozvánka bola odoslaná na {E}. Po prijatí sa používateľ vráti na stránku rodokmeňa.",
+    aiSelectFirst: "Najprv označte osobu v diagrame, o ktorej chcete vyhľadávať.",
+    aiLivingAlert: "Upozornenie\n\n{N} je podľa údajov v rodokmeni pravdepodobne žijúca osoba (bez dátumu úmrtia).\n\nVyhľadávanie informácií o žijúcich osobách nie je možné a nespustí sa. Ak osoba zomrela, doplňte jej dátum úmrtia.",
+    aiPopupBlocked: "Prehliadač zablokoval nové okno. Povoľte vyskakovacie okná pre túto stránku.",
+    aiCopied: " Prompt je skopírovaný do schránky.",
+    aiOpening: "Otvára sa Perplexity.",
+    aiOpeningCopied: " Ak sa vyhľadávanie nespustí samo, prompt je skopírovaný (Ctrl+V).",
+    aiUnknownName: "neznáme meno",
     appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged",
     btnSelectFile: "Vybrať súbor z počítača", btnSample: "Načítať ukážkový rodokmeň", btnNew: "Vytvoriť nový rodokmeň", footerText: "Genealogy HTML5 Single-File • Žiadne dáta neopúšťajú váš prehliadač",
     btnAddPerson: "1. Pridať osobu", btnSaveGdz: "2. Uložiť rodokmeň (.gdz)", btnLayout: "Preusporiadať", btnMainDiagram: "Návrat na hlavný diagram", btnExportPdf: "Export do PDF",
@@ -691,6 +747,62 @@ const i18n = {
     btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "4. Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgFileUploading: "Nahrávam súbory na úložisko: {X} / {N}…", msgFileUploadFail: "Súbor sa nepodarilo nahrať", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "3. Uložiť zložku SQLite"
   },
   cs: {
+    pageTitle: "Genealogy - Rodokmen",
+    familyPrefix: "Rodina",
+    srcTitle: "Aktuální zdroj údajů",
+    menuLbl: "Menu",
+    menuOpenGdz: "Otevřít složku Gedzip",
+    menuSaveGdz: "Uložit soubor Gedzip",
+    menuAi: "AI investigativa",
+    menuInvite: "Pozvat uživatele",
+    btnFanChart: "Vějířový graf",
+    tRootFromPerson: "Zobrazit rodokmen od této osoby (kořen)",
+    fanZoomOut: "Zmenšit",
+    fanZoomIn: "Zvětšit",
+    fanFit: "Přizpůsobit pohledu",
+    fanClose: "Zavřít",
+    fanRootLbl: "Kořen diagramu",
+    fanSearchPh: "Hledat osobu...",
+    fanGensLbl: "Počet generací",
+    fanBack: "Zpět o jeden krok",
+    fanSavePdf: "Uložit PDF",
+    fanNoPersons: "Rodokmen neobsahuje žádné osoby.",
+    fanNoAncestors: "Osoba nemá zaevidované předky.",
+    fanUnknown: "Neznámý",
+    fanKeepCenter: " — kliknutím ponecháte tuto osobu uprostřed",
+    fanNoPrev: "Žádný předchozí kořen.",
+    fanNoD3: "Knihovna D3.js se nenačetla. Zkontrolujte připojení k internetu.",
+    fanNoPdf: "Knihovna PDF se nenačetla.",
+    fanImgErr: "Obrázek grafu se nepodařilo vytvořit.",
+    tFileWord: "Soubor",
+    msgAttWait: "Čekám na stažení příloh ze serveru...",
+    msgAttMissTitle: "Chybí přílohy",
+    msgAttMissBody: "Nepodařilo se stáhnout {N} příloh ze serveru. Export GEDZIP by je neobsahoval. Pokračovat přesto?",
+    msgLocalNoServer: "Lokálně importovaný rodokmen nelze nahrát na server. Uložte jej do souboru GEDZIP.",
+    msgNotFromServer: "Tento rodokmen nebyl načten ze serveru, proto jej nelze nahrát na server. Můžete jej uložit pouze do lokálního souboru GEDZIP.",
+    msgNoVersion: "Chybí platná verze rodokmenu. Nejprve rodokmen načtěte ze serveru.",
+    msgVersionConflictErr: "Rodokmen mezitím změnil jiný uživatel. Vaše změny nebyly uloženy. Nejprve načtěte aktuální rodokmen ze serveru.",
+    msgVersionConflictToast: "Konflikt při ukládání: rodokmen mezitím změnil jiný uživatel. Vaše změny zůstaly v aplikaci, ale nebyly uloženy. Před dalším ukládáním načtěte aktuální rodokmen ze serveru.",
+    msgNoSaveConfirm: "Server nevrátil potvrzení o uložení rodokmenu.",
+    msgBadVersion: "Server vrátil po uložení neplatnou verzi.",
+    msgLoginFailed: "Přihlášení nebo připojení selhalo.",
+    clerkLoadFail: "Přihlašování Clerk se nepodařilo načíst. Obnovte stránku a zkuste to znovu.",
+    clerkNoToken: "Nepodařilo se získat přihlašovací token Clerk.",
+    clerkLoginFirst: "Nejprve se přihlaste přes Clerk.",
+    clerkSessionExpired: "Relace vypršela. Přihlaste se znovu.",
+    invAdminOnly: "Pozvánky může vytvářet pouze administrátor.",
+    invAdminFail: "Nepodařilo se ověřit administrátorské oprávnění.",
+    invPrompt: "Zadejte e-mailovou adresu osoby, kterou chcete pozvat:",
+    invBadEmail: "Zadejte platnou e-mailovou adresu.",
+    invFail: "Pozvánku se nepodařilo vytvořit.",
+    invSent: "Pozvánka byla odeslána na {E}. Po přijetí se uživatel vrátí na stránku rodokmenu.",
+    aiSelectFirst: "Nejprve označte v diagramu osobu, o které chcete vyhledávat.",
+    aiLivingAlert: "Upozornění\n\n{N} je podle údajů v rodokmenu pravděpodobně žijící osoba (bez data úmrtí).\n\nVyhledávání informací o žijících osobách není možné a nespustí se. Pokud osoba zemřela, doplňte její datum úmrtí.",
+    aiPopupBlocked: "Prohlížeč zablokoval nové okno. Povolte vyskakovací okna pro tuto stránku.",
+    aiCopied: " Prompt je zkopírován do schránky.",
+    aiOpening: "Otevírá se Perplexity.",
+    aiOpeningCopied: " Pokud se vyhledávání nespustí samo, prompt je zkopírován (Ctrl+V).",
+    aiUnknownName: "neznámé jméno",
     appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnMainDiagram: "Zpět na hlavní diagram", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Jméno, příjmení, rok, místo...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Detail • 2x klik = Úprava", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 internetových odkazů na matriky, archivy nebo jiné zdroje (skryté před veřejným náhledem).", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Přidejte doplňující poznámky k osobě (max 250 znaků). Nezobrazují se na veřejné kartě.", phNoteText: "Zadejte text poznámky...",
     tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.",
@@ -698,6 +810,62 @@ const i18n = {
     btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "4. Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgFileUploading: "Nahrávám soubory do úložiště: {X} / {N}…", msgFileUploadFail: "Soubor se nepodařilo nahrát", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "3. Uložit složku SQLite"
   },
   en: {
+    pageTitle: "Genealogy - Family Tree",
+    familyPrefix: "Family",
+    srcTitle: "Current data source",
+    menuLbl: "Menu",
+    menuOpenGdz: "Open Gedzip folder",
+    menuSaveGdz: "Save Gedzip file",
+    menuAi: "AI investigation",
+    menuInvite: "Invite user",
+    btnFanChart: "Fan chart",
+    tRootFromPerson: "Show the tree from this person (root)",
+    fanZoomOut: "Zoom out",
+    fanZoomIn: "Zoom in",
+    fanFit: "Fit to view",
+    fanClose: "Close",
+    fanRootLbl: "Diagram root",
+    fanSearchPh: "Search person...",
+    fanGensLbl: "Number of generations",
+    fanBack: "Back one step",
+    fanSavePdf: "Save PDF",
+    fanNoPersons: "The family tree contains no persons.",
+    fanNoAncestors: "This person has no recorded ancestors.",
+    fanUnknown: "Unknown",
+    fanKeepCenter: " — click to keep this person in the center",
+    fanNoPrev: "No previous root.",
+    fanNoD3: "The D3.js library failed to load. Check your internet connection.",
+    fanNoPdf: "The PDF library failed to load.",
+    fanImgErr: "The chart image could not be created.",
+    tFileWord: "File",
+    msgAttWait: "Waiting for attachments to download from the server...",
+    msgAttMissTitle: "Missing attachments",
+    msgAttMissBody: "{N} attachments could not be downloaded from the server. The GEDZIP export would not contain them. Continue anyway?",
+    msgLocalNoServer: "A locally imported family tree cannot be uploaded to the server. Save it to a GEDZIP file.",
+    msgNotFromServer: "This family tree was not loaded from the server, so it cannot be uploaded to the server. You can only save it to a local GEDZIP file.",
+    msgNoVersion: "The family tree has no valid version. Load the tree from the server first.",
+    msgVersionConflictErr: "Another user has changed the family tree in the meantime. Your changes were not saved. Load the current tree from the server first.",
+    msgVersionConflictToast: "Save conflict: another user has changed the family tree in the meantime. Your changes remain in the app but were not saved. Load the current tree from the server before saving again.",
+    msgNoSaveConfirm: "The server did not return a confirmation that the family tree was saved.",
+    msgBadVersion: "The server returned an invalid version after saving.",
+    msgLoginFailed: "Sign-in or connection failed.",
+    clerkLoadFail: "Clerk sign-in failed to load. Reload the page and try again.",
+    clerkNoToken: "Could not obtain the Clerk sign-in token.",
+    clerkLoginFirst: "Sign in with Clerk first.",
+    clerkSessionExpired: "Your session has expired. Sign in again.",
+    invAdminOnly: "Only an administrator can create invitations.",
+    invAdminFail: "Administrator permission could not be verified.",
+    invPrompt: "Enter the e-mail address of the person you want to invite:",
+    invBadEmail: "Enter a valid e-mail address.",
+    invFail: "The invitation could not be created.",
+    invSent: "The invitation was sent to {E}. After accepting it, the user will return to the family tree page.",
+    aiSelectFirst: "First select a person in the diagram to search for.",
+    aiLivingAlert: "Notice\n\n{N} is probably a living person according to the family tree data (no death date).\n\nSearching for information about living persons is not possible and will not be started. If the person has died, add the date of death.",
+    aiPopupBlocked: "The browser blocked the new window. Allow pop-ups for this page.",
+    aiCopied: " The prompt has been copied to the clipboard.",
+    aiOpening: "Opening Perplexity.",
+    aiOpeningCopied: " If the search does not start by itself, the prompt is copied (Ctrl+V).",
+    aiUnknownName: "unknown name",
     appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnMainDiagram: "Back to main diagram", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Name, surname, year, place...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Detail • 2x click = Edit", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 web links to registries, archives, or other sources (hidden from public view).", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
     tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Add supplementary notes for this person (max 250 chars). Hidden from public card.", phNoteText: "Enter note text...",
     tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.",
@@ -705,6 +873,62 @@ const i18n = {
     btnConnectDb: "Connect to database on server", btnSaveServer: "4. Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgFileUploading: "Uploading files to storage: {X} / {N}…", msgFileUploadFail: "File upload failed", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "3. Save SQLite Folder"
   },
   de: {
+    pageTitle: "Genealogy - Stammbaum",
+    familyPrefix: "Familie",
+    srcTitle: "Aktuelle Datenquelle",
+    menuLbl: "Menü",
+    menuOpenGdz: "Gedzip-Ordner öffnen",
+    menuSaveGdz: "Gedzip-Datei speichern",
+    menuAi: "KI-Recherche",
+    menuInvite: "Benutzer einladen",
+    btnFanChart: "Fächerdiagramm",
+    tRootFromPerson: "Stammbaum ab dieser Person anzeigen (Wurzel)",
+    fanZoomOut: "Verkleinern",
+    fanZoomIn: "Vergrößern",
+    fanFit: "An Ansicht anpassen",
+    fanClose: "Schließen",
+    fanRootLbl: "Wurzel des Diagramms",
+    fanSearchPh: "Person suchen...",
+    fanGensLbl: "Anzahl der Generationen",
+    fanBack: "Einen Schritt zurück",
+    fanSavePdf: "PDF speichern",
+    fanNoPersons: "Der Stammbaum enthält keine Personen.",
+    fanNoAncestors: "Diese Person hat keine erfassten Vorfahren.",
+    fanUnknown: "Unbekannt",
+    fanKeepCenter: " — Klick, um diese Person in der Mitte zu behalten",
+    fanNoPrev: "Keine vorherige Wurzel.",
+    fanNoD3: "Die Bibliothek D3.js konnte nicht geladen werden. Überprüfen Sie die Internetverbindung.",
+    fanNoPdf: "Die PDF-Bibliothek konnte nicht geladen werden.",
+    fanImgErr: "Das Diagrammbild konnte nicht erstellt werden.",
+    tFileWord: "Datei",
+    msgAttWait: "Warte auf den Download der Anhänge vom Server...",
+    msgAttMissTitle: "Fehlende Anhänge",
+    msgAttMissBody: "{N} Anhänge konnten nicht vom Server heruntergeladen werden. Der GEDZIP-Export würde sie nicht enthalten. Trotzdem fortfahren?",
+    msgLocalNoServer: "Ein lokal importierter Stammbaum kann nicht auf den Server hochgeladen werden. Speichern Sie ihn in einer GEDZIP-Datei.",
+    msgNotFromServer: "Dieser Stammbaum wurde nicht vom Server geladen und kann daher nicht auf den Server hochgeladen werden. Sie können ihn nur in einer lokalen GEDZIP-Datei speichern.",
+    msgNoVersion: "Es fehlt eine gültige Version des Stammbaums. Laden Sie den Stammbaum zuerst vom Server.",
+    msgVersionConflictErr: "Der Stammbaum wurde inzwischen von einem anderen Benutzer geändert. Ihre Änderungen wurden nicht gespeichert. Laden Sie zuerst den aktuellen Stammbaum vom Server.",
+    msgVersionConflictToast: "Speicherkonflikt: Der Stammbaum wurde inzwischen von einem anderen Benutzer geändert. Ihre Änderungen bleiben in der App, wurden aber nicht gespeichert. Laden Sie vor dem erneuten Speichern den aktuellen Stammbaum vom Server.",
+    msgNoSaveConfirm: "Der Server hat keine Bestätigung über das Speichern des Stammbaums zurückgegeben.",
+    msgBadVersion: "Der Server hat nach dem Speichern eine ungültige Version zurückgegeben.",
+    msgLoginFailed: "Anmeldung oder Verbindung fehlgeschlagen.",
+    clerkLoadFail: "Die Clerk-Anmeldung konnte nicht geladen werden. Laden Sie die Seite neu und versuchen Sie es erneut.",
+    clerkNoToken: "Das Clerk-Anmeldetoken konnte nicht abgerufen werden.",
+    clerkLoginFirst: "Melden Sie sich zuerst über Clerk an.",
+    clerkSessionExpired: "Die Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+    invAdminOnly: "Einladungen kann nur ein Administrator erstellen.",
+    invAdminFail: "Die Administratorberechtigung konnte nicht überprüft werden.",
+    invPrompt: "Geben Sie die E-Mail-Adresse der Person ein, die Sie einladen möchten:",
+    invBadEmail: "Geben Sie eine gültige E-Mail-Adresse ein.",
+    invFail: "Die Einladung konnte nicht erstellt werden.",
+    invSent: "Die Einladung wurde an {E} gesendet. Nach der Annahme kehrt der Benutzer zur Stammbaum-Seite zurück.",
+    aiSelectFirst: "Wählen Sie zuerst im Diagramm die Person aus, nach der gesucht werden soll.",
+    aiLivingAlert: "Hinweis\n\n{N} ist laut den Stammbaumdaten wahrscheinlich eine lebende Person (ohne Sterbedatum).\n\nDie Suche nach Informationen über lebende Personen ist nicht möglich und wird nicht gestartet. Falls die Person verstorben ist, tragen Sie das Sterbedatum ein.",
+    aiPopupBlocked: "Der Browser hat das neue Fenster blockiert. Erlauben Sie Pop-ups für diese Seite.",
+    aiCopied: " Der Prompt wurde in die Zwischenablage kopiert.",
+    aiOpening: "Perplexity wird geöffnet.",
+    aiOpeningCopied: " Falls die Suche nicht automatisch startet, wurde der Prompt kopiert (Strg+V).",
+    aiUnknownName: "unbekannter Name",
     appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnMainDiagram: "Zurück zum Hauptdiagramm", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Name, Nachname, Jahr, Ort...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Details • 2x Klick = Bearbeiten", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Weblinks zu Registern, Archiven oder anderen Quellen hinzu (für die Öffentlichkeit verborgen).", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
     tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Zusätzliche Notizen hinzufügen (max 250 Zeichen). Auf der öffentlichen Karte ausgeblendet.", phNoteText: "Notiztext eingeben...",
     tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.",
@@ -733,6 +957,10 @@ function setLanguage(lang) {
       el.innerHTML = i18n[currentLang][el.getAttribute('data-i18n')];
     }
   });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const v = i18n[currentLang][el.getAttribute('data-i18n-title')]; if (v) el.title = v;
+  });
+  document.title = t('pageTitle'); document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n-ph]').forEach(el => {
     if (i18n[currentLang][el.getAttribute('data-i18n-ph')]) {
       el.placeholder = i18n[currentLang][el.getAttribute('data-i18n-ph')];
@@ -740,6 +968,10 @@ function setLanguage(lang) {
   });
   
   updateCountsUI(); updateRecentListUI();
+  try { updateSidebarTreeLabels(); updateSourceUI(); } catch (e) {}
+  try { if (HREBEN.aktualna) { hrebenObnov(); drawTree(); } } catch (e) {}
+  try { const fm = document.getElementById('fanChartModal'); if (fm && !fm.classList.contains('hidden')) { fanRender(false); fanRenderRootList(document.getElementById('fanRootSearch').value); } } catch (e) {}
+  try { galleryObnovPopisky(); const gm = document.getElementById('mediaEditModal'); if (gm && !gm.classList.contains('hidden')) renderMediaGallery(); } catch (e) {}
   if(currentSelectedPersonId) selectPerson(currentSelectedPersonId, false);
   if(!document.getElementById('personEditModal').classList.contains('hidden')) openPersonEditor(document.getElementById('editPersonId').value);
   if(!document.getElementById('mediaModal').classList.contains('hidden')) openMediaLightbox(currentMediaTab);
@@ -957,7 +1189,7 @@ function updateSidebarTreeLabels() {
   }
   const surname = root ? (root.lastName || root.birthName || '').trim() : '';
   const familyLabel = document.getElementById('sidebarFamilyName');
-  if (familyLabel) familyLabel.textContent = 'Rodina' + (surname ? ' ' + surname : '');
+  if (familyLabel) familyLabel.textContent = t('familyPrefix') + (surname ? ' ' + surname : '');
   const fileLabel = document.getElementById('sidebarFileName');
   if (fileLabel) fileLabel.textContent = dbConnection ? 'SQL server' : (treeData.fileName || 'rodokmen.gdz');
 }
@@ -965,7 +1197,7 @@ function updateSourceUI() {
   const btn = document.getElementById('btnSaveServerSidebar'); if (!btn) return;
   const ok = treeSource === 'server';
   btn.classList.toggle('opacity-40', !ok); btn.classList.toggle('cursor-not-allowed', !ok);
-  btn.title = ok ? '' : 'Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP.';
+  btn.title = ok ? '' : t('msgLocalNoServer');
 }
 function launchWorkspace() {
   treeSource = 'local'; hydratePromise = null; dbConnection = null; updateDbStatusUI(); updateSourceUI();
@@ -1774,7 +2006,7 @@ function updateRecentListUI() {
     const p = treeData.persons[id];
     if (p) {
       const isMale = p.gender === 'M';
-      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || 'b.d.'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
+      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || '?'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
     }
   });
 }
@@ -1891,7 +2123,7 @@ function handleSpecificFilesAttach(input, targetType) {
   const files = Array.from(input.files); if (!files.length) return;
   for (const file of files) {
     const ext = file.name.split('.').pop().toLowerCase(); 
-    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`Súbor "${file.name}" ${t('tFileBanned')}`, "error"); continue; }
+    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`${t('tFileWord')} "${file.name}" ${t('tFileBanned')}`, "error"); continue; }
     
     const isPhoto = targetType === 'photo';
     const reader = new FileReader();
@@ -1948,6 +2180,14 @@ function renderAttachedFilesList() {
 
 // ---- Galéria (okno na úpravu médií / dokumentov) ----
 let galleryType = 'photo', galleryItems = [], gallerySelected = new Set();
+function galleryObnovPopisky() {
+  const type = galleryType;
+  document.getElementById('mediaEditTitle').innerText = gt(type === 'photo' ? 'editMedia' : 'editDocs');
+  document.getElementById('mediaTrashLbl').innerText = gt('trash');
+  document.getElementById('mediaSaveLbl').innerText = gt('save');
+  document.getElementById('mediaSelectAllLbl').innerText = gt('selectAll');
+  document.getElementById('mediaAddLbl').innerText = gt(type === 'photo' ? 'addPhotos' : 'addDocs');
+}
 function openMediaGallery(type) {
   galleryType = type;
   galleryItems = tempAttachedFiles.filter(f => (type === 'photo') === isPhotoFile(f)).map(f => Object.assign({}, f));
@@ -2056,7 +2296,7 @@ async function encodeJpegUnder(src, w0, h0, limitBytes) {
 async function prepareFileForUpload(file, kind) {
   const ext = fileExtOf(file.name), mime = String(file.type || '').toLowerCase();
   const banned = (treeSource === 'server' ? UPLOAD_BANNED_EXT : BANNED_EXTENSIONS).includes(ext);
-  if (banned) { showToast(UPLOAD_BANNED_EXT.includes(ext) && !BANNED_EXTENSIONS.includes(ext) ? ft('bannedWeb', file.name) : `Súbor "${file.name}" ${t('tFileBanned')}`, 'error'); return null; }
+  if (banned) { showToast(UPLOAD_BANNED_EXT.includes(ext) && !BANNED_EXTENSIONS.includes(ext) ? ft('bannedWeb', file.name) : `${t('tFileWord')} "${file.name}" ${t('tFileBanned')}`, 'error'); return null; }
   if (kind !== 'photo') {
     if (file.size > FILE_LIMIT_BYTES) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }
     return { name: file.name, data: await readAsDataUrl(file), type: ext };
@@ -2254,11 +2494,11 @@ function showDocumentsList() {
 
 async function saveGedzipTree() {
   if (treeSource === 'server') {
-    if (hydratePromise) { showToast('Čakám na stiahnutie príloh zo servera...', 'info'); try { await hydratePromise; } catch (e) {} }
+    if (hydratePromise) { showToast(t('msgAttWait'), 'info'); try { await hydratePromise; } catch (e) {} }
     let missing = 0;
     Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) missing++; }));
     if (missing > 0) {
-      showConfirm('Chýbajú prílohy', 'Nepodarilo sa stiahnuť ' + missing + ' príloh zo servera. Export GEDZIP by ich neobsahoval. Pokračovať aj tak?', () => saveGedzipTreeInternal());
+      showConfirm(t('msgAttMissTitle'), t('msgAttMissBody').replace('{N}', missing), () => saveGedzipTreeInternal());
       return;
     }
   }
@@ -2363,7 +2603,7 @@ function isBackendConfigured() {
 }
 
 async function ensureClerkReady() {
-  if (!window.Clerk) throw new Error('Prihlasovanie Clerk sa nepodarilo načítať. Obnov stránku a skús znova.');
+  if (!window.Clerk) throw new Error(t('clerkLoadFail'));
   if (!clerkLoadPromise) clerkLoadPromise = window.Clerk.load({
     ui: { ClerkUI: window.__internal_ClerkUICtor },
     signInFallbackRedirectUrl: GENEALOGY_APP_URL,
@@ -2429,43 +2669,43 @@ async function inviteGenealogyUser() {
       return;
     }
     const token = await clerk.session.getToken();
-    if (!token) throw new Error('Nepodarilo sa získať prihlasovací token Clerk.');
+    if (!token) throw new Error(t('clerkNoToken'));
     const base = BACKEND_URL.replace(/\/+$/, '');
     const roleRes = await fetch(base + '/api/invitations', {
       method: 'GET', headers: { Authorization: 'Bearer ' + token }, cache: 'no-store'
     });
     const roleData = await roleRes.json().catch(() => ({}));
-    if (roleRes.status === 403) throw new Error('Pozvánky môže vytvárať iba administrátor.');
-    if (!roleRes.ok || roleData.role !== 'admin') throw new Error(roleData.error || 'Nepodarilo sa overiť administrátorské oprávnenie.');
-    const email = window.prompt('Zadaj e-mailovú adresu osoby, ktorú chceš pozvať:');
+    if (roleRes.status === 403) throw new Error(t('invAdminOnly'));
+    if (!roleRes.ok || roleData.role !== 'admin') throw new Error(roleData.error || t('invAdminFail'));
+    const email = window.prompt(t('invPrompt'));
     if (email === null) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) throw new Error('Zadaj platnú e-mailovú adresu.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) throw new Error(t('invBadEmail'));
     const inviteRes = await fetch(base + '/api/invitations', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ emailAddress: email.trim() }), cache: 'no-store'
     });
     const inviteData = await inviteRes.json().catch(() => ({}));
-    if (!inviteRes.ok) throw new Error(inviteData.error || 'Pozvánku sa nepodarilo vytvoriť.');
-    alert('Pozvánka bola odoslaná na ' + email.trim() + '. Po prijatí sa používateľ vráti na stránku rodokmeňa.');
+    if (!inviteRes.ok) throw new Error(inviteData.error || t('invFail'));
+    alert(t('invSent').replace('{E}', email.trim()));
   } catch (err) {
-    alert(err && err.message ? err.message : 'Pozvánku sa nepodarilo vytvoriť.');
+    alert(err && err.message ? err.message : t('invFail'));
   }
 }
 
 async function getClerkSession() {
   const clerk = await ensureClerkReady();
   const active = clerk.session;
-  if (!clerk.isSignedIn || !active) throw new Error('Najprv sa prihlás cez Clerk.');
+  if (!clerk.isSignedIn || !active) throw new Error(t('clerkLoginFirst'));
   const email = active.user?.primaryEmailAddress?.emailAddress || active.user?.emailAddresses?.[0]?.emailAddress || '';
   return active;
 }
 
 async function clerkAuthHeaders(extra = {}) {
   const clerk = await ensureClerkReady();
-  if (!clerk.isSignedIn || !clerk.session) throw new Error('Relácia vypršala. Prihlás sa znova.');
+  if (!clerk.isSignedIn || !clerk.session) throw new Error(t('clerkSessionExpired'));
   const token = await clerk.session.getToken();
-  if (!token) throw new Error('Nepodarilo sa získať prihlasovací token Clerk.');
+  if (!token) throw new Error(t('clerkNoToken'));
   return Object.assign({}, extra, { Authorization: 'Bearer ' + token });
 }
 
@@ -2480,7 +2720,7 @@ function updateDbStatusUI() {
 }
 
 async function openDbModal(mode) {
-  if (mode === 'save' && treeSource !== 'server') { showToast('Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP.', 'error'); return; }
+  if (mode === 'save' && treeSource !== 'server') { showToast(t('msgLocalNoServer'), 'error'); return; }
   dbModalMode = mode;
   hideDbError();
   if (!isBackendConfigured()) {
@@ -2506,7 +2746,7 @@ async function openDbModal(mode) {
   } catch (err) {
     pendingDbMode = null;
     updateDbStatusUI();
-    showToast(err && err.message ? err.message : 'Prihlásenie alebo pripojenie zlyhalo.', 'error');
+    showToast(err && err.message ? err.message : t('msgLoginFailed'), 'error');
   }
 }
 
@@ -2534,17 +2774,14 @@ async function runDbAction(mode) {
     updateDbStatusUI();
 
     if (err && err.versionConflict) {
-      showToast(
-        'Konflikt pri ukladaní: rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny zostali v aplikácii, ale neboli uložené. Pred ďalším ukladaním načítaj aktuálny rodokmeň zo servera.',
-        'error'
-      );
+      showToast(t('msgVersionConflictToast'), 'error');
       return;
     }
 
     showToast(
       err && err.message
         ? err.message
-        : 'Prihlásenie alebo pripojenie zlyhalo.',
+        : t('msgLoginFailed'),
       'error'
     );
   }
@@ -3082,7 +3319,7 @@ async function putTreeData(session) {
 }
 
 async function putTreeDataOnce(session) {
-  if (treeSource !== 'server') throw new Error('Tento rodokmeň nebol načítaný zo servera, preto sa nedá nahrať na server. Môžete ho uložiť iba do lokálneho súboru GEDZIP.');
+  if (treeSource !== 'server') throw new Error(t('msgNotFromServer'));
   const persons = Object.values(treeData.persons);
 
   if (persons.length === 0) {
@@ -3093,7 +3330,7 @@ async function putTreeDataOnce(session) {
     !Number.isSafeInteger(treeVersion) ||
     treeVersion < 0
   ) {
-    throw new Error('Chýba platná verzia rodokmeňa. Najprv rodokmeň načítaj zo servera.');
+    throw new Error(t('msgNoVersion'));
   }
 
   await uploadPendingFiles(session);
@@ -3134,9 +3371,7 @@ async function putTreeDataOnce(session) {
         // Použijeme všeobecnú správu o konflikte.
       }
 
-      const err = new Error(
-        'Rodokmeň medzitým zmenil iný používateľ. Tvoje zmeny neboli uložené. Najprv načítaj aktuálny rodokmeň zo servera.'
-      );
+      const err = new Error(t('msgVersionConflictErr'));
 
       err.versionConflict = true;
       err.currentVersion = conflictData.currentVersion;
@@ -3157,7 +3392,7 @@ async function putTreeDataOnce(session) {
   try {
     result = await res.json();
   } catch (e) {
-    throw new Error('Server nevrátil potvrdenie o uložení rodokmeňa.');
+    throw new Error(t('msgNoSaveConfirm'));
   }
 
   if (
@@ -3166,7 +3401,7 @@ async function putTreeDataOnce(session) {
     !Number.isSafeInteger(Number(result.version)) ||
     Number(result.version) < 0
   ) {
-    throw new Error('Server vrátil neplatnú verziu po uložení.');
+    throw new Error(t('msgBadVersion'));
   }
 
   treeVersion = Number(result.version);
@@ -3174,7 +3409,7 @@ async function putTreeDataOnce(session) {
 
 
 async function saveToServer() {
-  if (treeSource !== 'server') { showToast('Lokálne importovaný rodokmeň sa nedá nahrať na server. Uložte ho do súboru GEDZIP (Menu → Uložiť súbor Gedzip).', 'error'); return; }
+  if (treeSource !== 'server') { showToast(t('msgLocalNoServer'), 'error'); return; }
   if (!dbConnection) { openDbModal('save'); return; }
   if (dbBusy) return;
   dbBusy = true; showToast(t('msgDbSaving'), 'info');
@@ -3233,13 +3468,15 @@ const FAN = { r0: 72, ringW: 130, gens: 5, history: [], rootId: null, ready: fal
 // Farby rodových vetiev podľa starých rodičov (modrá = otcov otec, zelená = otcova matka, oranžová = matkin otec, červená = matkina matka).
 // Odtieň sa systematicky mení podľa generácie: bližšie k stredu sýtejší, smerom von svetlejší a jemnejší.
 const FAN_VETVY = [{ h: 214 }, { h: 138 }, { h: 28 }, { h: 350 }];
+// Samostatná paleta spodnej polovice (predkovia partnera): fialová, tyrkysová, žltá, purpurová – bez zhody s farbami hornej polovice.
+const FAN_VETVY_DOLE = [{ h: 266 }, { h: 174 }, { h: 50 }, { h: 312 }];
 const FAN_NEUTRAL = '#e5e7eb';   // záloha, keď vetva nie je známa
 // Stred a rodičia už patria do farieb rodu: otec = vetva otcovho otca (modrá), matka = vetva matkinho otca (oranžová).
 // Stred má farbu rodiča, cez ktorého vedie línia ku koreňu rodu Sklenčár v hornej polovici (inak otcovu líniu).
-function fanFill(gen, vetva) {
+function fanFill(gen, vetva, dolu) {
   if (vetva == null) return FAN_NEUTRAL;
   const i = Math.max(-2, Math.min(gen - 2, 6));
-  return `hsl(${FAN_VETVY[vetva].h}, ${70 - i * 6}%, ${64 + i * 4.3}%)`;
+  return `hsl(${(dolu ? FAN_VETVY_DOLE : FAN_VETVY)[vetva].h}, ${70 - i * 6}%, ${64 + i * 4.3}%)`;
 }
 // Koreň celého diagramu = najstarší predok vetvy rodiny Sklenčár: muž s priezviskom Sklenčár/Sklencar bez otca v rodokmeni
 // a s najskorším rokom narodenia (bez roku narodenia až na poslednom mieste).
@@ -3266,7 +3503,7 @@ function fanVetvaStredu(root, topNodes) {
 function fanLastPartner(p) { const ps = fanPartners(p, null); return ps.length ? ps[ps.length - 1] : null; }
 const FAN_FONT = 'Georgia, "Times New Roman", serif';
 
-function fanName(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Neznámy'; }
+function fanName(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || t('fanUnknown'); }
 
 function fanDates(p) {
   const b = (p.birthDate || '').trim(), d = (p.deathDate || '').trim();
@@ -3320,7 +3557,7 @@ function fanBuildLines(p, o) {
   let nameLines;
   if (o.splitName && first && last) nameLines = [fanFit(first, o.maxW, o.nameFs, true), fanFit(last, o.maxW, o.nameFs, true)];
   else if (fanMeasure(fanName(p), o.nameFs, true) <= o.maxW) nameLines = [fanName(p)];
-  else nameLines = [fanFit(first || 'Neznámy', o.maxW, o.nameFs, true)].concat(last ? [fanFit(last, o.maxW, o.nameFs, true)] : []);
+  else nameLines = [fanFit(first || t('fanUnknown'), o.maxW, o.nameFs, true)].concat(last ? [fanFit(last, o.maxW, o.nameFs, true)] : []);
 
   const L = [];
   nameLines.forEach(t => L.push({ t, fs: o.nameFs, bold: true, fill: '#3b2a17' }));
@@ -3407,14 +3644,14 @@ function fanRender(refit) {
   const root = treeData.persons[FAN.rootId];
   const titleEl = document.getElementById('fanChartTitle');
   if (!root) {
-    titleEl.textContent = 'Vejárový graf';
+    titleEl.textContent = t('btnFanChart');
     FAN.extent = FAN.r0 + FAN.ringW;
     g.append('text').attr('text-anchor', 'middle').attr('font-family', FAN_FONT).attr('font-size', 22).attr('fill', '#5c4328')
-      .text('Rodokmeň neobsahuje žiadne osoby.');
+      .text(t('fanNoPersons'));
     if (refit) fanChartFit(false);
     return;
   }
-  titleEl.textContent = 'Vejárový graf – ' + fanName(root);
+  titleEl.textContent = t('btnFanChart') + ' – ' + fanName(root);
 
   const topNodes = fanBuildNodes(root, false);
   const partner = fanLastPartner(root);
@@ -3430,7 +3667,7 @@ function fanRender(refit) {
   segs.append('title').text(d => fanTooltip(d.person));
   segs.append('path')
     .attr('d', d => arc({ innerRadius: d.inner, outerRadius: d.outer, startAngle: d.a0, endAngle: d.a1 }))
-    .attr('fill', d => fanFill(d.gen, d.vetva))
+    .attr('fill', d => fanFill(d.gen, d.vetva, d.half === 'bottom'))
     .attr('stroke', '#80613d').attr('stroke-width', 1.2);
   segs.each(function (d) {
     const lay = fanLayoutText(d);
@@ -3440,14 +3677,14 @@ function fanRender(refit) {
   // Koreň v strede
   const rg = g.append('g').attr('class', 'fan-root').style('cursor', 'pointer')
     .on('click', (e) => { e.stopPropagation(); fanSetRoot(root.id, true); });
-  rg.append('title').text(fanTooltip(root) + ' — kliknutím ponecháte túto osobu v strede');
+  rg.append('title').text(fanTooltip(root) + t('fanKeepCenter'));
   rg.append('circle').attr('r', FAN.r0).attr('fill', fanFill(0, fanVetvaStredu(root, topNodes))).attr('stroke', '#684b2c').attr('stroke-width', 3);
   fanDrawLines(rg.append('g'), fanBuildLines(root, { maxW: 116, avail: 104, nameFs: 14, childFamId: null, maxPartners: 2, splitName: true }));
 
   if (topNodes.length === 0) {
     g.append('text').attr('y', -(FAN.r0 + 40)).attr('text-anchor', 'middle').attr('font-family', FAN_FONT)
       .attr('font-size', 18).attr('font-style', 'italic').attr('fill', '#5c4328')
-      .text('Osoba nemá zaevidovaných predkov.');
+      .text(t('fanNoAncestors'));
   }
   if (refit) fanChartFit(false);
 }
@@ -3479,7 +3716,7 @@ function fanDefaultRoot() {
 
 function openFanChartModal() {
   const modal = document.getElementById('fanChartModal'); if (!modal) return;
-  if (typeof d3 === 'undefined') { showToast('Knižnica D3.js sa nenačítala. Skontrolujte pripojenie na internet.', 'error'); return; }
+  if (typeof d3 === 'undefined') { showToast(t('fanNoD3'), 'error'); return; }
   modal.classList.remove('hidden');
   document.body.classList.add('overflow-hidden');
   FAN.history = [];
@@ -3531,7 +3768,7 @@ function fanChartGoBack() {
     const id = FAN.history.pop();
     if (treeData.persons[id]) { FAN.rootId = id; document.getElementById('fanChartMenu').classList.add('hidden'); fanRender(true); return; }
   }
-  showToast('Žiadny predchádzajúci koreň.', 'info');
+  showToast(t('fanNoPrev'), 'info');
 }
 
 function fanSetGens(v) {
@@ -3540,7 +3777,7 @@ function fanSetGens(v) {
 }
 
 async function saveFanChartPdf() {
-  if (!window.jspdf || !window.jspdf.jsPDF) { showToast('PDF knižnica sa nenačítala.', 'error'); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF) { showToast(t('fanNoPdf'), 'error'); return; }
   const svgEl = document.getElementById('fanSvg'); if (!svgEl || !FAN.rootId) return;
   try {
     const ext = FAN.extent, pad = 30, top = 28;
@@ -3565,7 +3802,7 @@ async function saveFanChartPdf() {
 
     const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' }));
     const img = new Image();
-    await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error('Obrázok grafu sa nepodarilo vytvoriť.')); img.src = url; });
+    await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error(t('fanImgErr'))); img.src = url; });
     const cv = document.createElement('canvas'); cv.width = Math.round(vbW * k); cv.height = Math.round(vbH * k);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     URL.revokeObjectURL(url);
@@ -3606,23 +3843,23 @@ setLanguage('sk');
     <!-- Horná lišta -->
     <div class="absolute top-0 left-0 right-0 z-20 h-14 bg-[#d2b48c]/95 border-b border-[#8b6b43] flex items-center justify-between px-3 gap-2">
       <div class="flex items-center gap-1">
-        <button onclick="toggleFanChartMenu()" title="Menu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="toggleFanChartMenu()" title="Menu" data-i18n-title="menuLbl" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-list text-xl"></i>
         </button>
-        <button onclick="fanChartZoomOut()" title="Zmenšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartZoomOut()" title="Zmenšiť" data-i18n-title="fanZoomOut" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-minus text-xl"></i>
         </button>
-        <button onclick="fanChartZoomIn()" title="Zväčšiť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartZoomIn()" title="Zväčšiť" data-i18n-title="fanZoomIn" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-plus text-xl"></i>
         </button>
-        <button onclick="fanChartFit(true)" title="Prispôsobiť pohľadu" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
+        <button onclick="fanChartFit(true)" title="Prispôsobiť pohľadu" data-i18n-title="fanFit" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center">
           <i class="ph-bold ph-corners-out text-xl"></i>
         </button>
       </div>
 
       <div id="fanChartTitle" class="text-[#4a3420] font-bold tracking-wide truncate text-sm sm:text-base">Vejárový graf</div>
 
-      <button onclick="closeFanChartModal()" title="Zavrieť" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center flex-shrink-0">
+      <button onclick="closeFanChartModal()" title="Zavrieť" data-i18n-title="fanClose" class="w-10 h-10 rounded-lg bg-[#8b6b43] hover:bg-[#6f5233] text-[#f5e6c8] flex items-center justify-center flex-shrink-0">
         <i class="ph-bold ph-x text-xl"></i>
       </button>
     </div>
@@ -3630,22 +3867,22 @@ setLanguage('sk');
     <!-- Hamburger menu -->
     <div id="fanChartMenu" class="hidden absolute top-14 left-3 z-30 w-72 max-w-[calc(100%-1.5rem)] bg-[#f1e2c2] border-2 border-[#8b6b43] rounded-xl shadow-xl p-3 space-y-3">
       <div>
-        <div class="text-[11px] font-bold uppercase tracking-wider text-[#6b4f2f] mb-1.5">Koreň diagramu</div>
-        <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" placeholder="Hľadať osobu..." class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
+        <div class="text-[11px] font-bold uppercase tracking-wider text-[#6b4f2f] mb-1.5" data-i18n="fanRootLbl">Koreň diagramu</div>
+        <input id="fanRootSearch" type="text" oninput="fanRenderRootList(this.value)" placeholder="Hľadať osobu..." data-i18n-ph="fanSearchPh" class="w-full px-3 py-2 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420] focus:outline-none focus:ring-2 focus:ring-[#8b6b43]">
         <div id="fanRootList" class="mt-1.5 max-h-56 overflow-y-auto custom-scroll space-y-0.5"></div>
       </div>
       <div class="flex items-center justify-between gap-2">
-        <label for="fanGensSelect" class="text-xs font-semibold text-[#4a3420]">Počet generácií</label>
+        <label for="fanGensSelect" class="text-xs font-semibold text-[#4a3420]" data-i18n="fanGensLbl">Počet generácií</label>
         <select id="fanGensSelect" onchange="fanSetGens(this.value)" class="px-2 py-1.5 text-xs rounded-lg border border-[#b89462] bg-[#fbf3de] text-[#4a3420]">
           <option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option>
         </select>
       </div>
       <div class="border-t border-[#c9a96e] pt-2 space-y-0.5">
         <button onclick="fanChartGoBack()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
-          <i class="ph-bold ph-arrow-left text-lg"></i> Späť o jeden krok
+          <i class="ph-bold ph-arrow-left text-lg"></i> <span data-i18n="fanBack">Späť o jeden krok</span>
         </button>
         <button onclick="saveFanChartPdf()" class="w-full text-left px-3 py-2 rounded-lg hover:bg-[#d2b48c] text-[#4a3420] text-sm font-semibold flex items-center gap-3">
-          <i class="ph-bold ph-file-pdf text-lg"></i> Uložiť PDF
+          <i class="ph-bold ph-file-pdf text-lg"></i> <span data-i18n="fanSavePdf">Uložiť PDF</span>
         </button>
       </div>
     </div>
@@ -3681,9 +3918,21 @@ function aiJeZijuca(p) {
   return (new Date().getFullYear() - rok) <= AI_MAX_ROKOV_ZIVOTA;
 }
 
-function aiMeno(p) { return `${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''}`.trim().replace(/ +/g, ' ') + (p.birthName ? ` (rodená/rodený ${p.birthName})` : ''); }
-function aiMenoKratke(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'neznáme meno'; }
-// Príbuzný: zosnulý s dátumami a miestami, žijúci iba menom (bez dátumov a miest).
+// Texty promptu pre Perplexity podľa zvoleného jazyka aplikácie (odpoveď sa žiada v tom istom jazyku).
+const AI_PROMPT = {
+  sk: { intro: 'Si skúsený genealóg a výskumník. Prehľadaj internet a zhrň všetky dostupné informácie o tejto zosnulej osobe z mojho rodokmeňa:', name: 'Meno', gender: 'Pohlavie', male: 'muž', female: 'žena', born: 'Narodenie', died: 'Úmrtie', unknown: 'neznáme', bornAs: 'rodená/rodený', parents: 'Rodičia', father: 'otec', mother: 'matka', partners: 'Partneri', wedding: 'sobáš', children: 'Deti', work: 'Povolanie a miesta pôsobenia',
+        task: ['Úloha (odpovedaj po slovensky):', '1. Zhrň všetko, čo sa o tejto osobe dá nájsť (život, rodina, povolanie, miesta pôsobenia, udalosti).', '2. Uveď odkazy na zdroje: médiá, noviny, dokumenty, matriky, archívy a genealogické databázy.', '3. Vypíš zistené prepojenia na ďalšie možné osoby: rodičia, starí rodičia, súrodenci, partneri, deti, a miesta pôsobenia.', '4. U každého tvrdenia uveď zdroj a rozlíš, či ide o overený fakt, alebo o domnienku. Nevymýšľaj si údaje; ak niečo nenájdeš, napíš to.'] },
+  cs: { intro: 'Jsi zkušený genealog a badatel. Prohledej internet a shrň všechny dostupné informace o této zesnulé osobě z mého rodokmenu:', name: 'Jméno', gender: 'Pohlaví', male: 'muž', female: 'žena', born: 'Narození', died: 'Úmrtí', unknown: 'neznámé', bornAs: 'rozená/rozený', parents: 'Rodiče', father: 'otec', mother: 'matka', partners: 'Partneři', wedding: 'sňatek', children: 'Děti', work: 'Povolání a místa působení',
+        task: ['Úkol (odpovídej česky):', '1. Shrň vše, co lze o této osobě najít (život, rodina, povolání, místa působení, události).', '2. Uveď odkazy na zdroje: média, noviny, dokumenty, matriky, archivy a genealogické databáze.', '3. Vypiš zjištěné souvislosti s dalšími možnými osobami: rodiče, prarodiče, sourozenci, partneři, děti a místa působení.', '4. U každého tvrzení uveď zdroj a rozliš, zda jde o ověřený fakt, nebo o domněnku. Nevymýšlej si údaje; pokud něco nenajdeš, napiš to.'] },
+  en: { intro: 'You are an experienced genealogist and researcher. Search the internet and summarize all available information about this deceased person from my family tree:', name: 'Name', gender: 'Gender', male: 'male', female: 'female', born: 'Born', died: 'Died', unknown: 'unknown', bornAs: 'née', parents: 'Parents', father: 'father', mother: 'mother', partners: 'Partners', wedding: 'marriage', children: 'Children', work: 'Occupation and places of activity',
+        task: ['Task (answer in English):', '1. Summarize everything that can be found about this person (life, family, occupation, places of activity, events).', '2. Give links to sources: media, newspapers, documents, parish registers, archives and genealogical databases.', '3. List the connections found to other possible persons: parents, grandparents, siblings, partners, children, and places of activity.', '4. For every claim give the source and distinguish a verified fact from a supposition. Do not invent data; if you find nothing, say so.'] },
+  de: { intro: 'Du bist ein erfahrener Genealoge und Rechercheur. Durchsuche das Internet und fasse alle verfügbaren Informationen über diese verstorbene Person aus meinem Stammbaum zusammen:', name: 'Name', gender: 'Geschlecht', male: 'männlich', female: 'weiblich', born: 'Geboren', died: 'Gestorben', unknown: 'unbekannt', bornAs: 'geb.', parents: 'Eltern', father: 'Vater', mother: 'Mutter', partners: 'Partner', wedding: 'Heirat', children: 'Kinder', work: 'Beruf und Wirkungsorte',
+        task: ['Aufgabe (antworte auf Deutsch):', '1. Fasse alles zusammen, was über diese Person zu finden ist (Leben, Familie, Beruf, Wirkungsorte, Ereignisse).', '2. Nenne Links zu Quellen: Medien, Zeitungen, Dokumente, Kirchenbücher, Archive und genealogische Datenbanken.', '3. Liste die gefundenen Verbindungen zu weiteren möglichen Personen auf: Eltern, Großeltern, Geschwister, Partner, Kinder und Wirkungsorte.', '4. Gib bei jeder Aussage die Quelle an und unterscheide, ob es sich um einen belegten Fakt oder eine Vermutung handelt. Erfinde keine Daten; wenn du nichts findest, schreibe das.'] }
+};
+function aiT() { return AI_PROMPT[currentLang] || AI_PROMPT.sk; }
+function aiMeno(p) { return `${p.title || ''} ${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''}`.trim().replace(/ +/g, ' ') + (p.birthName ? ` (${aiT().bornAs} ${p.birthName})` : ''); }
+function aiMenoKratke(p) { return `${p.firstName || ''} ${p.lastName || ''}`.trim() || t('aiUnknownName'); }
+// Príbuzný: zosnulý s dátumami, žijúci iba menom (bez dátumov a miest).
 function aiPribuzny(p) {
   if (aiJeZijuca(p)) return aiMenoKratke(p);
   const d = [p.birthDate ? '* ' + p.birthDate : '', p.deathDate ? '† ' + p.deathDate : ''].filter(Boolean).join(', ');
@@ -3692,80 +3941,43 @@ function aiPribuzny(p) {
 
 function zostavAiPrompt(personId, strucne) {
   const p = treeData.persons[personId]; if (!p) return '';
-  const r = [];
-  r.push(`Si skúsený genealóg a výskumník. Prehľadaj internet a zhrň všetky dostupné informácie o tejto zosnulej osobe z mojho rodokmeňa:`);
-  r.push(`Meno: ${aiMeno(p)}`);
-  r.push(`Pohlavie: ${p.gender === 'F' ? 'žena' : 'muž'}`);
-  r.push(`Narodenie: ${p.birthDate || 'neznáme'}${p.birthPlace ? ', ' + p.birthPlace : ''}${p.birthCountry ? ' (' + p.birthCountry + ')' : ''}`);
-  r.push(`Úmrtie: ${p.deathDate || 'neznáme'}${p.deathPlace ? ', ' + p.deathPlace : ''}`);
+  const L = aiT(), r = [];
+  r.push(L.intro);
+  r.push(`${L.name}: ${aiMeno(p)}`);
+  r.push(`${L.gender}: ${p.gender === 'F' ? L.female : L.male}`);
+  r.push(`${L.born}: ${p.birthDate || L.unknown}${p.birthPlace ? ', ' + p.birthPlace : ''}${p.birthCountry ? ' (' + p.birthCountry + ')' : ''}`);
+  r.push(`${L.died}: ${p.deathDate || L.unknown}${p.deathPlace ? ', ' + p.deathPlace : ''}`);
   const par = getParentsOf(p.id);
-  if (par.father || par.mother) r.push(`Rodičia: ${[par.father && 'otec ' + aiPribuzny(par.father), par.mother && 'matka ' + aiPribuzny(par.mother)].filter(Boolean).join('; ')}`);
+  if (par.father || par.mother) r.push(`${L.parents}: ${[par.father && L.father + ' ' + aiPribuzny(par.father), par.mother && L.mother + ' ' + aiPribuzny(par.mother)].filter(Boolean).join('; ')}`);
   const sp = getSpousesOf(p.id);
-  if (sp.length) r.push(`Partneri: ${sp.map(x => aiPribuzny(x.person) + (x.marrDate ? `, sobáš ${x.marrDate}` : '')).join('; ')}`);
+  if (sp.length) r.push(`${L.partners}: ${sp.map(x => aiPribuzny(x.person) + (x.marrDate ? `, ${L.wedding} ${x.marrDate}` : '')).join('; ')}`);
   const ch = getChildrenOf(p.id);
-  if (ch.length) r.push(`Deti: ${ch.map(c => strucne ? aiMenoKratke(c) : aiPribuzny(c)).join('; ')}`);
+  if (ch.length) r.push(`${L.children}: ${ch.map(c => strucne ? aiMenoKratke(c) : aiPribuzny(c)).join('; ')}`);
   if (!strucne) {
-    const povolania = (p.occupations || []).map(o => `${o.title || ''}${o.city ? ' v ' + o.city : ''}`.trim()).filter(Boolean);
-    if (povolania.length) r.push(`Povolanie a miesta pôsobenia: ${povolania.join('; ')}`);
+    const povolania = (p.occupations || []).map(o => `${o.title || ''}${o.city ? ' – ' + o.city : ''}`.trim()).filter(Boolean);
+    if (povolania.length) r.push(`${L.work}: ${povolania.join('; ')}`);
   }
   r.push('');
-  r.push('Úloha (odpovedaj po slovensky):');
-  r.push('1. Zhrň všetko, čo sa o tejto osobe dá nájsť (život, rodina, povolanie, miesta pôsobenia, udalosti).');
-  r.push('2. Uveď odkazy na zdroje: médiá, noviny, dokumenty, matriky, archívy a genealogické databázy.');
-  r.push('3. Vypíš zistené prepojenia na ďalšie možné osoby: rodičia, starí rodičia, súrodenci, partneri, deti, a miesta pôsobenia.');
-  r.push('4. U každého tvrdenia uveď zdroj a rozlíš, či ide o overený fakt, alebo o domnienku. Nevymýšľaj si údaje; ak niečo nenájdeš, napíš to.');
+  L.task.forEach(x => r.push(x));
   return r.join('\n');
 }
-
 
 function spustiAiInvestigativu() {
   const id = currentSelectedPersonId;
   const p = id && treeData && treeData.persons ? treeData.persons[id] : null;
-  if (!p) { showToast('Najprv označte osobu v diagrame, o ktorej chcete vyhľadávať.', 'error'); return; }
-  if (aiJeZijuca(p)) {
-    alert(`Upozornenie\n\n${aiMenoKratke(p)} je podľa údajov v rodokmeni pravdepodobne žijúca osoba (bez dátumu úmrtia).\n\nVyhľadávanie informácií o žijúcich osobách nie je možné a nespustí sa. Ak osoba zomrela, doplňte jej dátum úmrtia.`);
-    return;
-  }
+  if (!p) { showToast(t('aiSelectFirst'), 'error'); return; }
+  if (aiJeZijuca(p)) { alert(t('aiLivingAlert').replace('{N}', aiMenoKratke(p))); return; }
   let prompt = zostavAiPrompt(id, false);
   let url = 'https://www.perplexity.ai/search?q=' + encodeURIComponent(prompt);
   if (url.length > AI_MAX_DLZKA_ODKAZU) { prompt = zostavAiPrompt(id, true); url = 'https://www.perplexity.ai/search?q=' + encodeURIComponent(prompt); }
   let skopirovany = false;
   try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(prompt).catch(() => {}); skopirovany = true; } } catch (e) {}
   const okno = window.open(url, '_blank', 'noopener');
-  if (!okno) { showToast('Prehliadač zablokoval nové okno. Povoľte vyskakovacie okná pre túto stránku.' + (skopirovany ? ' Prompt je skopírovaný do schránky.' : ''), 'error'); return; }
-  showToast('Otvára sa Perplexity.' + (skopirovany ? ' Ak sa vyhľadávanie nespustí samo, prompt je skopírovaný (Ctrl+V).' : ''), 'info');
+  if (!okno) { showToast(t('aiPopupBlocked') + (skopirovany ? t('aiCopied') : ''), 'error'); return; }
+  showToast(t('aiOpening') + (skopirovany ? t('aiOpeningCopied') : ''), 'info');
 }
 </script>
 
-
-<!-- CONFLICT RESOLUTION MODAL -->
-<div id="conflictModalMain" class="fixed inset-0 z-[90] bg-slate-900/80 backdrop-blur-sm hidden flex items-center justify-center p-4 font-sans">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
-    <div class="px-5 py-4 border-b border-rose-100 bg-rose-50 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-rose-200 flex items-center justify-center text-rose-700">
-          <i class="ph-bold ph-git-merge text-2xl"></i>
-        </div>
-        <div>
-          <h3 class="text-lg font-bold text-slate-800">Kolízia pri ukladaní</h3>
-          <p class="text-[11px] text-slate-600">Iný používateľ medzitým upravil rovnaké údaje a vznikli konflikty. <b>Nekolidujúce zmeny boli automaticky prevzaté.</b> Vyberte, ktoré z kolidujúcich zmien chcete zachovať.</p>
-        </div>
-      </div>
-    </div>
-    <div id="conflictList" class="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50 custom-scroll">
-        <!-- Conflict items dynamically injected here -->
-    </div>
-    <div class="px-5 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
-      <span id="conflictProgress" class="text-sm font-semibold text-slate-500">Vyriešené: 0 / X</span>
-      <div class="flex gap-3">
-         <button onclick="cancelConflictResolution()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition">Zrušiť ukladanie</button>
-         <button id="btnResolveConflicts" disabled onclick="submitResolvedConflicts()" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-sm transition flex items-center gap-2">
-            <i class="ph-bold ph-check"></i> Potvrdiť a zlúčiť
-         </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
