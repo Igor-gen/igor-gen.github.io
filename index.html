@@ -1145,6 +1145,39 @@ function parseGedcomString(text, fileName, attachedFiles) {
     }
   }
 
+  // === Bezpečnosť: premapovanie ID z importovaného GEDCOM ===
+  // ID z cudzieho .ged súboru môžu obsahovať apostrofy a iné znaky, ktoré by
+  // v onclick atribútoch (selectPerson('@I...@')) umožnili vloženie kódu (XSS).
+  // Preto sa každé ID preloží na bezpečný formát @I...@ / @F...@ (len [A-Za-z0-9_]),
+  // s garanciou jedinečnosti, a premapujú sa aj všetky referencie (famc, fams,
+  // husbandId, wifeId, children). Pre bežné GEDCOM súbory sa nič nezmení.
+  const gidSeen = new Set(); const gidMap = {};
+  const gidSafe = (raw, prefix) => {
+    let base = String(raw || '').replace(/^@+|@+$/g, '').replace(/[^A-Za-z0-9_]/g, '');
+    if (!base) base = 'X';
+    const core = base.startsWith(prefix) ? base : prefix + base; // bežné @I1@/@F1@ zostanú bez zmeny
+    let id = '@' + core + '@'; let n = 2;
+    while (gidSeen.has(id)) { id = '@' + core + '_' + n + '@'; n++; }
+    gidSeen.add(id); return id;
+  };
+  Object.keys(persons).forEach(oldId => { gidMap['P' + oldId] = gidSafe(oldId, 'I'); });
+  Object.keys(families).forEach(oldId => { gidMap['M' + oldId] = gidSafe(oldId, 'F'); });
+  Object.keys(persons).forEach(oldId => {
+    const per = persons[oldId]; const newId = gidMap['P' + oldId];
+    per.id = newId;
+    per.famc = per.famc ? (gidMap['M' + per.famc] || null) : null;
+    per.fams = (per.fams || []).map(f => gidMap['M' + f]).filter(Boolean);
+    if (newId !== oldId) { persons[newId] = per; delete persons[oldId]; }
+  });
+  Object.keys(families).forEach(oldId => {
+    const fam = families[oldId]; const newId = gidMap['M' + oldId];
+    fam.id = newId;
+    fam.husbandId = fam.husbandId ? (gidMap['P' + fam.husbandId] || null) : null;
+    fam.wifeId = fam.wifeId ? (gidMap['P' + fam.wifeId] || null) : null;
+    fam.children = (fam.children || []).map(c => gidMap['P' + c]).filter(Boolean);
+    if (newId !== oldId) { families[newId] = fam; delete families[oldId]; }
+  });
+
   Object.values(persons).forEach(per => {
     const refs = per._obje || []; delete per._obje;
     refs.forEach(ref => {
