@@ -164,6 +164,9 @@
         <button onclick="openDbModal('load')" class="btn-glass sm:col-span-2 px-4 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2">
           <i class="ph-bold ph-plugs-connected" style="color:#52a5ff;"></i> <span data-i18n="btnConnectDb">Pripojiť databázu na serveri</span>
         </button>
+        <button id="btnRestoreWork" onclick="restoreAutosaved()" class="btn-glass hidden w-full sm:col-span-2 px-4 py-3 rounded-xl text-amber-200 text-sm font-semibold flex items-center justify-center gap-2">
+          <i class="ph-bold ph-clock-counter-clockwise text-amber-400"></i> <span data-restore-label>Obnoviť poslednú prácu</span>
+        </button>
       </div>
 
       <!-- LANGUAGE SELECTOR -->
@@ -1033,14 +1036,14 @@ function loadSampleTree() {
   treeData = { fileName: "Ukazkovy_Rodokmen.gdz", persons: { "@I1@": p1, "@I2@": p2, "@I3@": p3, "@I4@": p4, "@I5@": p5, "@I6@": p6 }, families: { "@F1@": fam1, "@F2@": fam2 }, files: {} };
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@", "@I2@", "@I3@", "@I4@", "@I5@"];
-  launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success");
+  launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success"); autoSaveNow();
 }
 
 function createNewTree() {
   const p1 = createPersonObj("@I1@", "", "Zakladateľ", "Rodiny", "M", "01.01.1970", "Bratislava", "Slovensko", "", ""); p1.x = 400; p1.y = 120;
   treeData = { fileName: "Novy_Rodokmen.gdz", persons: { "@I1@": p1 }, families: {}, files: {} };
   originalTreeData = JSON.parse(JSON.stringify(treeData));
-  recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success");
+  recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success"); autoSaveNow();
 }
 
 function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, bCountry, dDate, dPlace) {
@@ -1157,7 +1160,7 @@ function parseGedcomString(text, fileName, attachedFiles) {
   });
 
   treeData = { fileName: fileName, persons: persons, families: families, files: attachedFiles };
-  recentEditedIds = Object.keys(persons).slice(0, 5); launchWorkspace(); autoLayoutTree(true); showToast(t('msgReadOk').replace('{X}', Object.keys(persons).length), "success");
+  recentEditedIds = Object.keys(persons).slice(0, 5); launchWorkspace(); autoLayoutTree(true); showToast(t('msgReadOk').replace('{X}', Object.keys(persons).length), "success"); autoSaveNow();
 }
 
 function toggleFileMenu() {
@@ -1824,7 +1827,7 @@ function selectPerson(personId, openPanel = true) {
       const isLast = (idx === spouses.length - 1);
       spouseInfoEl.innerHTML += `
         <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
-          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${isLast ? 'bg-emerald-500' : 'bg-slate-300'}"></span><div><p class="font-semibold text-slate-800">${esc(sp.person.firstName)} ${esc(sp.person.lastName)}</p><p class="text-[10px] text-slate-400">${t('tMarr')} ${sp.marrDate || '?'}</p></div></div>
+          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${isLast ? 'bg-emerald-500' : 'bg-slate-300'}"></span><div><p class="font-semibold text-slate-800">${esc(sp.person.firstName)} ${esc(sp.person.lastName)}</p><p class="text-[10px] text-slate-400">${t('tMarr')} ${esc(sp.marrDate || '?')}</p></div></div>
           <div class="flex items-center gap-1"><button onclick="centerOnPerson('${sp.person.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded"><i class="ph-bold ph-crosshair"></i></button><button onclick="selectPerson('${sp.person.id}')" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-medium"><i class="ph-bold ph-arrow-right"></i></button></div>
         </div>`;
     });
@@ -2339,7 +2342,7 @@ function gallerySave() {
     if (mine.length && !seen) mine[0].isMain = true;
   } else mine.forEach(f => { f.isMain = false; });
   tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
-  closeMediaGallery(); renderAttachedFilesList();
+  closeMediaGallery(); renderAttachedFilesList(); autoSaveNow();
 }
 function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
 function removeTempFile(fileId) { 
@@ -2440,7 +2443,7 @@ function savePersonForm(e) {
 
   closePersonEditor(); autoLayoutTree(false);
   if (isNew && canvas) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
-  selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success");
+  selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success"); autoSaveNow();
 }
 
 function deleteCurrentPerson() {
@@ -2452,7 +2455,7 @@ function deleteCurrentPerson() {
     (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam) { if (fam.husbandId === pId) fam.husbandId = null; if (fam.wifeId === pId) fam.wifeId = null; if (!fam.husbandId && !fam.wifeId && fam.children.length === 0) delete treeData.families[fId]; } });
     delete treeData.persons[pId]; recentEditedIds = recentEditedIds.filter(id => id !== pId); closePersonEditor();
     const remainingIds = Object.keys(treeData.persons); if (remainingIds.length > 0) selectPerson(remainingIds[0]); else currentSelectedPersonId = null;
-    updateRecentListUI(); updateCountsUI(); autoLayoutTree(false); showToast(t('msgDelOk'), "info");
+    updateRecentListUI(); updateCountsUI(); autoLayoutTree(false); showToast(t('msgDelOk'), "info"); autoSaveNow();
   });
 }
 
@@ -3976,6 +3979,64 @@ function spustiAiInvestigativu() {
   if (!okno) { showToast(t('aiPopupBlocked') + (skopirovany ? t('aiCopied') : ''), 'error'); return; }
   showToast(t('aiOpening') + (skopirovany ? t('aiOpeningCopied') : ''), 'info');
 }
+</script>
+
+<script>
+// ===================== AUTOMATICKÉ ULOŽENIE (localStorage) =====================
+// Rodokmeň sa pri každej zmene uloží do prehliadača. Po obnovení/zatvorení
+// stránky sa na uvítacej obrazovke zobrazí tlačidlo "Obnoviť poslednú prácu".
+// Dáta nikdy neposielajú na žiadny server – zostávajú v tomto prehliadači.
+const AUTOSAVE_KEY = 'genealogy_autosave_v1';
+
+function autoSaveNow() {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(treeData));
+  } catch (e) {
+    // Kvóta prekročená (typicky veľké fotografie) – skús uložiť bez médií.
+    try {
+      const light = JSON.parse(JSON.stringify(treeData, (k, v) =>
+        (k === 'data' && typeof v === 'string' && v.startsWith('data:')) ? '' : v
+      ));
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(light));
+      showToast('Automatické uloženie: fotografie/dokumenty sa nezmestili do úložiska a boli vynechané.', 'error');
+    } catch (e2) { console.error('Autosave failed:', e2); }
+  }
+}
+
+function autoSaveLoad() {
+  try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+
+function autoSaveClear() {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {}
+}
+
+function restoreAutosaved() {
+  const data = autoSaveLoad();
+  if (!data || !data.persons || !Object.keys(data.persons).length) { showToast(t('tNoSearch'), 'error'); return; }
+  treeData = data;
+  originalTreeData = JSON.parse(JSON.stringify(treeData));
+  recentEditedIds = Object.keys(data.persons).slice(0, 5);
+  const btn = document.getElementById('btnRestoreWork'); if (btn) btn.remove();
+  launchWorkspace(); autoLayoutTree(true);
+  showToast(t('msgReadOk').replace('{X}', Object.keys(data.persons).length), 'success');
+}
+
+// Na začiatku: ak existuje rozpracovaná práca, zobraz tlačidlo na obnovenie.
+(function initRestoreButton() {
+  const btn = document.getElementById('btnRestoreWork'); if (!btn) return;
+  const data = autoSaveLoad();
+  if (data && data.persons && Object.keys(data.persons).length > 0) {
+    const n = Object.keys(data.persons).length;
+    const labels = {
+      sk: `Obnoviť poslednú prácu (${n} osôb)`,  cs: `Obnovit poslední práci (${n} osob)`,
+      en: `Restore last session (${n} persons)`,  de: `Letzte Sitzung wiederherstellen (${n} Personen)`
+    };
+    btn.querySelector('[data-restore-label]').innerText = labels[currentLang] || labels.sk;
+    btn.classList.remove('hidden');
+  } else { btn.remove(); }
+})();
 </script>
 
 
