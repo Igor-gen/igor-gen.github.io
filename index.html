@@ -1159,7 +1159,11 @@ function parseGedcomString(text, fileName, attachedFiles) {
       const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext) && !/^docs\//.test(String(ref.file).replace(/\\/g, '/'));
       const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
       const uid = Math.random().toString(36).slice(2, 9);
-      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main, caption: ref.title || '' });
+      if (isImg) {
+        const phObj = { id: 'media_' + uid, name: shownName, data: fObj.data, thumb: '', type: 'photo', isMain: !!ref.main, caption: ref.title || '' };
+        per.photos.push(phObj);
+        createThumbnailDataUrl(fObj.data).then(th => { if (th) phObj.thumb = th; }).catch(() => {});
+      }
       else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext, caption: ref.title || '' });
     });
     if (per.photos.length && !per.photos.some(ph => ph.isMain)) per.photos[0].isMain = true;
@@ -1767,9 +1771,10 @@ function drawPersonBubble(p, c = ctx, noSelect = false, rola = '', px = p.x, py 
   const avatarCenterX = x + 34; const avatarCenterY = y + h / 2; const avatarRadius = 22;
   c.save(); c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.clip();
   const mainPhoto = p.photos.find(ph => ph.isMain) || p.photos[0];
-  if (mainPhoto && mainPhoto.data) {
+  const mainSrc = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
+  if (mainSrc) {
     let img = cachedImages[mainPhoto.id];
-    if (!img) { img = new Image(); img.src = mainPhoto.data; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
+    if (!img || img._src !== mainSrc) { img = new Image(); img._src = mainSrc; img.src = mainSrc; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
     try {
       // výrez „cover“: fotka sa nikdy nedeformuje, vyplní celý kruh a oreže sa to, čo presahuje
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, d = avatarRadius * 2;
@@ -1797,10 +1802,11 @@ function vykresliAvatarKarty(p) {
   const avatarContainer = document.getElementById('detailAvatarContainer'); if (!avatarContainer || !p) return;
   const isMale = (p.gender === 'M');
   const mainPhoto = (p.photos || []).find(ph => ph.isMain) || (p.photos || [])[0];
-  if (mainPhoto && mainPhoto.data) {
+  const src = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
+  if (src) {
     avatarContainer.innerHTML = '';
     const im = document.createElement('img');
-    im.src = mainPhoto.data; im.alt = p.firstName || '';
+    im.src = src; im.alt = p.firstName || '';
     im.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
     avatarContainer.appendChild(im);
   } else { avatarContainer.innerHTML = `<i class="ph-bold ph-user text-4xl ${isMale ? 'text-blue-500' : 'text-pink-500'}"></i>`; }
@@ -2114,7 +2120,8 @@ function updateSpouseRowAvatar(selectEl) {
   const row = selectEl.closest('.spouse-row'); const preview = row.querySelector('.spouse-avatar-preview'); const partnerId = selectEl.value;
   if (!partnerId || !treeData.persons[partnerId]) { preview.innerHTML = `<i class="ph-bold ph-user text-slate-400"></i>`; return; }
   const partner = treeData.persons[partnerId]; const mainPhoto = partner.photos.find(ph => ph.isMain) || partner.photos[0];
-  if (mainPhoto && mainPhoto.data) preview.innerHTML = `<img src="${mainPhoto.data}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
+  const spSrc = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
+  if (spSrc) preview.innerHTML = `<img src="${spSrc}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
 }
 
 function populateChildrenEditor(currentId, person) { const container = document.getElementById('childrenContainer'); container.innerHTML = ""; const children = currentId ? getChildrenOf(currentId) : []; children.forEach(c => addChildFieldRow(c.id)); }
@@ -2142,7 +2149,8 @@ function renderAttachedFilesList() {
   const list = document.getElementById('attachedFilesList'); if (!list) return;
   const photos = tempAttachedFiles.filter(isPhotoFile), docs = tempAttachedFiles.filter(f => !isPhotoFile(f));
   const main = photos.find(f => f.isMain) || photos[0], doc = docs[0];
-  const photoBox = main && main.data ? `<img src="${main.data}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
+  const mainSrc = main && (main.thumb || main.data);
+  const photoBox = mainSrc ? `<img src="${mainSrc}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
   const docBox = doc ? `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-3xl"></i><span class="font-bold uppercase text-[10px]">${esc(doc.type)}</span></div>` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-file-text text-3xl"></i><span class="text-[11px]">${esc(gt('noDoc'))}</span></div>`;
   list.innerHTML = `
     <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -2190,8 +2198,9 @@ function renderMediaGallery() {
   const isPh = galleryType === 'photo';
   grid.innerHTML = galleryItems.map(f => {
     const sel = gallerySelected.has(f.id);
+    const phSrc = f.thumb || f.data;
     const body = isPh
-      ? (f.data ? `<img src="${f.data}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
+      ? (phSrc ? `<img src="${phSrc}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
       : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
     const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
     return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
@@ -2258,6 +2267,25 @@ async function decodeImageFile(file) {
     img.src = url;
   });
 }
+// Vytvorí malý JPEG náhľad (thumbnail, max 160 px, ~3-8 KB) pre bežnú prácu bez nutnosti sťahovať plné rozlíšenie z Backblaze.
+const THUMB_MAX_DIM = 160;
+const THUMB_QUALITY = 0.72;
+async function createThumbnailDataUrl(dataUrlOrBlob) {
+  try {
+    const blob = typeof dataUrlOrBlob === 'string' ? await (await fetch(dataUrlOrBlob)).blob() : dataUrlOrBlob;
+    const src = await decodeImageFile(blob);
+    const w0 = src.width || src.naturalWidth || 1, h0 = src.height || src.naturalHeight || 1;
+    const sc = Math.min(1, THUMB_MAX_DIM / Math.max(w0, h0));
+    const w = Math.max(1, Math.round(w0 * sc)), h = Math.max(1, Math.round(h0 * sc));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const cctx = c.getContext('2d'); cctx.fillStyle = '#ffffff'; cctx.fillRect(0, 0, w, h); cctx.drawImage(src, 0, 0, w, h);
+    if (src.close) { try { src.close(); } catch (e) {} }
+    return c.toDataURL('image/jpeg', THUMB_QUALITY);
+  } catch (e) {
+    return '';
+  }
+}
+
 // Zakóduje obrázok do JPEG tak, aby bol najviac limitBytes; postupne znižuje kvalitu a rozmer.
 async function encodeJpegUnder(src, w0, h0, limitBytes) {
   let maxDim = Math.min(3600, Math.max(w0, h0));
@@ -2287,7 +2315,11 @@ async function prepareFileForUpload(file, kind) {
   if (!okType) { showToast(ft('badImage', file.name), 'error'); return null; }
   const isGif = ext === 'gif' || mime === 'image/gif';
   const tooBig = file.size > FILE_LIMIT_BYTES;
-  if (!isHeic && !tooBig) return { name: file.name, data: await readAsDataUrl(file), type: 'photo' };
+  if (!isHeic && !tooBig) {
+    const dataUrl = await readAsDataUrl(file);
+    const thumb = await createThumbnailDataUrl(file);
+    return { name: file.name, data: dataUrl, thumb, type: 'photo' };
+  }
   if (isGif) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }   // animáciu nemožno bezpečne zmenšiť
   showToast(ft('working', file.name), 'info');
   let src;
@@ -2297,7 +2329,9 @@ async function prepareFileForUpload(file, kind) {
   if (src.close) { try { src.close(); } catch (e) { /* nie je kritické */ } }
   if (!blob) { showToast(ft('tooBigPhoto', file.name, file.size), 'error'); return null; }
   showToast(isHeic && !tooBig ? ft('heicConv', file.name) : ft('shrunk', file.name, blob.size), 'success');
-  return { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', data: await readAsDataUrl(blob), type: 'photo' };
+  const dataUrl = await readAsDataUrl(blob);
+  const thumb = await createThumbnailDataUrl(blob);
+  return { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', data: dataUrl, thumb, type: 'photo' };
 }
 
 async function galleryHandleFiles(input) {
@@ -2307,7 +2341,7 @@ async function galleryHandleFiles(input) {
     let prepared = null;
     try { prepared = await prepareFileForUpload(file, isPh ? 'photo' : 'doc'); } catch (e) { showToast(String(e && e.message || e), 'error'); }
     if (!prepared) continue;
-    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
+    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, thumb: prepared.thumb || '', type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
   }
   input.value = '';
   renderMediaGallery();
@@ -2440,11 +2474,26 @@ function switchMediaLightboxTab(tab) {
   else { tabDocsBtn.className = "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-white/20 text-white"; tabPhotosBtn.className = "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold text-white/70 hover:text-white"; btnToggleMosaic.style.display = "none"; document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.add('hidden'); showDocumentsList(); }
 }
 
-function showPhotoSlider() {
+async function showPhotoSlider() {
   isMosaicActive = false; document.getElementById('mosaicBtnText').innerText = t('btnMosaic'); document.getElementById('photoSliderView').classList.remove('hidden'); document.getElementById('photoMosaicView').classList.add('hidden');
   const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
-  if (photos.length === 0) { document.getElementById('activePhotoImg').src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
-  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : ''; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
+  const imgEl = document.getElementById('activePhotoImg');
+  if (photos.length === 0) { imgEl.src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
+  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0;
+  const cur = photos[currentPhotoIndex];
+  const reqIdx = currentPhotoIndex, reqPerson = activeMediaPersonId;
+  // Najprv okamžite zobrazíme lokálny náhľad (thumbnail), kým sa na pozadí dotiahne plné rozlíšenie z Backblaze
+  imgEl.src = cur.data || cur.thumb || '';
+  imgEl.style.filter = (!cur.data && cur.key) ? 'blur(2px)' : 'none';
+  document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : '';
+  document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
+  if (!cur.data && cur.key) {
+    const fullData = await ensureFullFileData(cur);
+    if (fullData && activeMediaPersonId === reqPerson && currentPhotoIndex === reqIdx && !isMosaicActive) {
+      imgEl.src = fullData;
+      imgEl.style.filter = 'none';
+    }
+  }
 }
 
 function nextPhoto() { const p = treeData.persons[activeMediaPersonId]; if (!p || !p.photos.length) return; currentPhotoIndex = (currentPhotoIndex + 1) % p.photos.length; showPhotoSlider(); }
@@ -2455,20 +2504,48 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
+  // V mozaike používame úsporné miniatúry (ph.thumb || ph.data); plný obrázok sa stiahne až po kliknutí na fotku
+  photos.forEach((ph, idx) => {
+    const src = ph.thumb || ph.data || '';
+    grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02] bg-slate-800">${src ? `<img src="${src}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="ph-bold ph-image text-3xl"></i></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`;
+  });
+  const missingThumbs = photos.filter(ph => !ph.thumb && !ph.data && ph.key);
+  if (missingThumbs.length) downloadFilesBatch(missingThumbs, true).then(() => { if (isMosaicActive && activeMediaPersonId === p.id) showPhotoMosaic(); });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach((doc, idx) => {
+    container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${esc(doc.type || 'DOC')}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || doc.name || t('tDoc'))}</h4></div></div><button type="button" onclick="downloadDocumentOnDemand(${idx})" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></button></div>`;
+  });
+}
+
+async function downloadDocumentOnDemand(idx) {
+  const p = treeData.persons[activeMediaPersonId];
+  const doc = p && p.documents && p.documents[idx];
+  if (!doc) return;
+  if (!doc.data && doc.key) {
+    showToast(t('msgAttWait'), 'info');
+    await ensureFullFileData(doc);
+  }
+  if (!doc.data) { showToast(t('msgFileUploadFail'), 'error'); return; }
+  const a = document.createElement('a');
+  a.href = doc.data;
+  a.download = doc.name || 'dokument';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 async function saveGedzipTree() {
   if (treeSource === 'server') {
-    if (hydratePromise) { showToast(t('msgAttWait'), 'info'); try { await hydratePromise; } catch (e) {} }
+    const needFull = [];
+    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) needFull.push(f); }));
+    if (needFull.length > 0) {
+      showToast(t('msgAttWait'), 'info');
+      try { await downloadFilesBatch(needFull, false); } catch (e) {}
+    }
     let missing = 0;
-    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) missing++; }));
+    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data && !f.thumb) missing++; }));
     if (missing > 0) {
       showConfirm(t('msgAttMissTitle'), t('msgAttMissBody').replace('{N}', missing), () => saveGedzipTreeInternal());
       return;
@@ -2528,7 +2605,7 @@ async function saveGedzipTreeInternal() {
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
 
-      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || ph.thumb || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
       p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${dc.caption ? '3 TITL ' + String(dc.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
     });
 
@@ -2831,10 +2908,19 @@ async function fetchTreeData(session) {
 }
 
 
-// --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč ---
+// --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč a malý náhľad (thumb) ---
 function fileList(p) { return (p.photos || []).map(f => [f, 'photo']).concat((p.documents || []).map(f => [f, 'doc'])); }
+const inflightDownloads = new Map();
 
 async function uploadPendingFiles(session) {
+  // Pred odoslaním zabezpečíme, aby každá lokálna fotka mala vytvorený malý náhľad (thumb)
+  for (const p of Object.values(treeData.persons)) {
+    for (const ph of (p.photos || [])) {
+      if (ph.data && !ph.thumb) {
+        ph.thumb = await createThumbnailDataUrl(ph.data);
+      }
+    }
+  }
   const pending = [];
   Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f, kind]) => { if (f.data && !f.key) pending.push([f, kind]); }));
   let done = 0;
@@ -2853,17 +2939,15 @@ async function uploadPendingFiles(session) {
       const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: 'upload', kind, name: f.name, mime, size: blob.size }) });
       if (!r.ok) {
-        // Chyby súboru sa nesmú tváriť ako „rodokmeň je príliš veľký“
         if (r.status === 413) throw new Error(ft('tooBigShort', '', raw.size));
         if (r.status === 400) {
-          let j = {}; try { j = await r.clone().json(); } catch (e) { /* všeobecná chyba nižšie */ }
+          let j = {}; try { j = await r.clone().json(); } catch (e) {}
           if (j.error === 'banned extension') throw new Error(ft('bannedShort'));
           if (j.error === 'bad image type') throw new Error(ft('badImageShort'));
         }
         const err = await backendError(r, 'msgDbSessionExpired'); if (r.status === 401) err.sessionExpired = true; throw err;
       }
       const up = await r.json();
-      // Telo musí mať presne ten Content-Type, ktorý server podpísal do URL (inak Backblaze odmietne PUT bez CORS hlavičiek).
       const signedType = (up.headers && (up.headers['Content-Type'] || up.headers['content-type'])) || up.mime || mime;
       blob = new Blob([raw], { type: signedType });
       let put;
@@ -2883,13 +2967,13 @@ async function uploadPendingFiles(session) {
   }
 }
 
-function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
+// Do databázy ukladáme ku kľúču aj malý náhľad (thumb ~3-8 KB), aby sa pri bežnej práci vôbec nemuseli sťahovať plné fotky z Backblaze.
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0, thumb: f.thumb || '' }; }
 
-// Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
-async function hydrateFiles(session) {
-  const todo = [];
-  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) todo.push(f); }));
-  if (!todo.length) return;
+// Stiahne z Backblaze B2 zoznam súborov. Ak je onlyThumb = true, vytvorí z nich len malý náhľad a veľké dáta uvoľní z RAM.
+async function downloadFilesBatch(filesList, onlyThumb = false) {
+  const todo = (filesList || []).filter(f => f && f.key && (onlyThumb ? (!f.thumb && !f.data) : !f.data));
+  if (!todo.length || treeSource !== 'server') return;
   const treeRef = treeData;
   try {
     for (let i = 0; i < todo.length; i += 50) {
@@ -2903,16 +2987,57 @@ async function hydrateFiles(session) {
         while (idx < chunk.length) {
           const f = chunk[idx++]; const u = urls[f.key]; if (!u) continue;
           try {
-            const res = await fetch(u, { cache: 'no-store' }); if (!res.ok) continue;
+            const res = await fetch(u); if (!res.ok) continue;
             const blob = await res.blob();
-            f.data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
-            if (treeRef === treeData) { drawTree(); const vp = treeData.persons[currentSelectedPersonId]; if (vp) vykresliAvatarKarty(vp); }
+            if (onlyThumb && isPhotoFile(f)) {
+              f.thumb = await createThumbnailDataUrl(blob);
+            } else {
+              f.data = await readAsDataUrl(blob);
+              if (isPhotoFile(f) && !f.thumb) f.thumb = await createThumbnailDataUrl(blob);
+            }
+            if (treeRef === treeData) {
+              drawTree();
+              const vp = treeData.persons[currentSelectedPersonId];
+              if (vp) vykresliAvatarKarty(vp);
+            }
           } catch (e) { /* jeden súbor nesmie zastaviť ostatné */ }
         }
       };
       await Promise.all([worker(), worker(), worker(), worker()]);
     }
-  } catch (e) { /* načítanie súborov je doplnkové */ }
+  } catch (e) {}
+}
+
+// Stiahne plné rozlíšenie konkrétnej fotografie alebo dokumentu z Backblaze B2 až na vyžiadanie (pri otvorení v galérii alebo sťahovaní dokumentu).
+async function ensureFullFileData(f) {
+  if (!f) return '';
+  if (f.data) return f.data;
+  if (!f.key || treeSource !== 'server') return f.thumb || '';
+  if (inflightDownloads.has(f.key)) return inflightDownloads.get(f.key);
+  const p = (async () => {
+    try {
+      await downloadFilesBatch([f], false);
+      return f.data || f.thumb || '';
+    } finally {
+      inflightDownloads.delete(f.key);
+    }
+  })();
+  inflightDownloads.set(f.key, p);
+  return p;
+}
+
+// Pri načítaní stromu zo servera NEsťahujeme všetky fotografie ani dokumenty v plnej veľkosti!
+// Ak majú fotky uložený náhľad (thumb), nesťahuje sa z Backblaze vôbec nič (0 B).
+// Ak ide o starší záznam bez thumbu, dotiahnu sa na pozadí iba chýbajúce náhľady pre hlavné (profilové) fotky.
+async function hydrateFiles(session) {
+  const missingMainThumbs = [];
+  Object.values(treeData.persons).forEach(p => {
+    const photos = p.photos || [];
+    const main = photos.find(ph => ph.isMain) || photos[0];
+    if (main && main.key && !main.thumb && !main.data) missingMainThumbs.push(main);
+  });
+  if (!missingMainThumbs.length) return;
+  await downloadFilesBatch(missingMainThumbs, true);
 }
 
 
@@ -3216,7 +3341,7 @@ function serverDataToTree(data) {
 }
 // Kópia stavu bez obsahu súborov (iba kľúče) – slúži ako základ pre ďalšie zlúčenie
 function snapshotBase(tree) {
-  return JSON.parse(JSON.stringify({ persons: tree.persons, families: tree.families }, (k, v) => (k === 'data' && typeof v === 'string' ? undefined : v)));
+  return JSON.parse(JSON.stringify({ persons: tree.persons, families: tree.families }, (k, v) => ((k === 'data' || k === 'thumb') && typeof v === 'string' ? undefined : v)));
 }
 
 function mergeRenderLines(lines) {
