@@ -307,12 +307,7 @@
     
     <!-- Horná legenda vľavo: rovnaký vizuálny štýl ako spodná + dátum posledného uloženia na server -->
     <div id="topLegend" class="absolute top-4 left-4 hidden sm:flex flex-col gap-1 bg-white/95 backdrop-blur-md px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl shadow-lg border border-slate-200/80 text-[10px] sm:text-xs text-slate-600 pointer-events-none" style="z-index: 15;">
-      <div class="flex items-center gap-3 sm:gap-4">
-        <div class="flex items-center gap-1 sm:gap-1.5"><span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-maleBg border-2 border-maleBorder"></span><span class="font-medium" data-i18n="legendMale">Muž</span></div>
-        <div class="flex items-center gap-1 sm:gap-1.5"><span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-femaleBg border-2 border-femaleBorder"></span><span class="font-medium" data-i18n="legendFemale">Žena</span></div>
-        <div class="flex items-center gap-1 sm:gap-1.5"><span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-rose-500"></span><span class="text-slate-500 whitespace-nowrap" data-i18n="legendHub">Rodinný uzol</span></div>
-      </div>
-      <div id="lastSavedBadge" class="hidden items-center gap-1.5 pt-1 border-t border-slate-200 whitespace-nowrap">
+      <div id="lastSavedBadge" class="hidden items-center gap-1.5 whitespace-nowrap">
         <i class="ph-bold ph-cloud-arrow-up text-slate-400"></i>
         <span class="text-slate-500" data-i18n="lastSavedPrefix">Posledné uloženie na server:</span>
         <span id="lastSavedDate" class="font-semibold text-slate-600">—</span>
