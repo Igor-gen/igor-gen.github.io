@@ -3522,7 +3522,9 @@ const FAN_NEUTRAL = '#e5e7eb';   // záloha, keď vetva nie je známa
 function fanFill(gen, vetva, dolu) {
   if (vetva == null) return FAN_NEUTRAL;
   const i = Math.max(-2, Math.min(gen - 2, 6));
-  return `hsl(${(dolu ? FAN_VETVY_DOLE : FAN_VETVY)[vetva].h}, ${70 - i * 6}%, ${64 + i * 4.3}%)`;
+  // 50 % priesvitnosť: odtiene vetiev (palety) ostanú, ale sýtosť sa zmierni
+  // a tmavé texty na segmentoch sú výrazne lepšie čitateľné.
+  return `hsla(${(dolu ? FAN_VETVY_DOLE : FAN_VETVY)[vetva].h}, ${70 - i * 6}%, ${64 + i * 4.3}%, 0.5)`;
 }
 // Koreň celého diagramu = najstarší predok vetvy rodiny Sklenčár: muž s priezviskom Sklenčár/Sklencar bez otca v rodokmeni
 // a s najskorším rokom narodenia (bez roku narodenia až na poslednom mieste).
