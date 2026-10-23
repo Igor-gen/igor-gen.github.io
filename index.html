@@ -4314,21 +4314,34 @@ function autoSaveClear() {
 }
 
 async function restoreAutosaved() {
+  // Načítanie rodokmeňa VŽDY uprednostni server (spoločná databáza pre všetkých
+  // používateľov) – lokálna záloha sa použije len, keď server nie je dostupný.
+  if (isBackendConfigured()) {
+    try {
+      const clerk = await ensureClerkReady();
+      if (clerk.isSignedIn && clerk.session) {
+        const server = await fetchTreeData(clerk.session);
+        const btn0 = document.getElementById('btnRestoreWork'); if (btn0) btn0.remove();
+        loadTreeFromServer(server, clerk.session);
+        return;
+      }
+      // Neprihlásený – otvor prihlásenie; po ňom Clerk listener automaticky
+      // načíta rodokmeň zo servera (rovnaký tok ako „Pripojiť databázu").
+      pendingDbMode = 'load';
+      const btn0 = document.getElementById('btnRestoreWork'); if (btn0) btn0.remove();
+      await clerk.openSignIn({
+        fallbackRedirectUrl: GENEALOGY_APP_URL,
+        forceRedirectUrl: GENEALOGY_APP_URL,
+        signInFallbackRedirectUrl: GENEALOGY_APP_URL,
+        signUpFallbackRedirectUrl: GENEALOGY_APP_URL
+      });
+      return;
+    } catch (e) { /* server alebo Clerk nedostupný – nižšie sa použije lokálna záloha */ }
+  }
   const saved = await autoSaveLoad();
   const data = saved && saved.tree;
   if (!data || !data.persons || !Object.keys(data.persons).length) { showToast(t('tNoSearch'), 'error'); return; }
   const meta = saved.meta;
-
-  // Ak autosave pochádza zo serverového rodokmeňa, potichu porovnaj verziu so serverom.
-  // Server vyhrá, len ak je naozaj novší (inak používateľovi zachovaj neuloženú lokálnu prácu).
-  if (meta.source === 'server' && isBackendConfigured()) {
-    try {
-      const session = await getClerkSession();
-      const server = await fetchTreeData(session);
-      if (Number(server.version) > Number(meta.version)) { loadTreeFromServer(server, session); return; }
-    } catch (e) { /* neprihlásený alebo server nedostupný – obnov lokálnu kópiu */ }
-  }
-
   pushUndoSnapshot();
   // Odstráň "duchov" – media záznamy, ktorým chýba obsah (data) po starom vyradení z autouloženia.
   let bezMedii = 0;
@@ -4361,9 +4374,13 @@ async function restoreAutosaved() {
   const data = saved && saved.tree;
   if (data && data.persons && Object.keys(data.persons).length > 0) {
     const n = Object.keys(data.persons).length;
+    // S nakonfigurovaným backendom tlačidlo načíta rodokmeň zo servera (spoločný pre všetkých).
+    const serverCase = isBackendConfigured();
     const labels = {
-      sk: `Obnoviť poslednú prácu (${n} osôb)`,  cs: `Obnovit poslední práci (${n} osob)`,
-      en: `Restore last session (${n} persons)`,  de: `Letzte Sitzung wiederherstellen (${n} Personen)`
+      sk: serverCase ? `Pokračovať v práci – načíta rodokmeň zo servera` : `Obnoviť poslednú prácu (${n} osôb)`,
+      cs: serverCase ? `Pokračovat v práci – načte rodokmen ze serveru` : `Obnovit poslední práci (${n} osob)`,
+      en: serverCase ? `Continue working – loads the tree from the server` : `Restore last session (${n} persons)`,
+      de: serverCase ? `Weiterarbeiten – lädt den Stammbaum vom Server` : `Letzte Sitzung wiederherstellen (${n} Personen)`
     };
     btn.querySelector('[data-restore-label]').innerText = labels[currentLang] || labels.sk;
     btn.classList.remove('hidden');
