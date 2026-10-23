@@ -2166,26 +2166,29 @@ function addChildFieldRow(selectedChildId = "") {
   row.innerHTML = `<select class="child-select flex-1 p-2 rounded-xl border border-slate-300 bg-white">${optionsHtml}</select><button type="button" onclick="this.closest('.child-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`; container.appendChild(row);
 }
 
-async function handleSpecificFilesAttach(input, targetType) {
+function handleSpecificFilesAttach(input, targetType) {
   const files = Array.from(input.files); if (!files.length) return;
-  const isPhoto = targetType === 'photo';
   for (const file of files) {
-    let prepared = null;
-    try { prepared = await prepareFileForUpload(file, isPhoto ? 'photo' : 'doc'); } catch (e) { showToast(String(e && e.message || e), 'error'); }
-    if (!prepared) continue;
-    const pExt = file.name.split('.').pop().toLowerCase();
-    tempAttachedFiles.push({
-      id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      name: prepared.name,
-      data: prepared.data,
-      type: isPhoto ? 'photo' : (prepared.type === 'photo' ? 'photo' : pExt),
-      isTargetType: targetType,
-      caption: '',
-      isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain)
-    });
-  }
+    const ext = file.name.split('.').pop().toLowerCase(); 
+    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`${t('tFileWord')} "${file.name}" ${t('tFileBanned')}`, "error"); continue; }
+    
+    const isPhoto = targetType === 'photo';
+    const reader = new FileReader();
+    reader.onload = (e) => { 
+      tempAttachedFiles.push({ 
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), 
+        name: file.name, 
+        data: e.target.result, 
+        type: isPhoto ? 'photo' : ext, 
+        isTargetType: targetType,
+        caption: '',
+        isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain) 
+      }); 
+      renderAttachedFilesList(); 
+    }; 
+    reader.readAsDataURL(file);
+  } 
   input.value = "";
-  renderAttachedFilesList();
 }
 
 function captionPlaceholder() {
@@ -2350,14 +2353,13 @@ async function prepareFileForUpload(file, kind) {
   if (!okType) { showToast(ft('badImage', file.name), 'error'); return null; }
   const isGif = ext === 'gif' || mime === 'image/gif';
   const tooBig = file.size > FILE_LIMIT_BYTES;
-  const SHRINK_BYTES = 350 * 1024;   // fotku nad túto veľkosť stiahneme na ~350 kB JPEG – autouloženie do localStorage má kvótu ~5 MB
-  if (!isHeic && (!tooBig && (!isGif && file.size <= SHRINK_BYTES || isGif))) return { name: file.name, data: await readAsDataUrl(file), type: 'photo' };
-  if (isGif && tooBig) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }   // animáciu nemožno bezpečne zmenšiť
+  if (!isHeic && !tooBig) return { name: file.name, data: await readAsDataUrl(file), type: 'photo' };
+  if (isGif) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }   // animáciu nemožno bezpečne zmenšiť
   showToast(ft('working', file.name), 'info');
   let src;
   try { src = await decodeImageFile(file); }
   catch (e) { showToast(isHeic ? ft('heicNo', file.name) : ft('badImage', file.name), 'error'); return null; }
-  const blob = await encodeJpegUnder(src, src.width || src.naturalWidth, src.height || src.naturalHeight, SHRINK_BYTES);
+  const blob = await encodeJpegUnder(src, src.width || src.naturalWidth, src.height || src.naturalHeight, FILE_LIMIT_BYTES);
   if (src.close) { try { src.close(); } catch (e) { /* nie je kritické */ } }
   if (!blob) { showToast(ft('tooBigPhoto', file.name, file.size), 'error'); return null; }
   showToast(isHeic && !tooBig ? ft('heicConv', file.name) : ft('shrunk', file.name, blob.size), 'success');
@@ -4231,103 +4233,46 @@ function spustiAiChat() {
 // Dáta nikdy neposielajú na žiadny server – zostávajú v tomto prehliadači.
 const AUTOSAVE_KEY = 'genealogy_autosave_v1';
 
-// Hlásenia automatického uloženia vo 4 jazykoch.
-const AS_MSGS = {
-  sk: { idb: 'Automatické uloženie: dáta sú väčšie, uložené bezpečne do IndexedDB (fotografie zostávajú).', stripped: 'Automatické uloženie: {N} médií sa nezmestilo do úložiska a bolo vynechaných.', fail: 'Automatické uloženie zlyhalo – úložisko prehliadača je plné.' },
-  cs: { idb: 'Automatické uložení: data jsou větší, bezpečně uložena do IndexedDB (fotografie zůstávají).', stripped: 'Automatické uložení: {N} médií se nevešlo do úložiště a bylo vynecháno.', fail: 'Automatické uložení selhalo – úložiště prohlížeče je plné.' },
-  en: { idb: 'Autosave: data is large, stored safely in IndexedDB (photos kept).', stripped: 'Autosave: {N} media items did not fit into storage and were skipped.', fail: 'Autosave failed – browser storage is full.' },
-  de: { idb: 'Automatisches Speichern: Daten sind groß, sicher in IndexedDB gespeichert (Fotos bleiben erhalten).', stripped: 'Automatisches Speichern: {N} Medien passten nicht in den Speicher und wurden übersprungen.', fail: 'Automatisches Speichern fehlgeschlagen – Browser-Speicher ist voll.' }
-};
-function asMsg(k) { return (AS_MSGS[currentLang] && AS_MSGS[currentLang][k]) || AS_MSGS.sk[k]; }
-
-// IndexedDB – záložné úložisko pre veľké rodokmene (localStorage má kvótu ~5 MB).
-function idbOpen() {
-  return new Promise((ok, no) => {
-    const req = indexedDB.open('genealogy_autosave', 1);
-    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains('kv')) req.result.createObjectStore('kv'); };
-    req.onsuccess = () => ok(req.result);
-    req.onerror = () => no(req.error);
-  });
-}
-function idbSetAutosave(obj) {
-  return idbOpen().then(db => new Promise((ok, no) => {
-    const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(obj, 'tree');
-    tx.oncomplete = () => ok(true); tx.onerror = () => no(tx.error);
-  }));
-}
-function idbGetAutosave() {
-  return idbOpen().then(db => new Promise((ok, no) => {
-    const req = db.transaction('kv', 'readonly').objectStore('kv').get('tree');
-    req.onsuccess = () => ok(req.result || null); req.onerror = () => no(req.error);
-  }));
-}
-function idbDelAutosave() {
-  return idbOpen().then(db => new Promise((ok, no) => {
-    const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete('tree');
-    tx.oncomplete = () => ok(true); tx.onerror = () => no(tx.error);
-  })).catch(() => {});
-}
-
 function autoSaveNow() {
-  const json = JSON.stringify(treeData);
   try {
-    localStorage.setItem(AUTOSAVE_KEY, json);
-    idbDelAutosave();   // kompletná kópia je v localStorage – IndexedDB kópia už netreba
-    return;
-  } catch (e) { /* kvóta localStorage – pokračuj fallbackom nižšie */ }
-  try {
-    // Plná kópia do IndexedDB (bez obmedzenia ~5 MB, fotografie zostanú),
-    // do localStorage len odľahčená kópia (médiá s prázdnym data).
-    const light = JSON.parse(json, (k, v) =>
-      (k === 'data' && typeof v === 'string' && v.startsWith('data:')) ? '' : v
-    );
-    try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(light)); } catch (e2) {}
-    idbSetAutosave(treeData).then(() => showToast(asMsg('idb'), 'info'))
-      .catch(() => showToast(asMsg('fail'), 'error'));
-  } catch (e2) { showToast(asMsg('fail'), 'error'); console.error('Autosave failed:', e2); }
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(treeData));
+  } catch (e) {
+    // Kvóta prekročená (typicky veľké fotografie) – skús uložiť bez médií.
+    try {
+      const light = JSON.parse(JSON.stringify(treeData, (k, v) =>
+        (k === 'data' && typeof v === 'string' && v.startsWith('data:')) ? '' : v
+      ));
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(light));
+      showToast('Automatické uloženie: fotografie/dokumenty sa nezmestili do úložiska a boli vynechané.', 'error');
+    } catch (e2) { console.error('Autosave failed:', e2); }
+  }
 }
 
-async function autoSaveLoad() {
-  // Uprednostni kompletnú kópiu z IndexedDB; inak použij localStorage.
-  try { const full = await idbGetAutosave(); if (full && full.persons && Object.keys(full.persons).length) return full; } catch (e) {}
+function autoSaveLoad() {
   try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }
   catch (e) { return null; }
 }
 
 function autoSaveClear() {
   try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {}
-  idbDelAutosave();
 }
 
-async function restoreAutosaved() {
-  const data = await autoSaveLoad();
+function restoreAutosaved() {
+  const data = autoSaveLoad();
   if (!data || !data.persons || !Object.keys(data.persons).length) { showToast(t('tNoSearch'), 'error'); return; }
   pushUndoSnapshot();
-  // Odstráň "duchov" – media záznamy, ktorým chýba obsah (data) po starom vyradení z autouloženia.
-  let bezMedii = 0;
-  for (const p of Object.values(data.persons)) {
-    for (const key of ['photos', 'documents']) {
-      if (Array.isArray(p[key])) {
-        const before = p[key].length;
-        p[key] = p[key].filter(f => f && typeof f.data === 'string' && f.data.startsWith('data:'));
-        bezMedii += before - p[key].length;
-        if (p[key].length && !p[key].some(f => f.isMain)) p[key][0].isMain = true;
-      }
-    }
-  }
   treeData = data;
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(data.persons).slice(0, 5);
   const btn = document.getElementById('btnRestoreWork'); if (btn) btn.remove();
   launchWorkspace(); autoLayoutTree(true);
-  if (bezMedii > 0) showToast(asMsg('stripped').replace('{N}', bezMedii), 'error');
   showToast(t('msgReadOk').replace('{X}', Object.keys(data.persons).length), 'success');
 }
 
 // Na začiatku: ak existuje rozpracovaná práca, zobraz tlačidlo na obnovenie.
-(async function initRestoreButton() {
+(function initRestoreButton() {
   const btn = document.getElementById('btnRestoreWork'); if (!btn) return;
-  const data = await autoSaveLoad();
+  const data = autoSaveLoad();
   if (data && data.persons && Object.keys(data.persons).length > 0) {
     const n = Object.keys(data.persons).length;
     const labels = {
