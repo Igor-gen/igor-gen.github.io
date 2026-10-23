@@ -577,7 +577,7 @@
       <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-slate-600"><input type="checkbox" id="mediaSelectAll" onchange="gallerySelectAll(this.checked)" class="w-4 h-4 accent-indigo-600"><span id="mediaSelectAllLbl">Označiť všetko</span></label>
       <label class="cursor-pointer px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg border border-indigo-200 flex items-center gap-1.5 shadow-sm"><i class="ph-bold ph-plus"></i><span id="mediaAddLbl">Pridať</span><input id="mediaAddInput" type="file" multiple class="hidden" onchange="galleryHandleFiles(this)"></label>
     </div>
-    <div id="mediaEditGrid" class="p-3 sm:p-5 overflow-y-auto custom-scroll grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 flex-1"></div>
+    <div id="mediaEditGrid" oncontextmenu="return false" ondragstart="return false" onselectstart="if (event.target.tagName !== 'INPUT') return false;" class="p-3 sm:p-5 overflow-y-auto custom-scroll grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50 flex-1"></div>
   </div>
 </div>
 
@@ -2261,7 +2261,7 @@ function renderMediaGallery() {
   grid.innerHTML = galleryItems.map(f => {
     const sel = gallerySelected.has(f.id);
     const body = isPh
-      ? (f.data ? `<img src="${f.data}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
+      ? (f.data ? `<img src="${f.data}" draggable="false" class="w-full h-full object-cover" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
       : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
     const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
     return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
