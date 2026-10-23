@@ -2,7 +2,7 @@
 <html lang="sk">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Genealogy - Rodokmeň</title>
   <!-- Clerk authentication (invite-only users are managed in Clerk Dashboard) -->
   <script defer crossorigin="anonymous" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js"></script>
@@ -1056,7 +1056,11 @@ function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, 
   return { id: id || generateId("I"), title: title || "", firstName: firstName || "", middleName: "", lastName: lastName || "", birthName: "", gender: gender || "M", birthDate: bDate || "", birthPlace: bPlace || "", birthCountry: bCountry || "Slovensko", deathDate: dDate || "", deathPlace: dPlace || "", fams: [], famc: null, events: [], sources: [], addresses: [], occupations: [], notes: [], photos: [], documents: [], x: 0, y: 0 };
 }
 
-function generateId(prefix) { return `@${prefix}${Math.floor(Math.random() * 899999 + 100000)}@`; }
+function generateId(prefix) {
+  let s = ''; try { s = crypto.randomUUID().replace(/-/g, '').slice(0, 12); }
+  catch (e) { s = Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+  return `@${prefix}${s}@`;
+}
 
 document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 const dropZone = document.getElementById('dropZone');
