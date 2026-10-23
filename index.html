@@ -4268,8 +4268,22 @@ function idbDelAutosave() {
   })).catch(() => {});
 }
 
+// Autosave ukladá aj metadáta: kedy bolo uložené, odkiaľ rodokmeň pochádza
+// ('server'/'local') a akú mal serverovú verziu. Pri obnovení potom aplikácia
+// porovná verziu so serverom a použije novšiu – tak používateľ B vidí zmeny
+// používateľa A aj cez tlačidlo „Obnoviť poslednú prácu".
+function autoSavePayload() {
+  return { savedAt: Date.now(), source: treeSource, version: treeVersion, tree: treeData };
+}
+function autoSaveUnwrap(data) {
+  if (!data) return null;
+  if (data && data.tree && data.tree.persons) return { meta: { source: data.source || 'local', version: Number(data.version) || 0, savedAt: data.savedAt || 0 }, tree: data.tree };
+  if (data && data.persons) return { meta: { source: 'local', version: 0, savedAt: 0 }, tree: data };   // starý formát bez metadát
+  return null;
+}
+
 function autoSaveNow() {
-  const json = JSON.stringify(treeData);
+  const json = JSON.stringify(autoSavePayload());
   try {
     localStorage.setItem(AUTOSAVE_KEY, json);
     idbDelAutosave();   // kompletná kópia je v localStorage – IndexedDB kópia už netreba
@@ -4282,15 +4296,15 @@ function autoSaveNow() {
       (k === 'data' && typeof v === 'string' && v.startsWith('data:')) ? '' : v
     );
     try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(light)); } catch (e2) {}
-    idbSetAutosave(treeData).then(() => showToast(asMsg('idb'), 'info'))
+    idbSetAutosave(autoSavePayload()).then(() => showToast(asMsg('idb'), 'info'))
       .catch(() => showToast(asMsg('fail'), 'error'));
   } catch (e2) { showToast(asMsg('fail'), 'error'); console.error('Autosave failed:', e2); }
 }
 
 async function autoSaveLoad() {
   // Uprednostni kompletnú kópiu z IndexedDB; inak použij localStorage.
-  try { const full = await idbGetAutosave(); if (full && full.persons && Object.keys(full.persons).length) return full; } catch (e) {}
-  try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }
+  try { const full = await idbGetAutosave(); if (full) { const u = autoSaveUnwrap(full); if (u && Object.keys(u.tree.persons).length) return u; } } catch (e) {}
+  try { return autoSaveUnwrap(JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null')); }
   catch (e) { return null; }
 }
 
@@ -4300,8 +4314,21 @@ function autoSaveClear() {
 }
 
 async function restoreAutosaved() {
-  const data = await autoSaveLoad();
+  const saved = await autoSaveLoad();
+  const data = saved && saved.tree;
   if (!data || !data.persons || !Object.keys(data.persons).length) { showToast(t('tNoSearch'), 'error'); return; }
+  const meta = saved.meta;
+
+  // Ak autosave pochádza zo serverového rodokmeňa, potichu porovnaj verziu so serverom.
+  // Server vyhrá, len ak je naozaj novší (inak používateľovi zachovaj neuloženú lokálnu prácu).
+  if (meta.source === 'server' && isBackendConfigured()) {
+    try {
+      const session = await getClerkSession();
+      const server = await fetchTreeData(session);
+      if (Number(server.version) > Number(meta.version)) { loadTreeFromServer(server, session); return; }
+    } catch (e) { /* neprihlásený alebo server nedostupný – obnov lokálnu kópiu */ }
+  }
+
   pushUndoSnapshot();
   // Odstráň "duchov" – media záznamy, ktorým chýba obsah (data) po starom vyradení z autouloženia.
   let bezMedii = 0;
@@ -4318,6 +4345,9 @@ async function restoreAutosaved() {
   treeData = data;
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(data.persons).slice(0, 5);
+  treeSource = meta.source === 'server' ? 'server' : 'local';
+  treeVersion = Number(meta.version) || 0;   // správne číslo verzie aj pre neskorší zápis na server
+  updateSourceUI();
   const btn = document.getElementById('btnRestoreWork'); if (btn) btn.remove();
   launchWorkspace(); autoLayoutTree(true);
   if (bezMedii > 0) showToast(asMsg('stripped').replace('{N}', bezMedii), 'error');
@@ -4327,7 +4357,8 @@ async function restoreAutosaved() {
 // Na začiatku: ak existuje rozpracovaná práca, zobraz tlačidlo na obnovenie.
 (async function initRestoreButton() {
   const btn = document.getElementById('btnRestoreWork'); if (!btn) return;
-  const data = await autoSaveLoad();
+  const saved = await autoSaveLoad();
+  const data = saved && saved.tree;
   if (data && data.persons && Object.keys(data.persons).length > 0) {
     const n = Object.keys(data.persons).length;
     const labels = {
@@ -4338,6 +4369,78 @@ async function restoreAutosaved() {
     btn.classList.remove('hidden');
   } else { btn.remove(); }
 })();
+
+// ===================== ULOŽENIE PRI ODCHODE Z APLIKÁCIE =====================
+// Ak používateľ so serverovým rodokmeňom odchádza (zatvorenie karty/refresh) a má
+// nezapísané zmeny, prehliadač zobrazí výzvu na zotrvanie a aplikácia ponúkne
+// zápis na server (vrátane riešenia konfliktov, ak medzitým ukladal iný používateľ).
+const EXIT_MSGS = {
+  sk: { title: 'Neuložené zmeny', intro: 'Máte zmeny, ktoré nie sú zapísané na serveri. Chcete ich pred odchodom uložiť?', save: 'Zapísať na server', stay: 'Zostať v aplikácii', skip: 'Odísť bez uloženia', saved: 'Zmeny sú zapísané na server – aplikáciu môžete bezpečne zavrieť.', saveFail: 'Zápis sa nepodaril – zmeny zostávajú v lokálnej zálohe prehliadača.' },
+  cs: { title: 'Neuložené změny', intro: 'Máte změny, které nejsou zapsány na serveru. Chcete je před odchodem uložit?', save: 'Zapsat na server', stay: 'Zůstat v aplikaci', skip: 'Odejít bez uložení', saved: 'Změny jsou zapsány na server – aplikaci můžete bezpečně zavřít.', saveFail: 'Zápis se nepodařil – změny zůstávají v místní záloze prohlížeče.' },
+  en: { title: 'Unsaved changes', intro: 'You have changes that are not saved to the server. Save them before leaving?', save: 'Save to server', stay: 'Stay in the app', skip: 'Leave without saving', saved: 'Changes saved to the server – you can safely close the app.', saveFail: 'Save failed – your changes remain in the browser backup.' },
+  de: { title: 'Ungespeicherte Änderungen', intro: 'Sie haben Änderungen, die noch nicht auf dem Server gespeichert sind. Vor dem Verlassen speichern?', save: 'Auf dem Server speichern', stay: 'In der App bleiben', skip: 'Ohne Speichern verlassen', saved: 'Änderungen sind auf dem Server gespeichert – Sie können die App sicher schließen.', saveFail: 'Speichern fehlgeschlagen – Ihre Änderungen bleiben im Browser-Backup.' }
+};
+function xt(k) { return (EXIT_MSGS[currentLang] && EXIT_MSGS[currentLang][k]) || EXIT_MSGS.sk[k]; }
+
+// Má rodokmeň nezapísané zmeny oproti naposledy uloženému stavu?
+// Porovnávaj bez media obsahu (photos/documents .data) – ten sa na server nijako nezmení.
+function isTreeDirty() {
+  if (!treeData || !treeData.persons || !Object.keys(treeData.persons).length) return false;
+  if (!originalTreeData || !originalTreeData.persons) return treeSource === 'server';
+  try {
+    const strip = (k, v) => (k === 'data' && typeof v === 'string') ? undefined : v;
+    const a = JSON.stringify({ persons: treeData.persons, families: treeData.families }, strip);
+    const b = JSON.stringify({ persons: originalTreeData.persons, families: originalTreeData.families }, strip);
+    return a !== b;
+  } catch (e) { return false; }
+}
+
+let exitPromptSuppressed = false;
+let exitModalOpen = false;
+
+function showExitSaveModal() {
+  if (exitModalOpen || treeSource !== 'server' || !isTreeDirty()) return;
+  exitModalOpen = true;
+  const ov = document.createElement('div');
+  ov.id = 'exitSaveModal';
+  ov.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4';
+  ov.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <i class="ph-bold ph-cloud-arrow-up text-2xl text-amber-500"></i>
+        <h3 class="text-lg font-bold text-slate-800">${xt('title')}</h3>
+      </div>
+      <p class="text-sm text-slate-600">${xt('intro')}</p>
+      <div class="flex flex-col gap-2">
+        <button id="exitBtnSave" class="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm flex items-center justify-center gap-2"><i class="ph-bold ph-cloud-arrow-up"></i>${xt('save')}</button>
+        <button id="exitBtnStay" class="w-full px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm">${xt('stay')}</button>
+        <button id="exitBtnSkip" class="w-full px-2 py-2 rounded-xl text-xs text-slate-400 hover:text-slate-600">${xt('skip')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); exitModalOpen = false; };
+  ov.querySelector('#exitBtnStay').onclick = close;
+  ov.querySelector('#exitBtnSkip').onclick = () => { exitPromptSuppressed = true; close(); };
+  ov.querySelector('#exitBtnSave').onclick = async () => {
+    const btn = ov.querySelector('#exitBtnSave');
+    btn.disabled = true; btn.classList.add('opacity-60');
+    try {
+      await saveToServer();            // vrátane prihlásenia cez Clerk a riešenia konfliktov (merge modal)
+      if (isTreeDirty()) { showToast(xt('saveFail'), 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); }
+      else { showToast(xt('saved'), 'success'); close(); }
+    } catch (e) { showToast(xt('saveFail'), 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); }
+  };
+}
+
+window.addEventListener('beforeunload', (e) => {
+  if (exitPromptSuppressed || exitModalOpen) return;
+  if (treeSource === 'server' && isTreeDirty()) {
+    e.preventDefault();
+    e.returnValue = '';                     // prehliadač zobrazí všeobecnú výzvu na zotrvanie
+    setTimeout(showExitSaveModal, 300);      // ak používateľ zostal, ponúkneme uloženie na server
+  }
+});
+
 
 // ===================== UNDO / REDO =====================
 // Snapshot celého treeData (JSON) pred každou zmenou. Zásobník max. 25 krokov,
