@@ -32,8 +32,7 @@
     }
   </script>
   <style>
-    body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; }
-    #familyCanvas, #fanSvg { touch-action: none; }
+    body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: 'Inter', system-ui, sans-serif; touch-action: none; }
     .btn-glow { background: #237be6; box-shadow: 0 0 20px rgba(35,123,230,0.4); transition: all 0.3s ease; border: none; }
     .btn-glow:hover { background: #318ffb; box-shadow: 0 0 25px rgba(49,143,251,0.6); transform: translateY(-1px); }
     .btn-glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s ease; }
@@ -260,6 +259,8 @@
         <button onclick="zoomCanvas(1.2)" class="p-1 sm:p-1.5 rounded hover:bg-slate-200"><i class="ph-bold ph-magnifying-glass-plus"></i></button>
         <button onclick="zoomCanvas(0.8)" class="p-1 sm:p-1.5 rounded hover:bg-slate-200"><i class="ph-bold ph-magnifying-glass-minus"></i></button>
         <button onclick="fitTreeToView()" class="p-1 sm:p-1.5 rounded hover:bg-slate-200 text-indigo-600"><i class="ph-bold ph-corners-out"></i></button>
+        <button id="btnUndo" onclick="undoAction()" title="Undo (Ctrl+Z)" class="p-1 sm:p-1.5 rounded hover:bg-slate-200"><i class="ph-bold ph-arrow-counter-clockwise"></i></button>
+        <button id="btnRedo" onclick="redoAction()" title="Redo (Ctrl+Y)" class="p-1 sm:p-1.5 rounded hover:bg-slate-200"><i class="ph-bold ph-arrow-clockwise"></i></button>
       </div>
     </div>
 
@@ -977,12 +978,7 @@ function setLanguage(lang) {
   try { const fm = document.getElementById('fanChartModal'); if (fm && !fm.classList.contains('hidden')) { fanRender(false); fanRenderRootList(document.getElementById('fanRootSearch').value); } } catch (e) {}
   try { galleryObnovPopisky(); const gm = document.getElementById('mediaEditModal'); if (gm && !gm.classList.contains('hidden')) renderMediaGallery(); } catch (e) {}
   if(currentSelectedPersonId) selectPerson(currentSelectedPersonId, false);
-  if(!document.getElementById('personEditModal').classList.contains('hidden')) {
-    const isNew = !document.getElementById('editPersonId').value;
-    document.getElementById('modalTitle').innerText = isNew ? t('tNewPerson') : t('tEditPerson');
-    renderAttachedFilesList();
-  }
-  try { updateRestoreButtonLabel(); } catch (e) {}
+  if(!document.getElementById('personEditModal').classList.contains('hidden')) openPersonEditor(document.getElementById('editPersonId').value);
   if(!document.getElementById('mediaModal').classList.contains('hidden')) openMediaLightbox(currentMediaTab);
 }
 
@@ -1039,17 +1035,19 @@ function loadSampleTree() {
   const fam2 = { id: "@F2@", husbandId: "@I3@", wifeId: "@I4@", marrDate: "20.08.2003", children: ["@I5@", "@I6@"] };
   p3.fams = ["@F2@"]; p4.fams = ["@F2@"]; p5.famc = "@F2@"; p6.famc = "@F2@";
 
+  pushUndoSnapshot();
   treeData = { fileName: "Ukazkovy_Rodokmen.gdz", persons: { "@I1@": p1, "@I2@": p2, "@I3@": p3, "@I4@": p4, "@I5@": p5, "@I6@": p6 }, families: { "@F1@": fam1, "@F2@": fam2 }, files: {} };
-  originalTreeData = snapshotBase(treeData);
+  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = ["@I1@", "@I2@", "@I3@", "@I4@", "@I5@"];
-  launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success"); autoSaveNow(false);
+  launchWorkspace(); autoLayoutTree(true); showToast(t('msgLoaded'), "success"); autoSaveNow();
 }
 
 function createNewTree() {
   const p1 = createPersonObj("@I1@", "", "Zakladateľ", "Rodiny", "M", "01.01.1970", "Bratislava", "Slovensko", "", ""); p1.x = 400; p1.y = 120;
+  pushUndoSnapshot();
   treeData = { fileName: "Novy_Rodokmen.gdz", persons: { "@I1@": p1 }, families: {}, files: {} };
-  originalTreeData = snapshotBase(treeData);
-  recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success"); autoSaveNow(false);
+  originalTreeData = JSON.parse(JSON.stringify(treeData));
+  recentEditedIds = ["@I1@"]; launchWorkspace(); autoLayoutTree(true); showToast(t('msgNew'), "success"); autoSaveNow();
 }
 
 function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, bCountry, dDate, dPlace) {
@@ -1057,8 +1055,9 @@ function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, 
 }
 
 function generateId(prefix) {
+  // crypto.randomUUID() – prakticky vylučuje kolízie ID (dve osoby s rovnakým ID by sa prepisovali).
   let s = ''; try { s = crypto.randomUUID().replace(/-/g, '').slice(0, 12); }
-  catch (e) { s = Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+  catch (e) { s = Date.now().toString(36) + Math.random().toString(36).slice(2, 9); } // záloha pre staršie prehliadače
   return `@${prefix}${s}@`;
 }
 
@@ -1155,6 +1154,39 @@ function parseGedcomString(text, fileName, attachedFiles) {
     }
   }
 
+  // === Bezpečnosť: premapovanie ID z importovaného GEDCOM ===
+  // ID z cudzieho .ged súboru môžu obsahovať apostrofy a iné znaky, ktoré by
+  // v onclick atribútoch (selectPerson('@I...@')) umožnili vloženie kódu (XSS).
+  // Preto sa každé ID preloží na bezpečný formát @I...@ / @F...@ (len [A-Za-z0-9_]),
+  // s garanciou jedinečnosti, a premapujú sa aj všetky referencie (famc, fams,
+  // husbandId, wifeId, children). Pre bežné GEDCOM súbory sa nič nezmení.
+  const gidSeen = new Set(); const gidMap = {};
+  const gidSafe = (raw, prefix) => {
+    let base = String(raw || '').replace(/^@+|@+$/g, '').replace(/[^A-Za-z0-9_]/g, '');
+    if (!base) base = 'X';
+    const core = base.startsWith(prefix) ? base : prefix + base; // bežné @I1@/@F1@ zostanú bez zmeny
+    let id = '@' + core + '@'; let n = 2;
+    while (gidSeen.has(id)) { id = '@' + core + '_' + n + '@'; n++; }
+    gidSeen.add(id); return id;
+  };
+  Object.keys(persons).forEach(oldId => { gidMap['P' + oldId] = gidSafe(oldId, 'I'); });
+  Object.keys(families).forEach(oldId => { gidMap['M' + oldId] = gidSafe(oldId, 'F'); });
+  Object.keys(persons).forEach(oldId => {
+    const per = persons[oldId]; const newId = gidMap['P' + oldId];
+    per.id = newId;
+    per.famc = per.famc ? (gidMap['M' + per.famc] || null) : null;
+    per.fams = (per.fams || []).map(f => gidMap['M' + f]).filter(Boolean);
+    if (newId !== oldId) { persons[newId] = per; delete persons[oldId]; }
+  });
+  Object.keys(families).forEach(oldId => {
+    const fam = families[oldId]; const newId = gidMap['M' + oldId];
+    fam.id = newId;
+    fam.husbandId = fam.husbandId ? (gidMap['P' + fam.husbandId] || null) : null;
+    fam.wifeId = fam.wifeId ? (gidMap['P' + fam.wifeId] || null) : null;
+    fam.children = (fam.children || []).map(c => gidMap['P' + c]).filter(Boolean);
+    if (newId !== oldId) { families[newId] = fam; delete families[oldId]; }
+  });
+
   Object.values(persons).forEach(per => {
     const refs = per._obje || []; delete per._obje;
     refs.forEach(ref => {
@@ -1163,19 +1195,15 @@ function parseGedcomString(text, fileName, attachedFiles) {
       const fObj = attachedFiles[key]; const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(fObj.ext) && !/^docs\//.test(String(ref.file).replace(/\\/g, '/'));
       const shownName = fObj.name.split('/').pop().replace(/^[A-Za-z0-9]+_(photo|doc)_\d+_/, '');
       const uid = Math.random().toString(36).slice(2, 9);
-      if (isImg) {
-        const phObj = { id: 'media_' + uid, name: shownName, data: fObj.data, thumb: '', type: 'photo', isMain: !!ref.main, caption: ref.title || '' };
-        per.photos.push(phObj);
-        createThumbnailDataUrl(fObj.data).then(th => { if (th) phObj.thumb = th; }).catch(() => {});
-      }
+      if (isImg) per.photos.push({ id: 'media_' + uid, name: shownName, data: fObj.data, type: 'photo', isMain: !!ref.main, caption: ref.title || '' });
       else per.documents.push({ id: 'doc_' + uid, name: shownName, data: fObj.data, type: fObj.ext, caption: ref.title || '' });
     });
     if (per.photos.length && !per.photos.some(ph => ph.isMain)) per.photos[0].isMain = true;
   });
 
+  pushUndoSnapshot();
   treeData = { fileName: fileName, persons: persons, families: families, files: attachedFiles };
-  originalTreeData = snapshotBase(treeData);
-  recentEditedIds = Object.keys(persons).slice(0, 5); launchWorkspace(); autoLayoutTree(true); showToast(t('msgReadOk').replace('{X}', Object.keys(persons).length), "success"); autoSaveNow(false);
+  recentEditedIds = Object.keys(persons).slice(0, 5); launchWorkspace(); autoLayoutTree(true); showToast(t('msgReadOk').replace('{X}', Object.keys(persons).length), "success"); autoSaveNow();
 }
 
 function toggleFileMenu() {
@@ -1190,12 +1218,12 @@ function closeFileMenu() {
   if (panel) panel.classList.add('hidden');
   if (button) button.setAttribute('aria-expanded', 'false');
 }
-const DEFAULT_FOUNDER = { firstName: 'igor', lastName: 'sklencar' };
 function updateSidebarTreeLabels() {
   const people = Object.values(treeData.persons || {});
+  // The family name is based on the genealogy founder, Igor Sklencar.
   const norm = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-  let root = people.find(person => norm(person.firstName) === DEFAULT_FOUNDER.firstName && norm(person.lastName) === DEFAULT_FOUNDER.lastName);
-  if (!root) root = people.find(person => norm(person.firstName) === DEFAULT_FOUNDER.firstName && [person.lastName, person.birthName].some(name => norm(name) === DEFAULT_FOUNDER.lastName));
+  let root = people.find(person => norm(person.firstName) === 'igor' && norm(person.lastName) === 'sklencar');
+  if (!root) root = people.find(person => norm(person.firstName) === 'igor' && [person.lastName, person.birthName].some(name => norm(name) === 'sklencar'));
   // Safe fallback for a different tree that does not contain Igor Sklencar.
   if (!root) {
     let earliest = Infinity;
@@ -1259,6 +1287,8 @@ function marrInfo(fam) {
   const cw = measureTxt(FONT_MARR, '0'), tw = measureTxt(FONT_MARR, fam.marrDate);
   return { cw, tw, w: tw + 2 * cw };
 }
+// Voľné miesto medzi bublinami partnerov: bublina s dátumom + po jednom znaku odstup z každej strany.
+function coupleGap(fam) { const m = marrInfo(fam); return m ? Math.max(44, m.w + 2 * m.cw) : 64; }
 
 // ===== HREBEŇOVÝ DIAGRAM: prísny patrilineárny systém s posuvnými pod-plátnami =====
 // Zóna 1: os = priama otcovská línia od koreňa nahor; súrodenci každého predka na hrebeni VĽAVO, partneri VPRAVO od osoby,
@@ -1636,7 +1666,7 @@ function hrebenNakresli(c, z) {
       c.font = 'bold 39px system-ui, sans-serif'; c.fillStyle = '#475569'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(pismeno, u.x, u.y + 2);
       return;
     }
-    drawPersonBubble(u.os, c, false, u.rola, u.x, u.y);
+    const q = Object.create(u.os); q.x = u.x; q.y = u.y; drawPersonBubble(q, c, false, u.rola);
   });
   z.odkazy.forEach(o => {
     const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, hr = HREBEN_HROT, l = o.x - sm * o.w / 2, r = o.x + sm * o.w / 2;   // šípka smeruje doprava (návratová doľava)
@@ -1763,22 +1793,21 @@ function drawSubtleGrid() {
   ctx.beginPath(); for (let x = offsetX; x < canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); } for (let y = offsetY; y < canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); } ctx.stroke();
 }
 
-function drawPersonBubble(p, c = ctx, noSelect = false, rola = '', px = p.x, py = p.y) {
+function drawPersonBubble(p, c = ctx, noSelect = false, rola = '') {
   const h = LAYOUT.bh; const w = personBubbleW(p);
   const fullNameStr = personNameStr(p);
   const birthStr = p.birthDate ? `* ${p.birthDate}` : '* ?';
   const deathStr = p.deathDate ? ` † ${p.deathDate}` : '';
-  const x = px - w / 2; const y = py - h / 2; const radius = 22; const isSelected = !noSelect && (p.id === currentSelectedPersonId);
+  const x = p.x - w / 2; const y = p.y - h / 2; const radius = 22; const isSelected = !noSelect && (p.id === currentSelectedPersonId);
   const isMale = (p.gender === 'M'); let bgColor = isMale ? '#dbeafe' : '#fce7f3'; let borderColor = isMale ? '#1e40af' : '#be185d';
   if (isSelected) { c.beginPath(); c.roundRect(x - 4, y - 4, w + 8, h + 8, radius + 4); c.fillStyle = 'rgba(99, 102, 241, 0.3)'; c.fill(); }
   c.beginPath(); c.roundRect(x, y, w, h, radius); c.fillStyle = bgColor; c.fill(); c.lineWidth = isSelected ? 3.5 : 2.2; c.strokeStyle = borderColor; c.stroke();
   const avatarCenterX = x + 34; const avatarCenterY = y + h / 2; const avatarRadius = 22;
   c.save(); c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.clip();
   const mainPhoto = p.photos.find(ph => ph.isMain) || p.photos[0];
-  const mainSrc = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
-  if (mainSrc) {
+  if (mainPhoto && mainPhoto.data) {
     let img = cachedImages[mainPhoto.id];
-    if (!img || img._src !== mainSrc) { img = new Image(); img._src = mainSrc; img.src = mainSrc; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
+    if (!img) { img = new Image(); img.src = mainPhoto.data; img.onload = () => drawTree(); cachedImages[mainPhoto.id] = img; }
     try {
       // výrez „cover“: fotka sa nikdy nedeformuje, vyplní celý kruh a oreže sa to, čo presahuje
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, d = avatarRadius * 2;
@@ -1801,16 +1830,17 @@ c.fillStyle = '#475569';
 c.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
 }
 
+function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidth) return str; let s = str; while (s.length > 0 && ctx.measureText(s + '...').width > maxWidth) s = s.slice(0, -1); return s + '...'; }
+
 // Hlavná fotografia v hornej časti karty osoby (vyplní celý kruh, bez deformácie). Volá sa aj po dodatočnom stiahnutí príloh zo servera.
 function vykresliAvatarKarty(p) {
   const avatarContainer = document.getElementById('detailAvatarContainer'); if (!avatarContainer || !p) return;
   const isMale = (p.gender === 'M');
   const mainPhoto = (p.photos || []).find(ph => ph.isMain) || (p.photos || [])[0];
-  const src = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
-  if (src) {
+  if (mainPhoto && mainPhoto.data) {
     avatarContainer.innerHTML = '';
     const im = document.createElement('img');
-    im.src = src; im.alt = p.firstName || '';
+    im.src = mainPhoto.data; im.alt = p.firstName || '';
     im.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
     avatarContainer.appendChild(im);
   } else { avatarContainer.innerHTML = `<i class="ph-bold ph-user text-4xl ${isMale ? 'text-blue-500' : 'text-pink-500'}"></i>`; }
@@ -1852,7 +1882,7 @@ function selectPerson(personId, openPanel = true) {
       childrenListEl.innerHTML += `
         <div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition cursor-pointer" onclick="selectPerson('${c.id}')">
           <div class="flex items-center gap-2"><i class="ph-bold ${c.gender === 'M' ? 'ph-gender-male text-blue-500' : 'ph-gender-female text-pink-500'}"></i><span class="font-medium text-slate-700">${esc(c.firstName)} ${esc(c.lastName)}</span></div>
-          <div class="flex items-center gap-2"><span class="text-[10px] text-slate-400">${esc(c.birthDate || '?')}</span><button onclick="event.stopPropagation(); centerOnPerson('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>
+          <div class="flex items-center gap-2"><span class="text-[10px] text-slate-400">${c.birthDate || '?'}</span><button onclick="event.stopPropagation(); centerOnPerson('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>
         </div>`;
     });
   }
@@ -2022,7 +2052,7 @@ function updateRecentListUI() {
     const p = treeData.persons[id];
     if (p) {
       const isMale = p.gender === 'M';
-      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${esc(p.birthDate || '?')}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
+      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || '?'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
     }
   });
 }
@@ -2124,8 +2154,7 @@ function updateSpouseRowAvatar(selectEl) {
   const row = selectEl.closest('.spouse-row'); const preview = row.querySelector('.spouse-avatar-preview'); const partnerId = selectEl.value;
   if (!partnerId || !treeData.persons[partnerId]) { preview.innerHTML = `<i class="ph-bold ph-user text-slate-400"></i>`; return; }
   const partner = treeData.persons[partnerId]; const mainPhoto = partner.photos.find(ph => ph.isMain) || partner.photos[0];
-  const spSrc = mainPhoto && (mainPhoto.thumb || mainPhoto.data);
-  if (spSrc) preview.innerHTML = `<img src="${spSrc}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
+  if (mainPhoto && mainPhoto.data) preview.innerHTML = `<img src="${mainPhoto.data}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
 }
 
 function populateChildrenEditor(currentId, person) { const container = document.getElementById('childrenContainer'); container.innerHTML = ""; const children = currentId ? getChildrenOf(currentId) : []; children.forEach(c => addChildFieldRow(c.id)); }
@@ -2134,6 +2163,31 @@ function addChildFieldRow(selectedChildId = "") {
   let optionsHtml = `<option value="">${t('tOptSelChild')}</option>`; const currId = document.getElementById('editPersonId').value;
   Object.values(treeData.persons).forEach(p => { if (p.id !== currId) optionsHtml += `<option value="${p.id}" ${p.id === selectedChildId ? 'selected' : ''}>${esc(p.firstName)} ${esc(p.lastName)} (${esc(p.birthDate || '?')})</option>`; });
   row.innerHTML = `<select class="child-select flex-1 p-2 rounded-xl border border-slate-300 bg-white">${optionsHtml}</select><button type="button" onclick="this.closest('.child-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`; container.appendChild(row);
+}
+
+function handleSpecificFilesAttach(input, targetType) {
+  const files = Array.from(input.files); if (!files.length) return;
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase(); 
+    if (BANNED_EXTENSIONS.includes(ext)) { showToast(`${t('tFileWord')} "${file.name}" ${t('tFileBanned')}`, "error"); continue; }
+    
+    const isPhoto = targetType === 'photo';
+    const reader = new FileReader();
+    reader.onload = (e) => { 
+      tempAttachedFiles.push({ 
+        id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), 
+        name: file.name, 
+        data: e.target.result, 
+        type: isPhoto ? 'photo' : ext, 
+        isTargetType: targetType,
+        caption: '',
+        isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain) 
+      }); 
+      renderAttachedFilesList(); 
+    }; 
+    reader.readAsDataURL(file);
+  } 
+  input.value = "";
 }
 
 function captionPlaceholder() {
@@ -2153,8 +2207,7 @@ function renderAttachedFilesList() {
   const list = document.getElementById('attachedFilesList'); if (!list) return;
   const photos = tempAttachedFiles.filter(isPhotoFile), docs = tempAttachedFiles.filter(f => !isPhotoFile(f));
   const main = photos.find(f => f.isMain) || photos[0], doc = docs[0];
-  const mainSrc = main && (main.thumb || main.data);
-  const photoBox = mainSrc ? `<img src="${mainSrc}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
+  const photoBox = main && main.data ? `<img src="${main.data}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
   const docBox = doc ? `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-3xl"></i><span class="font-bold uppercase text-[10px]">${esc(doc.type)}</span></div>` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-file-text text-3xl"></i><span class="text-[11px]">${esc(gt('noDoc'))}</span></div>`;
   list.innerHTML = `
     <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -2202,9 +2255,8 @@ function renderMediaGallery() {
   const isPh = galleryType === 'photo';
   grid.innerHTML = galleryItems.map(f => {
     const sel = gallerySelected.has(f.id);
-    const phSrc = f.thumb || f.data;
     const body = isPh
-      ? (phSrc ? `<img src="${phSrc}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
+      ? (f.data ? `<img src="${f.data}" class="w-full h-full object-cover">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
       : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
     const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
     return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
@@ -2271,25 +2323,6 @@ async function decodeImageFile(file) {
     img.src = url;
   });
 }
-// Vytvorí malý JPEG náhľad (thumbnail, max 160 px, ~3-8 KB) pre bežnú prácu bez nutnosti sťahovať plné rozlíšenie z Backblaze.
-const THUMB_MAX_DIM = 160;
-const THUMB_QUALITY = 0.72;
-async function createThumbnailDataUrl(dataUrlOrBlob) {
-  try {
-    const blob = typeof dataUrlOrBlob === 'string' ? await (await fetch(dataUrlOrBlob)).blob() : dataUrlOrBlob;
-    const src = await decodeImageFile(blob);
-    const w0 = src.width || src.naturalWidth || 1, h0 = src.height || src.naturalHeight || 1;
-    const sc = Math.min(1, THUMB_MAX_DIM / Math.max(w0, h0));
-    const w = Math.max(1, Math.round(w0 * sc)), h = Math.max(1, Math.round(h0 * sc));
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const cctx = c.getContext('2d'); cctx.fillStyle = '#ffffff'; cctx.fillRect(0, 0, w, h); cctx.drawImage(src, 0, 0, w, h);
-    if (src.close) { try { src.close(); } catch (e) {} }
-    return c.toDataURL('image/jpeg', THUMB_QUALITY);
-  } catch (e) {
-    return '';
-  }
-}
-
 // Zakóduje obrázok do JPEG tak, aby bol najviac limitBytes; postupne znižuje kvalitu a rozmer.
 async function encodeJpegUnder(src, w0, h0, limitBytes) {
   let maxDim = Math.min(3600, Math.max(w0, h0));
@@ -2319,11 +2352,7 @@ async function prepareFileForUpload(file, kind) {
   if (!okType) { showToast(ft('badImage', file.name), 'error'); return null; }
   const isGif = ext === 'gif' || mime === 'image/gif';
   const tooBig = file.size > FILE_LIMIT_BYTES;
-  if (!isHeic && !tooBig) {
-    const dataUrl = await readAsDataUrl(file);
-    const thumb = await createThumbnailDataUrl(file);
-    return { name: file.name, data: dataUrl, thumb, type: 'photo' };
-  }
+  if (!isHeic && !tooBig) return { name: file.name, data: await readAsDataUrl(file), type: 'photo' };
   if (isGif) { showToast(ft('tooBigFile', file.name, file.size), 'error'); return null; }   // animáciu nemožno bezpečne zmenšiť
   showToast(ft('working', file.name), 'info');
   let src;
@@ -2333,9 +2362,7 @@ async function prepareFileForUpload(file, kind) {
   if (src.close) { try { src.close(); } catch (e) { /* nie je kritické */ } }
   if (!blob) { showToast(ft('tooBigPhoto', file.name, file.size), 'error'); return null; }
   showToast(isHeic && !tooBig ? ft('heicConv', file.name) : ft('shrunk', file.name, blob.size), 'success');
-  const dataUrl = await readAsDataUrl(blob);
-  const thumb = await createThumbnailDataUrl(blob);
-  return { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', data: dataUrl, thumb, type: 'photo' };
+  return { name: file.name.replace(/\.[^.]+$/, '') + '.jpg', data: await readAsDataUrl(blob), type: 'photo' };
 }
 
 async function galleryHandleFiles(input) {
@@ -2345,7 +2372,7 @@ async function galleryHandleFiles(input) {
     let prepared = null;
     try { prepared = await prepareFileForUpload(file, isPh ? 'photo' : 'doc'); } catch (e) { showToast(String(e && e.message || e), 'error'); }
     if (!prepared) continue;
-    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, thumb: prepared.thumb || '', type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
+    galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
   }
   input.value = '';
   renderMediaGallery();
@@ -2358,7 +2385,16 @@ function gallerySave() {
     if (mine.length && !seen) mine[0].isMain = true;
   } else mine.forEach(f => { f.isMain = false; });
   tempAttachedFiles = galleryType === 'photo' ? mine.concat(others) : others.concat(mine);
-  closeMediaGallery(); renderAttachedFilesList();
+  closeMediaGallery(); renderAttachedFilesList(); autoSaveNow();
+}
+function setMainPhoto(fileId) { tempAttachedFiles.forEach(f => f.isMain = (f.id === fileId)); renderAttachedFilesList(); }
+function removeTempFile(fileId) { 
+  showConfirm(t('confirmTitle'), t('confirmDelFile'), () => {
+    tempAttachedFiles = tempAttachedFiles.filter(f => f.id !== fileId); 
+    const photo = tempAttachedFiles.find(isPhotoFile); 
+    if (photo && !tempAttachedFiles.some(f => f.isMain)) photo.isMain = true; 
+    renderAttachedFilesList(); 
+  });
 }
 
 // Pri uložení osoby sa riadky editora vytvárajú nanovo; nezmenené (a pri úprave aj upravené) záznamy si majú ponechať pôvodné id,
@@ -2374,7 +2410,7 @@ function keepItemIds(oldList, newList, fields) {
   pending.forEach((n, i) => { if (rest[i]) n.id = rest[i].id; });
 }
 function savePersonForm(e) {
-  e.preventDefault(); const personId = document.getElementById('editPersonId').value; const isNew = !personId;
+  e.preventDefault(); pushUndoSnapshot(); const personId = document.getElementById('editPersonId').value; const isNew = !personId;
   const id = isNew ? generateId("I") : personId; const p = isNew ? createPersonObj(id) : treeData.persons[id];
 
   p.title = document.getElementById('editTitle').value.trim(); p.firstName = document.getElementById('editFirstName').value.trim(); p.middleName = document.getElementById('editMiddleName').value.trim(); p.lastName = document.getElementById('editLastName').value.trim(); p.birthName = document.getElementById('editBirthName').value.trim(); p.gender = document.getElementById('editGender').value; p.birthDate = document.getElementById('editBirthDate').value.trim(); p.birthPlace = document.getElementById('editBirthPlace').value.trim(); p.birthCountry = document.getElementById('editBirthCountry').value; p.deathDate = document.getElementById('editDeathDate').value.trim(); p.deathPlace = document.getElementById('editDeathPlace').value.trim();
@@ -2450,19 +2486,20 @@ function savePersonForm(e) {
 
   closePersonEditor(); autoLayoutTree(false);
   if (isNew && canvas) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
-  selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success"); autoSaveNow(true);
+  selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success"); autoSaveNow();
 }
 
 function deleteCurrentPerson() {
   const pId = document.getElementById('editPersonId').value; if (!pId || !treeData.persons[pId]) return; 
   
   showConfirm(t('confirmTitle'), t('confirmDelPerson'), () => {
+    pushUndoSnapshot();
     const p = treeData.persons[pId];
     if (p.famc && treeData.families[p.famc]) treeData.families[p.famc].children = treeData.families[p.famc].children.filter(c => c !== pId);
     (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam) { if (fam.husbandId === pId) fam.husbandId = null; if (fam.wifeId === pId) fam.wifeId = null; if (!fam.husbandId && !fam.wifeId && fam.children.length === 0) delete treeData.families[fId]; } });
     delete treeData.persons[pId]; recentEditedIds = recentEditedIds.filter(id => id !== pId); closePersonEditor();
     const remainingIds = Object.keys(treeData.persons); if (remainingIds.length > 0) selectPerson(remainingIds[0]); else currentSelectedPersonId = null;
-    updateRecentListUI(); updateCountsUI(); autoLayoutTree(false); showToast(t('msgDelOk'), "info"); autoSaveNow(true);
+    updateRecentListUI(); updateCountsUI(); autoLayoutTree(false); showToast(t('msgDelOk'), "info"); autoSaveNow();
   });
 }
 
@@ -2478,26 +2515,11 @@ function switchMediaLightboxTab(tab) {
   else { tabDocsBtn.className = "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold bg-white/20 text-white"; tabPhotosBtn.className = "px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold text-white/70 hover:text-white"; btnToggleMosaic.style.display = "none"; document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.add('hidden'); showDocumentsList(); }
 }
 
-async function showPhotoSlider() {
+function showPhotoSlider() {
   isMosaicActive = false; document.getElementById('mosaicBtnText').innerText = t('btnMosaic'); document.getElementById('photoSliderView').classList.remove('hidden'); document.getElementById('photoMosaicView').classList.add('hidden');
   const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
-  const imgEl = document.getElementById('activePhotoImg');
-  if (photos.length === 0) { imgEl.src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
-  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0;
-  const cur = photos[currentPhotoIndex];
-  const reqIdx = currentPhotoIndex, reqPerson = activeMediaPersonId;
-  // Najprv okamžite zobrazíme lokálny náhľad (thumbnail), kým sa na pozadí dotiahne plné rozlíšenie z Backblaze
-  imgEl.src = cur.data || cur.thumb || '';
-  imgEl.style.filter = (!cur.data && cur.key) ? 'blur(2px)' : 'none';
-  document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : '';
-  document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
-  if (!cur.data && cur.key) {
-    const fullData = await ensureFullFileData(cur);
-    if (fullData && activeMediaPersonId === reqPerson && currentPhotoIndex === reqIdx && !isMosaicActive) {
-      imgEl.src = fullData;
-      imgEl.style.filter = 'none';
-    }
-  }
+  if (photos.length === 0) { document.getElementById('activePhotoImg').src = "https://placehold.co/600x400/1e293b/ffffff?text=Ziadna+Fotografia"; document.getElementById('activePhotoCaption').innerText = t('tNoPhotoDisplay'); document.getElementById('activePhotoIndex').innerText = "0 / 0"; return; }
+  if (currentPhotoIndex >= photos.length) currentPhotoIndex = 0; const cur = photos[currentPhotoIndex]; document.getElementById('activePhotoImg').src = cur.data; document.getElementById('activePhotoCaption').innerHTML = cur.caption ? `<span class="block text-sm sm:text-base text-white font-semibold max-w-2xl mx-auto break-words">${esc(cur.caption)}</span>` : ''; document.getElementById('activePhotoIndex').innerText = `${currentPhotoIndex + 1} / ${photos.length}`;
 }
 
 function nextPhoto() { const p = treeData.persons[activeMediaPersonId]; if (!p || !p.photos.length) return; currentPhotoIndex = (currentPhotoIndex + 1) % p.photos.length; showPhotoSlider(); }
@@ -2508,48 +2530,20 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  // V mozaike používame úsporné miniatúry (ph.thumb || ph.data); plný obrázok sa stiahne až po kliknutí na fotku
-  photos.forEach((ph, idx) => {
-    const src = ph.thumb || ph.data || '';
-    grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02] bg-slate-800">${src ? `<img src="${src}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-400"><i class="ph-bold ph-image text-3xl"></i></div>`}<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`;
-  });
-  const missingThumbs = photos.filter(ph => !ph.thumb && !ph.data && ph.key);
-  if (missingThumbs.length) downloadFilesBatch(missingThumbs, true).then(() => { if (isMosaicActive && activeMediaPersonId === p.id) showPhotoMosaic(); });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach((doc, idx) => {
-    container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${esc(doc.type || 'DOC')}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || doc.name || t('tDoc'))}</h4></div></div><button type="button" onclick="downloadDocumentOnDemand(${idx})" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></button></div>`;
-  });
-}
-
-async function downloadDocumentOnDemand(idx) {
-  const p = treeData.persons[activeMediaPersonId];
-  const doc = p && p.documents && p.documents[idx];
-  if (!doc) return;
-  if (!doc.data && doc.key) {
-    showToast(t('msgAttWait'), 'info');
-    await ensureFullFileData(doc);
-  }
-  if (!doc.data) { showToast(t('msgFileUploadFail'), 'error'); return; }
-  const a = document.createElement('a');
-  a.href = doc.data;
-  a.download = doc.name || 'dokument';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
   if (treeSource === 'server') {
-    const needFull = [];
-    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) needFull.push(f); }));
-    if (needFull.length > 0) {
-      showToast(t('msgAttWait'), 'info');
-      try { await downloadFilesBatch(needFull, false); } catch (e) {}
-    }
+    if (hydratePromise) { showToast(t('msgAttWait'), 'info'); try { await hydratePromise; } catch (e) {} }
     let missing = 0;
-    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data && !f.thumb) missing++; }));
+    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) missing++; }));
     if (missing > 0) {
       showConfirm(t('msgAttMissTitle'), t('msgAttMissBody').replace('{N}', missing), () => saveGedzipTreeInternal());
       return;
@@ -2609,7 +2603,7 @@ async function saveGedzipTreeInternal() {
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
 
-      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || ph.thumb || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
+      p.photos.forEach((ph, idx) => { const cleanName = ph.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `media/${newId.replace(/@/g, '')}_photo_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${ph.caption ? '3 TITL ' + String(ph.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${cleanName.split('.').pop()}\n${ph.isMain ? '2 _PRIM Y\n' : ''}`; const base64Data = (ph.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
       p.documents.forEach((dc, idx) => { const cleanName = dc.name.replace(/[^a-zA-Z0-9._-]/g, '_'); const filename = `docs/${newId.replace(/@/g, '')}_doc_${idx}_${cleanName}`; ged += `1 OBJE\n2 FILE ${filename}\n${dc.caption ? '3 TITL ' + String(dc.caption).replace(/\s*[\r\n]+\s*/g, ' ') + '\n' : ''}2 FORM ${dc.type}\n`; const base64Data = (dc.data || '').split(',')[1]; if (base64Data) zip.file(filename, base64Data, { base64: true }); });
     });
 
@@ -2630,13 +2624,13 @@ async function saveGedzipTreeInternal() {
       try {
         const fileHandle = await window.showSaveFilePicker({ suggestedName: defaultName, types: [{ description: 'GEDZIP Archív', accept: { 'application/zip': ['.gdz', '.gedzip', '.zip'] } }], });
         const writable = await fileHandle.createWritable(); await writable.write(content); await writable.close();
-        if (treeSource === 'local') { treeData.fileName = fileHandle.name; updateSidebarTreeLabels(); } isDirty = false; showToast(t('msgGdzOk'), "success"); return;
+        if (treeSource === 'local') { treeData.fileName = fileHandle.name; updateSidebarTreeLabels(); } showToast(t('msgGdzOk'), "success"); return;
       } catch (err) { if (err.name === 'AbortError') return; }
     }
 
     const downloadUrl = URL.createObjectURL(content); const a = document.createElement("a"); a.href = downloadUrl; a.download = defaultName;
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(downloadUrl);
-    isDirty = false; showToast(t('msgGdzOk'), "success");
+    showToast(t('msgGdzOk'), "success");
   } catch (err) { showToast(t('msgGdzErr') + " " + err.message, "error"); }
 }
 
@@ -2750,8 +2744,7 @@ async function getClerkSession() {
   const clerk = await ensureClerkReady();
   const active = clerk.session;
   if (!clerk.isSignedIn || !active) throw new Error(t('clerkLoginFirst'));
-  const email = active.user?.primaryEmailAddress?.emailAddress || active.user?.emailAddresses?.[0]?.emailAddress || active.user?.username || '';
-  active.displayUser = email || 'User';
+  const email = active.user?.primaryEmailAddress?.emailAddress || active.user?.emailAddresses?.[0]?.emailAddress || '';
   return active;
 }
 
@@ -2767,8 +2760,7 @@ function updateDbStatusUI() {
   const box = document.getElementById('sidebarDbStatus'); if (!box) return;
   if (dbConnection) {
     let host = BACKEND_URL; try { host = new URL(BACKEND_URL).host; } catch (e) {}
-    const uName = dbConnection.displayUser || dbConnection.user?.primaryEmailAddress?.emailAddress || dbConnection.user?.username || dbConnection.username || 'User';
-    document.getElementById('sidebarDbHost').innerText = `${uName} @ ${host}`;
+    document.getElementById('sidebarDbHost').innerText = `${dbConnection.username} @ ${host}`;
     box.title = t('dbConnectedLbl') + ': ' + host;
     box.classList.remove('hidden');
   } else { box.classList.add('hidden'); }
@@ -2912,19 +2904,10 @@ async function fetchTreeData(session) {
 }
 
 
-// --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč a malý náhľad (thumb) ---
+// --- Súbory (fotky, dokumenty): ukladajú sa do Backblaze B2, v databáze je iba ich kľúč ---
 function fileList(p) { return (p.photos || []).map(f => [f, 'photo']).concat((p.documents || []).map(f => [f, 'doc'])); }
-const inflightDownloads = new Map();
 
 async function uploadPendingFiles(session) {
-  // Pred odoslaním zabezpečíme, aby každá lokálna fotka mala vytvorený malý náhľad (thumb)
-  for (const p of Object.values(treeData.persons)) {
-    for (const ph of (p.photos || [])) {
-      if (ph.data && !ph.thumb) {
-        ph.thumb = await createThumbnailDataUrl(ph.data);
-      }
-    }
-  }
   const pending = [];
   Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f, kind]) => { if (f.data && !f.key) pending.push([f, kind]); }));
   let done = 0;
@@ -2943,15 +2926,17 @@ async function uploadPendingFiles(session) {
       const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: 'upload', kind, name: f.name, mime, size: blob.size }) });
       if (!r.ok) {
+        // Chyby súboru sa nesmú tváriť ako „rodokmeň je príliš veľký“
         if (r.status === 413) throw new Error(ft('tooBigShort', '', raw.size));
         if (r.status === 400) {
-          let j = {}; try { j = await r.clone().json(); } catch (e) {}
+          let j = {}; try { j = await r.clone().json(); } catch (e) { /* všeobecná chyba nižšie */ }
           if (j.error === 'banned extension') throw new Error(ft('bannedShort'));
           if (j.error === 'bad image type') throw new Error(ft('badImageShort'));
         }
         const err = await backendError(r, 'msgDbSessionExpired'); if (r.status === 401) err.sessionExpired = true; throw err;
       }
       const up = await r.json();
+      // Telo musí mať presne ten Content-Type, ktorý server podpísal do URL (inak Backblaze odmietne PUT bez CORS hlavičiek).
       const signedType = (up.headers && (up.headers['Content-Type'] || up.headers['content-type'])) || up.mime || mime;
       blob = new Blob([raw], { type: signedType });
       let put;
@@ -2971,13 +2956,13 @@ async function uploadPendingFiles(session) {
   }
 }
 
-// Do databázy ukladáme ku kľúču aj malý náhľad (thumb ~3-8 KB), aby sa pri bežnej práci vôbec nemuseli sťahovať plné fotky z Backblaze.
-function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0, thumb: f.thumb || '' }; }
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
 
-// Stiahne z Backblaze B2 zoznam súborov. Ak je onlyThumb = true, vytvorí z nich len malý náhľad a veľké dáta uvoľní z RAM.
-async function downloadFilesBatch(filesList, onlyThumb = false) {
-  const todo = (filesList || []).filter(f => f && f.key && (onlyThumb ? (!f.thumb && !f.data) : !f.data));
-  if (!todo.length || treeSource !== 'server') return;
+// Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
+async function hydrateFiles(session) {
+  const todo = [];
+  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) todo.push(f); }));
+  if (!todo.length) return;
   const treeRef = treeData;
   try {
     for (let i = 0; i < todo.length; i += 50) {
@@ -2991,57 +2976,16 @@ async function downloadFilesBatch(filesList, onlyThumb = false) {
         while (idx < chunk.length) {
           const f = chunk[idx++]; const u = urls[f.key]; if (!u) continue;
           try {
-            const res = await fetch(u); if (!res.ok) continue;
+            const res = await fetch(u, { cache: 'no-store' }); if (!res.ok) continue;
             const blob = await res.blob();
-            if (onlyThumb && isPhotoFile(f)) {
-              f.thumb = await createThumbnailDataUrl(blob);
-            } else {
-              f.data = await readAsDataUrl(blob);
-              if (isPhotoFile(f) && !f.thumb) f.thumb = await createThumbnailDataUrl(blob);
-            }
-            if (treeRef === treeData) {
-              drawTree();
-              const vp = treeData.persons[currentSelectedPersonId];
-              if (vp) vykresliAvatarKarty(vp);
-            }
+            f.data = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+            if (treeRef === treeData) { drawTree(); const vp = treeData.persons[currentSelectedPersonId]; if (vp) vykresliAvatarKarty(vp); }
           } catch (e) { /* jeden súbor nesmie zastaviť ostatné */ }
         }
       };
       await Promise.all([worker(), worker(), worker(), worker()]);
     }
-  } catch (e) {}
-}
-
-// Stiahne plné rozlíšenie konkrétnej fotografie alebo dokumentu z Backblaze B2 až na vyžiadanie (pri otvorení v galérii alebo sťahovaní dokumentu).
-async function ensureFullFileData(f) {
-  if (!f) return '';
-  if (f.data) return f.data;
-  if (!f.key || treeSource !== 'server') return f.thumb || '';
-  if (inflightDownloads.has(f.key)) return inflightDownloads.get(f.key);
-  const p = (async () => {
-    try {
-      await downloadFilesBatch([f], false);
-      return f.data || f.thumb || '';
-    } finally {
-      inflightDownloads.delete(f.key);
-    }
-  })();
-  inflightDownloads.set(f.key, p);
-  return p;
-}
-
-// Pri načítaní stromu zo servera NEsťahujeme všetky fotografie ani dokumenty v plnej veľkosti!
-// Ak majú fotky uložený náhľad (thumb), nesťahuje sa z Backblaze vôbec nič (0 B).
-// Ak ide o starší záznam bez thumbu, dotiahnu sa na pozadí iba chýbajúce náhľady pre hlavné (profilové) fotky.
-async function hydrateFiles(session) {
-  const missingMainThumbs = [];
-  Object.values(treeData.persons).forEach(p => {
-    const photos = p.photos || [];
-    const main = photos.find(ph => ph.isMain) || photos[0];
-    if (main && main.key && !main.thumb && !main.data) missingMainThumbs.push(main);
-  });
-  if (!missingMainThumbs.length) return;
-  await downloadFilesBatch(missingMainThumbs, true);
+  } catch (e) { /* načítanie súborov je doplnkové */ }
 }
 
 
@@ -3345,7 +3289,7 @@ function serverDataToTree(data) {
 }
 // Kópia stavu bez obsahu súborov (iba kľúče) – slúži ako základ pre ďalšie zlúčenie
 function snapshotBase(tree) {
-  return JSON.parse(JSON.stringify({ persons: tree.persons, families: tree.families }, (k, v) => ((k === 'data' || k === 'thumb') && typeof v === 'string' ? undefined : v)));
+  return JSON.parse(JSON.stringify({ persons: tree.persons, families: tree.families }, (k, v) => (k === 'data' && typeof v === 'string' ? undefined : v)));
 }
 
 function mergeRenderLines(lines) {
@@ -3412,8 +3356,6 @@ async function putTreeData(session) {
     try {
       await putTreeDataOnce(session);
       originalTreeData = snapshotBase(treeData);
-      isDirty = false;
-      autoSaveNow(false);
       return;
     } catch (err) {
       if (!err || !err.versionConflict) throw err;
@@ -3544,16 +3486,21 @@ function loadTreeFromServer(data, session) {
     createNewTree(); treeSource = 'server'; treeVersion = Number(data.version); updateSourceUI(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
   }
   treeVersion = Number(data.version);
-  treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
-  originalTreeData = snapshotBase(treeData);
+treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
+  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
   treeSource = 'server'; updateSourceUI();
   autoLayoutTree(true);
   dbConnection = session; updateDbStatusUI();
-  hydratePromise = hydrateFiles(session).then(() => autoSaveNow(false));
-  isDirty = false;
+  hydratePromise = hydrateFiles(session);
   showToast(t('msgDbLoaded').replace('{X}', Object.keys(persons).length), 'success');
+}
+
+async function submitDbForm(e) {
+  if (e) e.preventDefault();
+  closeDbModal();
+  await openDbModal(dbModalMode);
 }
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
@@ -3929,6 +3876,14 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', e => {
   const modal = document.getElementById('fanChartModal');
   if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeFanChartModal();
+  // Undo / Redo – nefunguje pri písaní do formulárov
+  if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+    const tag = ((e.target && e.target.tagName) || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undoAction(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redoAction(); }
+  }
 });
 
 setLanguage('sk');
@@ -3994,6 +3949,7 @@ setLanguage('sk');
 
   </div>
 </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 // ===================== AI INVESTIGATÍVA (Perplexity v novom okne prehliadača) =====================
@@ -4078,110 +4034,116 @@ function spustiAiInvestigativu() {
 </script>
 
 <script>
-// ===================== AUTOMATICKÉ ULOŽENIE (IndexedDB + ochrana pred zatvorením) =====================
-// IndexedDB nemá 5 MB limit ako localStorage, takže bezpečne uloží celý rodokmeň vrátane fotografií a dokumentov.
-const IDB_NAME = 'GenealogyAutoSaveDB';
-const IDB_STORE = 'autosave';
-const IDB_KEY = 'current_tree_v1';
-let isDirty = false;
-let cachedAutosaveMeta = null;
+// ===================== AUTOMATICKÉ ULOŽENIE (localStorage) =====================
+// Rodokmeň sa pri každej zmene uloží do prehliadača. Po obnovení/zatvorení
+// stránky sa na uvítacej obrazovke zobrazí tlačidlo "Obnoviť poslednú prácu".
+// Dáta nikdy neposielajú na žiadny server – zostávajú v tomto prehliadači.
+const AUTOSAVE_KEY = 'genealogy_autosave_v1';
 
-window.addEventListener('beforeunload', (e) => {
-  if (isDirty) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
-
-function openAutosaveDB() {
-  return new Promise((resolve, reject) => {
-    if (!window.indexedDB) return reject(new Error('IndexedDB nie je podporované'));
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function autoSaveNow(markDirty = true) {
-  if (markDirty) isDirty = true;
+function autoSaveNow() {
   try {
-    const db = await openAutosaveDB();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(treeData, IDB_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(treeData));
   } catch (e) {
-    console.warn('IndexedDB autosave fallback:', e);
+    // Kvóta prekročená (typicky veľké fotografie) – skús uložiť bez médií.
+    try {
+      const light = JSON.parse(JSON.stringify(treeData, (k, v) =>
+        (k === 'data' && typeof v === 'string' && v.startsWith('data:')) ? '' : v
+      ));
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(light));
+      showToast('Automatické uloženie: fotografie/dokumenty sa nezmestili do úložiska a boli vynechané.', 'error');
+    } catch (e2) { console.error('Autosave failed:', e2); }
   }
 }
 
-async function autoSaveLoad() {
-  try {
-    const db = await openAutosaveDB();
-    const data = await new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readonly');
-      const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-    db.close();
-    return data;
-  } catch (e) {
-    return null;
-  }
+function autoSaveLoad() {
+  try { return JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }
+  catch (e) { return null; }
 }
 
-function updateRestoreButtonLabel() {
-  const btn = document.getElementById('btnRestoreWork');
-  if (!btn || !cachedAutosaveMeta) return;
-  const n = cachedAutosaveMeta.count;
-  const labels = {
-    sk: `Obnoviť poslednú prácu (${n} osôb)`,
-    cs: `Obnovit poslední práci (${n} osob)`,
-    en: `Restore last session (${n} persons)`,
-    de: `Letzte Sitzung wiederherstellen (${n} Personen)`
-  };
-  const span = btn.querySelector('[data-restore-label]');
-  if (span) span.innerText = labels[currentLang] || labels.sk;
+function autoSaveClear() {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) {}
 }
 
-async function restoreAutosaved() {
-  const data = await autoSaveLoad();
-  if (!data || !data.persons || !Object.keys(data.persons).length) {
-    showToast(t('tNoSearch'), 'error');
-    return;
-  }
+function restoreAutosaved() {
+  const data = autoSaveLoad();
+  if (!data || !data.persons || !Object.keys(data.persons).length) { showToast(t('tNoSearch'), 'error'); return; }
+  pushUndoSnapshot();
   treeData = data;
-  originalTreeData = snapshotBase(treeData);
+  originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(data.persons).slice(0, 5);
-  const btn = document.getElementById('btnRestoreWork');
-  if (btn) btn.classList.add('hidden');
-  launchWorkspace();
-  autoLayoutTree(true);
-  isDirty = false;
+  const btn = document.getElementById('btnRestoreWork'); if (btn) btn.remove();
+  launchWorkspace(); autoLayoutTree(true);
   showToast(t('msgReadOk').replace('{X}', Object.keys(data.persons).length), 'success');
 }
 
-(async function initRestoreButton() {
-  const btn = document.getElementById('btnRestoreWork');
-  if (!btn) return;
-  const data = await autoSaveLoad();
+// Na začiatku: ak existuje rozpracovaná práca, zobraz tlačidlo na obnovenie.
+(function initRestoreButton() {
+  const btn = document.getElementById('btnRestoreWork'); if (!btn) return;
+  const data = autoSaveLoad();
   if (data && data.persons && Object.keys(data.persons).length > 0) {
-    cachedAutosaveMeta = { count: Object.keys(data.persons).length };
-    updateRestoreButtonLabel();
+    const n = Object.keys(data.persons).length;
+    const labels = {
+      sk: `Obnoviť poslednú prácu (${n} osôb)`,  cs: `Obnovit poslední práci (${n} osob)`,
+      en: `Restore last session (${n} persons)`,  de: `Letzte Sitzung wiederherstellen (${n} Personen)`
+    };
+    btn.querySelector('[data-restore-label]').innerText = labels[currentLang] || labels.sk;
     btn.classList.remove('hidden');
-  } else {
-    btn.classList.add('hidden');
-  }
+  } else { btn.remove(); }
 })();
+
+// ===================== UNDO / REDO =====================
+// Snapshot celého treeData (JSON) pred každou zmenou. Zásobník max. 25 krokov,
+// pamäťovo najnáročnejšie sú fotografie (data-URL). Redo sa ruší pri novej zmene.
+const UNDO_LIMIT = 25;
+let undoStack = []; let redoStack = [];
+const UNDO_MSGS = {
+  sk: { undo: 'Zmena vrátená', redo: 'Zmena obnovená', noUndo: 'Nie je čo vrátiť', noRedo: 'Nie je čo obnoviť' },
+  cs: { undo: 'Změna vrácena', redo: 'Změna obnovena', noUndo: 'Není co vrátit', noRedo: 'Není co obnovit' },
+  en: { undo: 'Change undone', redo: 'Change redone', noUndo: 'Nothing to undo', noRedo: 'Nothing to redo' },
+  de: { undo: 'Änderung zurückgenommen', redo: 'Änderung wiederhergestellt', noUndo: 'Nichts zurückzunehmen', noRedo: 'Nichts wiederherzustellen' }
+};
+function undoMsg(k) { return (UNDO_MSGS[currentLang] || UNDO_MSGS.sk)[k]; }
+
+function pushUndoSnapshot() {
+  try {
+    undoStack.push(JSON.stringify(treeData));
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack = [];
+    updateUndoRedoButtons();
+  } catch (e) { console.error('Undo snapshot failed:', e); }
+}
+
+function applyUndoRedo(json, msgOk) {
+  try { treeData = JSON.parse(json); } catch (e) { showToast(msgOk, 'error'); return; }
+  recentEditedIds = recentEditedIds.filter(id => treeData.persons[id]);
+  if (!treeData.persons[currentSelectedPersonId]) {
+    const k = Object.keys(treeData.persons); currentSelectedPersonId = k.length ? k[0] : null;
+  }
+  if (currentSelectedPersonId) selectPerson(currentSelectedPersonId);
+  updateRecentListUI(); updateCountsUI(); autoLayoutTree(false);
+  autoSaveNow(); updateUndoRedoButtons();
+  showToast(msgOk, 'info');
+}
+
+function undoAction() {
+  if (!undoStack.length) { showToast(undoMsg('noUndo'), 'error'); return; }
+  redoStack.push(JSON.stringify(treeData));
+  applyUndoRedo(undoStack.pop(), undoMsg('undo'));
+}
+
+function redoAction() {
+  if (!redoStack.length) { showToast(undoMsg('noRedo'), 'error'); return; }
+  undoStack.push(JSON.stringify(treeData));
+  applyUndoRedo(redoStack.pop(), undoMsg('redo'));
+}
+
+function updateUndoRedoButtons() {
+  const u = document.getElementById('btnUndo'), r = document.getElementById('btnRedo');
+  if (u) { u.classList.toggle('opacity-40', !undoStack.length); u.classList.toggle('cursor-not-allowed', !undoStack.length); }
+  if (r) { r.classList.toggle('opacity-40', !redoStack.length); r.classList.toggle('cursor-not-allowed', !redoStack.length); }
+}
 </script>
+
 
 </body>
 </html>
