@@ -1597,37 +1597,36 @@ function hrebenOtvorZonu(ustrednaId, spatId, odId, okamzite) {
 }
 
 // ===== VÝBER DIAGRAMU PODĽA RODU (bočný panel) =====
-// Zoznam: hlavný diagram + všetky rody (priezviská), ktorých diagram je buď otvorený,
-// alebo naň existuje odkaz z už otvorených diagramov (rodiny partnerov).
+// Zoznam: hlavný diagram + všetky rody (priezviská) z ORANŽOVÝCH ŠÍPOK všetkých
+// otvorených diagramov (aj ešte neotvorených cieľov). Každý rod je v zozname len raz.
 function rodNazov(p) { return String((p && (p.lastName || p.birthName)) || '').trim(); }
-function rodDiagramLabel(p) {
-  const n = rodNazov(p) || '?';
-  const menom = p && p.firstName ? ' (' + p.firstName + ')' : '';
-  return t('rodFamily').replace('{N}', n) + menom;
-}
 function updateRodDiagramSelect() {
   const sel = document.getElementById('rodDiagramSelect'); if (!sel) return;
-  const opts = []; const seen = new Set();
+  const opts = []; const rody = new Set();          // rody = priezviská, už uvedené v zozname
   const hlavna = HREBEN.zony && HREBEN.zony[0];
   if (hlavna) {
     const koren = treeData.persons[HREBEN.koren];
     opts.push({ value: '__main__', label: t('rodMainOpt') + (rodNazov(koren) ? ' – ' + rodNazov(koren) : '') });
   }
-  const pridajZone = (z) => {
-    if (!z || z === hlavna) return;
-    const sp = treeData.persons[z.spat || z.ustredna]; if (!sp) return;
-    if (seen.has(z.kluc)) return; seen.add(z.kluc);
-    opts.push({ value: z.kluc, label: rodDiagramLabel(sp) });
+  const pridaj = (rodId, kluc, person) => {
+    if (!rodId || !kluc || !person) return;
+    if (rody.has(rodId)) return;                     // rod už je v zozname – neopakuj
+    rody.add(rodId);
+    opts.push({ value: kluc, label: t('rodFamily').replace('{N}', rodId) });
   };
-  const pridajOdkaz = (o) => {
-    if (!o || o.typ === 'spat') return;
-    const kluc = o.ustredna + '|' + (o.spat || '');
-    if (seen.has(kluc)) return;
-    const sp = treeData.persons[o.spat || o.ustredna]; if (!sp) return;
-    seen.add(kluc);
-    opts.push({ value: kluc, label: rodDiagramLabel(sp) });
-  };
-  (HREBEN.zony || []).forEach(z => { pridajZone(z); (z.odkazy || []).forEach(pridajOdkaz); });
+  (HREBEN.zony || []).forEach(z => {
+    if (z === hlavna) return;
+    const osa = treeData.persons[z.ustredna];        // rod otvoreného pod-plátna = osoba na ose
+    pridaj(rodNazov(osa), z.kluc, osa);
+  });
+  (HREBEN.zony || []).forEach(z => {
+    (z.odkazy || []).forEach(o => {
+      if (!o || o.typ === 'spat' || !o.ustredna) return;   // len oranžové šípky dopredu
+      const partner = treeData.persons[o.ustredna];         // rod, do ktorého šípka vedie
+      pridaj(rodNazov(partner), o.ustredna + '|' + (o.spat || ''), partner);
+    });
+  });
+  opts.sort((a, b) => a.value === '__main__' ? -1 : b.value === '__main__' ? 1 : String(a.label).localeCompare(String(b.label), 'sk', { sensitivity: 'base' }));
   const povodna = sel.value;
   sel.innerHTML = '<option value="">' + esc(t('rodSelectPh')) + '</option>' +
     opts.map(o => `<option value="${esc(o.value)}" ${o.value === povodna ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
