@@ -8,7 +8,7 @@
   <script defer crossorigin="anonymous" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js"></script>
   <script defer crossorigin="anonymous" data-clerk-publishable-key="pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ" src="https://intent-bee-3541.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,600;1,400;1,600&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- JSZip pre prácu s formátom GEDZIP -->
@@ -4661,13 +4661,15 @@ function updateUndoRedoButtons() {
   if (r) { r.classList.toggle('opacity-40', !redoStack.length); r.classList.toggle('cursor-not-allowed', !redoStack.length); }
 }
 
+
 // ============================================================
-// ===== PDF KNIHA V SECESNOM ŠTÝLE („Vytvor PDF knihu“) =====
+// ===== PDF KNIHA V SECESNOM ŠTÝLE – vydanie podľa RODÍN =====
 // ============================================================
-// Titulná strana: názov knihy + secesný ornament + zoznam rodov (obsah).
-// Každá strana orámovaná secesným vzorom (SVG šablóna používateľa).
-// Kapitoly: 1. rod Sklenčár, potom ostatné rody podľa výberovníka.
-// Členovia: od najstaršieho predka → partner(ka) → deti → vnúčatá → pravnúčatá.
+// Titulná strana: názov knihy + secesný ornament + obsah (zoznam rodín so stranami).
+// Každá rodina (FAM záznam) = samostatná strana so záhlavím v strede.
+// Poradie: otec, matka, deti (zoradené podľa dátumu narodenia).
+// PDF obsahuje záložky (bookmarks) na jednotlivé rodiny.
+// Font: Cormorant (secesný serif, plná slovenská diakritika).
 
 const PDF_BOOK = {
   W: 595, H: 842, SC: 2,           // A4 v bodoch (pt), render v merítku 2x
@@ -4702,7 +4704,7 @@ const PDF_BOOK_FRAME_SVG = `<?xml version="1.0" encoding="UTF-8"?>
   </g>
 </svg>`;
 
-// Sekcesný ornamentový oddelovač pre titulnú stranu a záhlavia kapitol
+// Sekcesný ornamentový oddelovač pre titulnú stranu a záhlavia rodín
 const PDF_BOOK_DIVIDER_SVG = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 60" width="300" height="60">
   <g stroke="#3B4E29" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -4749,50 +4751,6 @@ function pdfBookLoadImage(src) {
 
 function pdfBookBezDia(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
 
-// Zoznam rodov knihy: hlavný rod (koreň diagramu) ako prvý, potom rody z výberovníka
-function pdfBookRody() {
-  const ciele = rodCieleMapa();
-  const zoznam = [];
-  const koren = treeData.persons[HREBEN.koren];
-  const hlavny = koren ? rodNazov(koren) : '';
-  if (hlavny) zoznam.push(hlavny);
-  Array.from(ciele.keys()).sort((a, b) => a.localeCompare(b, 'sk', { sensitivity: 'base' }))
-    .forEach(n => { if (!zoznam.includes(n)) zoznam.push(n); });
-  return zoznam;
-}
-
-function pdfBookStarsiPredok(startId, rod) {
-  const P = treeData.persons; let cur = P[startId]; let guard = 0;
-  while (cur && guard++ < 60) {
-    const r = hrebenRodicia(cur); if (!r) break;
-    const o = r.otec, m = r.matka;
-    const kand = (o && rodNazov(o) === rod) ? o : ((m && rodNazov(m) === rod) ? m : (o || m));
-    if (!kand || kand.id === cur.id) break;
-    cur = kand;
-  }
-  return cur || P[startId];
-}
-
-// Generácie: [0]=najstarší predok, [1]=deti, [2]=vnúčatá, [3]=pravnúčatá
-function pdfBookGeneracie(korenId) {
-  const P = treeData.persons; const videne = new Set([korenId]);
-  const gen = [[P[korenId]]]; let cur = [P[korenId]];
-  for (let g = 0; g < 3; g++) {
-    const next = [];
-    cur.forEach(p => {
-      (p.fams || []).forEach(fid => {
-        const fam = (HREBEN.rodinyMapa || {})[fid] || treeData.families[fid];
-        if (!fam || !fam.children) return;
-        fam.children.forEach(cid => { if (P[cid] && !videne.has(cid)) { videne.add(cid); next.push(P[cid]); } });
-      });
-    });
-    if (!next.length) break;
-    next.sort((a, b) => (hrebenRok(a) === Infinity ? 9999 : hrebenRok(a)) - (hrebenRok(b) === Infinity ? 9999 : hrebenRok(b)));
-    gen.push(next); cur = next;
-  }
-  return gen;
-}
-
 function pdfBookMeno(p) {
   if (!p) return '';
   return [p.title, p.firstName, p.middleName, (p.lastName || p.birthName)].filter(Boolean).join(' ').trim();
@@ -4800,68 +4758,128 @@ function pdfBookMeno(p) {
 
 function pdfBookRokHodnota(p) { const r = hrebenRok(p); return (r === Infinity || isNaN(r)) ? 9999 : r; }
 
-// Základné riadky s údajmi osoby (Slovak labels – pekná kniha je v slovenčine)
-function pdfBookRiadky(p, rodPages) {
+// Jednoduchý genitív mužského krstného mena: Igor -> Igora, Peter -> Petra
+function pdfBookGenitivMena(meno) {
+  const m = String(meno || '').trim();
+  if (!m) return m;
+  const posledny = m.slice(-1);
+  if (!/[aeiouyáéíóúýôä]/i.test(posledny)) return m + 'a';   // končí na spoluhlásku
+  return m;                                                    // končí na samohlásku – ponecháme
+}
+
+// Zobrazovaný názov rodiny: „Rodina Igora Sklenčara“
+function pdfBookNazovRodiny(fam) {
+  const P = treeData.persons;
+  const h = (fam.husbandId && P[fam.husbandId]) || null;
+  const w = (fam.wifeId && P[fam.wifeId]) || null;
+  if (h) {
+    const krstne = h.firstName ? pdfBookGenitivMena(h.firstName) + ' ' : '';
+    return 'Rodina ' + krstne + (h.lastName || h.birthName || '').trim();
+  }
+  if (w) return 'Rodina ' + [w.firstName, w.lastName || w.birthName].filter(Boolean).join(' ');
+  return 'Rodina (neznáma)';
+}
+
+// Osoby hlavnej línie: koreň + jeho potomkovia + ich predkovia (rodová línia)
+function pdfBookOsobyHlavnejLiny() {
+  const P = treeData.persons; const set = new Set();
+  const pridajPredkov = (p) => { let c = p, guard = 0; while (c && !set.has(c.id) && guard++ < 100) { set.add(c.id); const r = hrebenOsovyRodic(c); c = r ? r.rodic : null; } };
+  const queue = HREBEN.koren && P[HREBEN.koren] ? [HREBEN.koren] : [];
+  const videne = new Set(queue);
+  while (queue.length) {
+    const p = P[queue.pop()]; if (!p) continue;
+    pridajPredkov(p);
+    (p.fams || []).forEach(fid => {
+      const fam = treeData.families[fid]; if (!fam || !fam.children) return;
+      fam.children.forEach(cid => { if (P[cid] && !videne.has(cid)) { videne.add(cid); queue.push(cid); } });
+    });
+  }
+  return set;
+}
+
+// Zoznam rodín knihy: hlavná línia chronologicky ako prvá, potom ostatné abecedne
+function pdfBookRodinyZoznam() {
+  const P = treeData.persons;
+  const hlavnaOsoby = pdfBookOsobyHlavnejLiny();
+  const hlavne = [], ostatne = [];
+  Object.values(treeData.families).forEach(fam => {
+    const h = (fam.husbandId && P[fam.husbandId]) || null;
+    const w = (fam.wifeId && P[fam.wifeId]) || null;
+    if (!h && !w) return;                                     // prázdna rodina sa do knihy nedostane
+    const rok = Math.min(h ? pdfBookRokHodnota(h) : 9999, w ? pdfBookRokHodnota(w) : 9999);
+    const rec = { fam, nazov: pdfBookNazovRodiny(fam), rok, priezvisko: pdfBookSortKluc(fam) };
+    const vHlavnej = (fam.husbandId && hlavnaOsoby.has(fam.husbandId)) || (fam.wifeId && hlavnaOsoby.has(fam.wifeId));
+    (vHlavnej ? hlavne : ostatne).push(rec);
+  });
+  hlavne.sort((a, b) => a.rok - b.rok);
+  ostatne.sort((a, b) => a.priezvisko.localeCompare(b.priezvisko, 'sk', { sensitivity: 'base' }) || (a.rok - b.rok));
+  return hlavne.concat(ostatne);
+}
+
+function pdfBookSortKluc(fam) {
+  const P = treeData.persons;
+  const p = (fam.husbandId && P[fam.husbandId]) || (fam.wifeId && P[fam.wifeId]) || {};
+  return String(p.lastName || p.birthName || '').toLowerCase();
+}
+
+// Členovia rodiny v poradí: otec, matka, deti podľa dátumu narodenia (najstaršie prvé)
+function pdfBookClenoviaRodiny(fam) {
+  const P = treeData.persons;
+  const out = [];
+  if (fam.husbandId && P[fam.husbandId]) out.push(P[fam.husbandId]);
+  if (fam.wifeId && P[fam.wifeId]) out.push(P[fam.wifeId]);
+  (fam.children || []).forEach(cid => { if (P[cid]) out.push(P[cid]); });
+  return out.slice(0, 2).concat(out.slice(2).sort((a, b) => pdfBookRokHodnota(a) - pdfBookRokHodnota(b)));
+}
+
+// Riadky s údajmi osoby (rovnaké detaily ako predtým)
+function pdfBookRiadky(p, famPages) {
   const riadky = [];
   const push = (l, v) => { if (v && String(v).trim()) riadky.push({ l, v: String(v).trim() }); };
   const ev = p.events || [];
   const notes = (p.notes || []).map(n => String(n));
-  // narodenie / úmrtie
   push('nar.', [p.birthDate, p.birthPlace].filter(Boolean).join(', '));
   push('†', [p.deathDate, p.deathPlace].filter(Boolean).join(', '));
-  // vierovyznanie (ak existuje)
   const relKw = /vierovyznan|nabozenstv|narodens|katol|evanjel|pravoslav|zidov|judais|islam|krestan|luter/i;
   const rel = notes.find(n => relKw.test(pdfBookBezDia(n)));
   const relEv = ev.find(e => relKw.test(pdfBookBezDia(e.title)) || relKw.test(pdfBookBezDia(e.place)));
   if (rel) push('vierovyznanie', rel);
   else if (relEv) push('vierovyznanie', [relEv.title, relEv.place].filter(Boolean).join(', '));
-  // krst
   const bapm = ev.find(e => e.type === 'BAPM');
   if (bapm) push('krst', [bapm.date, bapm.place].filter(Boolean).join(', '));
-  // birmovanie
   const birmEv = ev.find(e => /birm/i.test(pdfBookBezDia(e.title)) || /birm/i.test(pdfBookBezDia(e.type)));
   const birmN = notes.find(n => /birm/i.test(pdfBookBezDia(n)));
   if (birmEv) push('birmovanie', [birmEv.date, birmEv.place || birmEv.title].filter(Boolean).join(', '));
   else if (birmN) push('birmovanie', birmN);
-  // sobáše
   getSpousesOf(p.id).forEach(s => {
     push('sobáš', [s.marrDate, 's ' + pdfBookMeno(s.person)].filter(Boolean).join(' '));
   });
-  // školy s dátumami od–do
   const skLabels = { EDUC_ZS: 'základná škola', EDUC_SS: 'stredná škola', EDUC_VS: 'vysoká škola' };
   ev.filter(e => e.type && e.type.startsWith('EDUC')).forEach(e => {
     push(skLabels[e.type] || 'škola', [e.date, e.place || e.title].filter(Boolean).join(', '));
   });
-  // vzdelanie
   const vzKw = /vzdelan|diplom|promoce|titul|absolvent/i;
   const vzN = notes.find(n => vzKw.test(pdfBookBezDia(n)));
   if (vzN) push('vzdelanie', vzN);
   else if (ev.some(e => e.type === 'EDUC_VS')) push('vzdelanie', 'vysokoškolské');
-  // povolanie s obdobím od–do
   (p.occupations || []).slice(0, 2).forEach(o => {
     const per = [o.dateFrom, o.dateTo].filter(Boolean).join('–');
     push('povolanie', [o.title, o.city, per].filter(Boolean).join(', '));
   });
-  // rodné meno a odkaz na rod partnerky/partnera
+  // rodné meno + odkaz na stranu rodiny rodičov
   if (p.birthName) {
-    const rodSp = pdfBookRodPartnera(p);
-    const str = (rodSp && rodPages && rodPages.get(rodSp)) ? ' – rod ' + rodSp + ' je na strane ' + rodPages.get(rodSp) : '';
+    const famc = p.famc && treeData.families[p.famc];
+    const str = (famc && famPages && famPages.get(famc.id)) ? ' – rodina rodičov je na strane ' + famPages.get(famc.id) : '';
     push('rodné meno', p.birthName + str);
   }
   return riadky;
 }
 
-// Rod, z ktorého pochádza partner/partnerka (ak má rodičov v rodokmeni)
-function pdfBookRodPartnera(sp) {
-  if (!sp) return null;
-  const r = hrebenRodicia(sp); if (!r) return null;
-  const rodic = r.otec || r.matka; if (!rodic) return null;
-  const n = rodNazov(rodic); return n || null;
-}
-
 // ---- zalamovanie dlhých textov (rovnaké pre layout aj vykresľovanie) ----
 const pdfBookMeasureCtx = document.createElement('canvas').getContext('2d');
-const PDF_BOOK_LINE_FONT = '8.7pt Georgia, serif';
+const PDF_BOOK_LINE_FONT = '9pt Cormorant, Georgia, serif';
+const PDF_BOOK_NAME_FONT = 'italic 600 14pt Cormorant, Georgia, serif';
+const PDF_BOOK_HEAD_FONT = 'italic 600 20pt Cormorant, Georgia, serif';
 function pdfBookWrapText(text, maxW) {
   pdfBookMeasureCtx.font = PDF_BOOK_LINE_FONT;
   const words = String(text).split(/\s+/).filter(Boolean);
@@ -4879,41 +4897,32 @@ function pdfBookWrapRiadky(riadky) {
   const maxW = PDF_BOOK.W - PDF_BOOK.MARGIN_X - tx;
   return riadky.map(r => ({ l: r.l, lines: pdfBookWrapText(r.v, maxW) }));
 }
+function pdfBookBlockVyska(wrapped) {
+  return Math.max(84, 20 + wrapped.reduce((s, r) => s + r.lines.length, 0) * 13 + 8);
+}
 
-// ---- rozvrhnutie (layout) knihy: kapitoly → strany → bloky ----
-function pdfBookLayout(rodPages) {
-  const L = { pages: [], rodPages: new Map(), pageNum: 1 }; // strana 1 = titulná
-  const newPage = (rod) => { L.pageNum++; const pg = { num: L.pageNum, rod, items: [] }; L.pages.push(pg); return pg; };
-  const rody = pdfBookRody();
-  rody.forEach(rod => {
-    const startId = (treeData.persons[HREBEN.koren] && rodNazov(treeData.persons[HREBEN.koren]) === rod)
-      ? HREBEN.koren
-      : (() => { const ciele = rodCieleMapa(); const v = ciele.get(rod); return v ? v.split('|')[0] : null; })();
-    const predok = (startId && treeData.persons[startId]) ? pdfBookStarsiPredok(startId, rod) : null;
-    if (!predok) return;
-    L.rodPages.set(rod, L.pageNum + 1);               // nová kapitola vždy od novej strany
-    let pg = newPage(rod); let y = PDF_BOOK.TOP + 52; // miesto pre hlavičku kapitoly
-    const geny = pdfBookGeneracie(predok.id);
-    const genNadpis = ['Najstarší predkovia', 'Deti', 'Vnúčatá', 'Pravnúčatá'];
-    const videne = new Set();
-    geny.forEach((gen, gi) => {
-      if (!gen || !gen.length) return;
-      const nadpisH = 26;
-      if (y + nadpisH > PDF_BOOK.BOTTOM) { pg = newPage(rod); y = PDF_BOOK.TOP; }
-      pg.items.push({ kind: 'genHeader', y, text: genNadpis[gi] }); y += nadpisH;
-      gen.forEach(p => {
-        const bloky = [p];
-        getSpousesOf(p.id).forEach(s => { if (s.person && !videne.has(s.person.id)) bloky.push(s.person); });
-        bloky.forEach(os => {
-          if (videne.has(os.id)) return;
-          videne.add(os.id);
-          const riadky = pdfBookWrapRiadky(pdfBookRiadky(os, L.rodPages));
-          const h = Math.max(84, 20 + riadky.reduce((s, r) => s + r.lines.length, 0) * 12.5 + 8);
-          if (y + h > PDF_BOOK.BOTTOM) { pg = newPage(rod); y = PDF_BOOK.TOP; }
-          pg.items.push({ kind: 'person', y, p: os, riadky });
-          y += h;
-        });
-      });
+// ---- rozvrhnutie (layout) knihy: rodiny → strany → bloky ----
+function pdfBookLayout(famPages) {
+  const L = { pages: [], famPages: new Map(), famNazvy: new Map(), pageNum: 1 }; // strana 1 = titulná
+  const newPage = () => { L.pageNum++; const pg = { num: L.pageNum, items: [], nazov: null }; L.pages.push(pg); return pg; };
+  pdfBookRodinyZoznam().forEach(rec => {
+    const fam = rec.fam;
+    const clenovia = pdfBookClenoviaRodiny(fam);
+    const blocks = clenovia.map(p => {
+      const riadky = pdfBookWrapRiadky(pdfBookRiadky(p, L.famPages));
+      return { p, riadky, h: pdfBookBlockVyska(riadky) };
+    });
+    // predvýpočet počtu strán kapitoly (kvôli odkazom „rodina rodičov na strane X“)
+    let pages = 1, y = PDF_BOOK.TOP + 62;
+    blocks.forEach(b => { if (y + b.h > PDF_BOOK.BOTTOM) { pages++; y = PDF_BOOK.TOP; } y += b.h; });
+    L.famPages.set(fam.id, L.pageNum + 1);
+    L.famNazvy.set(fam.id, rec.nazov);
+    let pg = newPage(); pg.nazov = rec.nazov;
+    let yy = PDF_BOOK.TOP + 62;
+    blocks.forEach(b => {
+      if (yy + b.h > PDF_BOOK.BOTTOM) { pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP; }
+      pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky });
+      yy += b.h;
     });
   });
   return L;
@@ -4925,7 +4934,6 @@ function pdfBookDrawPhotoFrame(ctx, x, y, w, h) {
   ctx.save();
   ctx.strokeStyle = C; ctx.lineWidth = 1.4; ctx.strokeRect(x, y, w, h);
   ctx.lineWidth = 0.5; ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
-  // secesné rohové akcenty (malé výhonky)
   ctx.lineWidth = 1.1; ctx.beginPath();
   ctx.moveTo(x + 16, y); ctx.quadraticCurveTo(x + 2, y + 2, x, y + 16);
   ctx.moveTo(x + w - 16, y); ctx.quadraticCurveTo(x + w - 2, y + 2, x + w, y + 16);
@@ -4943,89 +4951,92 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
   const C = PDF_BOOK.COLOR, MX = PDF_BOOK.MARGIN_X;
   if (frameCv) ctx.drawImage(frameCv, 0, 0, PDF_BOOK.W, PDF_BOOK.H);
   ctx.textBaseline = 'alphabetic';
-  const center = (txt, font, y, color) => { ctx.font = font; ctx.fillStyle = color || C; ctx.textAlign = 'center'; ctx.fillText(txt, PDF_BOOK.W / 2, y); ctx.textAlign = 'left'; };
 
   if (pg.isTitle) {
     // Titulná strana knihy
-    center('Rodokmeň rodiny Sklenčár', '26pt Georgia, "Times New Roman", serif', 205);
-    ctx.font = '11pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
-    ctx.fillText('Kniha rodov podľa diagramov rodokmeňa', PDF_BOOK.W / 2, 232); ctx.textAlign = 'left';
+    ctx.font = PDF_BOOK_HEAD_FONT; ctx.fillStyle = C; ctx.textAlign = 'center';
+    ctx.fillText('Rodokmeň rodiny Sklenčár', PDF_BOOK.W / 2, 205); ctx.textAlign = 'left';
+    ctx.font = 'italic 12pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+    ctx.fillText('Kniha rodín podľa rodokmeňa', PDF_BOOK.W / 2, 232); ctx.textAlign = 'left';
     if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 220) / 2, 248, 220, 44);
-    // Obsah: zoznam rodov so stranami
-    ctx.font = '14pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+    // Obsah: zoznam rodín so stranami
+    ctx.font = '600 15pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
     ctx.fillText('O B S A H', PDF_BOOK.W / 2, 330); ctx.textAlign = 'left';
-    const rody = pg.toc; // [{rod, page}]
-    const gap = rody.length > 22 ? 17 : (rody.length > 14 ? 20 : 24);
+    const polozky = pg.toc; // [{nazov, page}]
+    const dvaStlpce = polozky.length > 30;
+    const colX = dvaStlpce ? [MX + 10, PDF_BOOK.W / 2 + 20] : [MX + 30];
+    const colMax = pdfBookTocMaxW(dvaStlpce);
+    const naStlpec = dvaStlpce ? Math.ceil(polozky.length / 2) : polozky.length;
+    const gap = dvaStlpce ? 17 : (polozky.length > 22 ? 17 : (polozky.length > 14 ? 20 : 24));
     let y = 360;
-    rody.forEach(r => {
-      ctx.font = '11.5pt Georgia, serif'; ctx.fillStyle = C;
-      ctx.fillText('Rod ' + r.rod, MX + 30, y);
-      const tw = ctx.measureText('Rod ' + r.rod).width;
-      const pw = ctx.measureText('strana ' + r.page).width;
+    polozky.forEach((r, i) => {
+      const col = dvaStlpce ? (i >= naStlpec ? 1 : 0) : 0;
+      if (dvaStlpce && i === naStlpec) y = 360;
+      const x0 = colX[col];
+      ctx.font = '11.5pt Cormorant, Georgia, serif'; ctx.fillStyle = C;
+      ctx.fillText(r.nazov, x0, y);
+      const tw = ctx.measureText(r.nazov).width;
+      ctx.font = '10.5pt Cormorant, Georgia, serif';
+      const pw = ctx.measureText('str. ' + r.page).width;
       ctx.strokeStyle = C; ctx.lineWidth = 0.4; ctx.setLineDash([1.5, 2.5]);
-      ctx.beginPath(); ctx.moveTo(MX + 36 + tw, y - 3); ctx.lineTo(PDF_BOOK.W - MX - 30 - pw, y - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x0 + tw + 6, y - 3); ctx.lineTo(x0 + colMax - pw - 4, y - 3); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillText('strana ' + r.page, PDF_BOOK.W - MX - 30 - pw, y);
+      ctx.fillText('str. ' + r.page, x0 + colMax - pw, y);
       y += gap;
     });
   } else {
-    // Kapitola rodu
-    if (pg.isChapterStart) {
-      ctx.font = '19pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
-      ctx.fillText('Rod ' + pg.rod, PDF_BOOK.W / 2, PDF_BOOK.TOP + 8); ctx.textAlign = 'left';
+    // Strana rodiny – záhlavie v strede
+    if (pg.nazov) {
+      ctx.font = PDF_BOOK_HEAD_FONT; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText(pg.nazov, PDF_BOOK.W / 2, PDF_BOOK.TOP + 8); ctx.textAlign = 'left';
       if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 180) / 2, PDF_BOOK.TOP + 18, 180, 36);
     }
     pg.items.forEach(it => {
-      const x = MX, maxW = PDF_BOOK.W - 2 * MX;
-      if (it.kind === 'genHeader') {
-        ctx.font = '9.5pt Georgia, serif'; ctx.fillStyle = '#7a8a6a';
-        const lbl = it.text.toUpperCase().split('').join(' ');
-        ctx.fillText(lbl, x, it.y + 8);
-        ctx.strokeStyle = '#9aab88'; ctx.lineWidth = 0.5;
-        ctx.beginPath(); ctx.moveTo(x + ctx.measureText(lbl).width + 10, it.y + 5); ctx.lineTo(x + maxW, it.y + 5); ctx.stroke();
-      } else if (it.kind === 'person') {
-        const p = it.p, ry = it.y;
-        // portrét v secesnom rámečku
-        const phW = 60, phH = 78;
-        const img = imgs.get(p.id);
-        ctx.save();
-        ctx.fillStyle = '#f4f6f0'; ctx.fillRect(x, ry, phW, phH);
-        if (img) {
-          const r = Math.min(phW / img.width, phH / img.height);
-          const iw = img.width * r, ih = img.height * r;
-          ctx.save(); ctx.beginPath(); ctx.rect(x, ry, phW, phH); ctx.clip();
-          ctx.drawImage(img, x + (phW - iw) / 2, ry + (phH - ih) / 2, iw, ih); ctx.restore();
-        } else {
-          ctx.strokeStyle = '#c4cdb8'; ctx.lineWidth = 0.8;
-          ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH / 2 - 6, 14, 0, Math.PI * 2); ctx.stroke();
-          ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH - 22, 20, Math.PI, 0); ctx.stroke();
-        }
-        ctx.restore();
-        pdfBookDrawPhotoFrame(ctx, x, ry, phW, phH);
-        // text vpravo od fotky
-        let ty = ry + 13; const tx = x + phW + 14;
-        ctx.font = 'bold 11.5pt Georgia, serif'; ctx.fillStyle = C;
-        let meno = pdfBookMeno(p);
-        if (p.gender === 'F' && p.birthName && p.lastName && p.birthName !== p.lastName) meno += '  (rodená ' + p.birthName + ')';
-        ctx.fillText(meno, tx, ty); ty += 15;
-        it.riadky.forEach(r => {
-          ctx.font = PDF_BOOK_LINE_FONT;
-          const lw = ctx.measureText(r.l + ':').width;
-          r.lines.forEach((ln, i) => {
-            if (i === 0) { ctx.fillStyle = '#77866a'; ctx.fillText(r.l + ':', tx, ty); }
-            ctx.fillStyle = '#2c3a22'; ctx.fillText(ln, tx + lw + 4, ty);
-            ty += 12.5;
-          });
-        });
+      if (it.kind !== 'person') return;
+      const p = it.p, ry = it.y, x = MX;
+      const phW = 60, phH = 78;
+      const img = imgs.get(p.id);
+      ctx.save();
+      ctx.fillStyle = '#f4f6f0'; ctx.fillRect(x, ry, phW, phH);
+      if (img) {
+        const r = Math.min(phW / img.width, phH / img.height);
+        const iw = img.width * r, ih = img.height * r;
+        ctx.save(); ctx.beginPath(); ctx.rect(x, ry, phW, phH); ctx.clip();
+        ctx.drawImage(img, x + (phW - iw) / 2, ry + (phH - ih) / 2, iw, ih); ctx.restore();
+      } else {
+        ctx.strokeStyle = '#c4cdb8'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH / 2 - 6, 14, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH - 22, 20, Math.PI, 0); ctx.stroke();
       }
+      ctx.restore();
+      pdfBookDrawPhotoFrame(ctx, x, ry, phW, phH);
+      // meno + údaje vpravo od portrétu
+      let ty = ry + 14; const tx = x + phW + 14;
+      ctx.font = PDF_BOOK_NAME_FONT; ctx.fillStyle = C;
+      let meno = pdfBookMeno(p);
+      if (p.gender === 'F' && p.birthName && p.lastName && p.birthName !== p.lastName) meno += '  (rodená ' + p.birthName + ')';
+      ctx.fillText(meno, tx, ty); ty += 16;
+      it.riadky.forEach(r => {
+        ctx.font = PDF_BOOK_LINE_FONT;
+        const lw = ctx.measureText(r.l + ':').width;
+        r.lines.forEach((ln, i) => {
+          if (i === 0) { ctx.fillStyle = '#77866a'; ctx.fillText(r.l + ':', tx, ty); }
+          ctx.fillStyle = '#2c3a22'; ctx.fillText(ln, tx + lw + 4, ty);
+          ty += 13;
+        });
+      });
     });
   }
   // číslo strany
-  ctx.font = 'italic 8.5pt Georgia, serif'; ctx.fillStyle = '#8b9a7c'; ctx.textAlign = 'center';
+  ctx.font = 'italic 9pt Cormorant, Georgia, serif'; ctx.fillStyle = '#8b9a7c'; ctx.textAlign = 'center';
   ctx.fillText(String(pg.num), PDF_BOOK.W / 2, 806); ctx.textAlign = 'left';
 }
 
-// ---- hlavná funkcia: vytvorenie a uloženie PDF knihy ----
+function pdfBookTocMaxW(dvaStlpce) {
+  return dvaStlpce ? (PDF_BOOK.W / 2 - PDF_BOOK.MARGIN_X - 20) : (PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X - 60);
+}
+
+// ---- hlavná funkcia: vytvorenie a stiahnutie PDF knihy ----
 async function vytvorPdfKnihu() {
   try {
     if (!window.jspdf || !window.jspdf.jsPDF) { showToast(t('fanNoPdf') || 'PDF knižnica nie je načítaná.', 'error'); return; }
@@ -5033,14 +5044,26 @@ async function vytvorPdfKnihu() {
     showToast('Generujem PDF knihu…', 'info');
     try { closeFileMenu(); } catch (e) {}
 
+    // načítanie secesného fontu Cormorant (plná slovenská diakritika)
+    try {
+      if (document.fonts && document.fonts.load) {
+        await Promise.all([
+          '400 12pt Cormorant', 'italic 400 12pt Cormorant',
+          '600 12pt Cormorant', 'italic 600 12pt Cormorant',
+        ].map(f => document.fonts.load(f, 'Živý príbeh ľúbostný čeština ťžď')));
+        await document.fonts.ready;
+      }
+    } catch (e) {}
+
     const frameCv = await pdfBookSvgToCanvas(PDF_BOOK_FRAME_SVG, PDF_BOOK.W, PDF_BOOK.H);
     const dividerCv = await pdfBookSvgToCanvas(PDF_BOOK_DIVIDER_SVG, 300, 60);
 
-    // 1. priechod – čísla strán kapitol (pre odkazy „rod na strane X“)
-    let L = pdfBookLayout(null);
-    const rodPages = L.rodPages;
-    // 2. priechod – finálne rozvrhnutie s odkazmi na strany
-    L = pdfBookLayout(rodPages);
+    // tri priechody layoutu – aby odkazy „rodina rodičov na strane X“ mali správne čísla
+    let L = pdfBookLayout(new Map());
+    L = pdfBookLayout(L.famPages);
+    const famPages = L.famPages;
+    L = pdfBookLayout(famPages);
+    const famNazvy = L.famNazvy;
 
     // prednačítanie hlavných fotografií
     const imgs = new Map();
@@ -5056,8 +5079,12 @@ async function vytvorPdfKnihu() {
     }));
     await Promise.all(promises);
 
-    // titulná strana (strana 1) – obsah so stranami kapitol
-    const rodyZoznam = Array.from(rodPages.keys()).map(rod => ({ rod, page: rodPages.get(rod) }));
+    // obsah: rodiny zoradené presne ako v knihe
+    const toc = [];
+    pdfBookRodinyZoznam().forEach(rec => {
+      const pg = famPages.get(rec.fam.id);
+      if (pg) toc.push({ nazov: rec.nazov, page: pg });
+    });
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
@@ -5072,14 +5099,22 @@ async function vytvorPdfKnihu() {
       pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PDF_BOOK.W, PDF_BOOK.H, undefined, 'FAST');
     };
 
-    await renderPage({ num: 1, isTitle: true, toc: rodyZoznam });
-    for (const pg of L.pages) {
-      pg.isChapterStart = (pg.num === rodPages.get(pg.rod));
-      await renderPage(pg);
-    }
+    // titulná strana (strana 1)
+    await renderPage({ num: 1, isTitle: true, toc });
+    // strany rodín
+    for (const pg of L.pages) await renderPage(pg);
 
+    // záložky (bookmarks) – obsah + každá rodina
+    try {
+      if (pdf.outline && pdf.outline.add) {
+        pdf.outline.add(null, 'Rodokmeň rodiny Sklenčár', { pageNumber: 1 });
+        toc.forEach(r => { pdf.outline.add(null, r.nazov, { pageNumber: r.page }); });
+      }
+    } catch (e) {}
+
+    // uloženie: stiahnutie .pdf na lokálny disk
     pdf.save('Rodokmen-rodiny-Sklencar.pdf');
-    showToast('PDF kniha bola vytvorená a uložená.', 'success');
+    showToast('PDF kniha bola vytvorená a stiahnutá (' + (L.pages.length + 1) + ' strán).', 'success');
   } catch (err) {
     console.error(err);
     showToast('Vytvorenie PDF knihy zlyhalo: ' + (err && err.message ? err.message : ''), 'error');
