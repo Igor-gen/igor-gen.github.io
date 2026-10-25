@@ -2222,6 +2222,38 @@ function personPickerLabel(p) {
   const rok = (String(p.birthDate || '').match(/\d{4}/) || ['?'])[0];
   return `${p.lastName || p.birthName || '?'}, ${p.firstName || '?'} (${rok})`;
 }
+// Rok narodenia osoby (číslo) alebo null, ak neznámy.
+function personRokNarodenia(p) {
+  const m = String((p && p.birthDate) || '').match(/\d{4}/);
+  return m ? Number(m[0]) : null;
+}
+// Vekovo-pohlavná podmienka pre výberové zoznamy v editore osoby:
+//  - otec: muž starší najviac o 50 rokov; matka: žena staršia najviac o 50 rokov
+//  - partner: opačné pohlavie; pri mužovi žena staršia max 50 / mladšia max 20 rokov, pri žene naopak
+//  - dieťa: mladšie ako editovaná osoba
+// Pohlavie sa filtruje vždy; vek iba ak je známy rok narodenia editovanej osoby.
+function pickerVekovaPasuje(kand, vztah, ja) {
+  if (!kand) return false;
+  if (vztah === 'father' && kand.gender !== 'M') return false;
+  if (vztah === 'mother' && kand.gender !== 'F') return false;
+  if (vztah === 'spouse') {
+    const jaZena = !!(ja && ja.gender === 'F');
+    if (jaZena && kand.gender !== 'M') return false;
+    if (!jaZena && kand.gender !== 'F') return false;
+  }
+  const rok = ja ? personRokNarodenia(ja) : null;
+  if (!rok) return true;                         // neznámy rok editovanej osoby → všetci (pohlavie ostáva)
+  const rokKand = personRokNarodenia(kand);
+  if (!rokKand) return true;                     // kandidát bez roka ostáva v ponuke
+  const diff = rokKand - rok;                    // + = kandidát mladší ako editovaná osoba
+  if (vztah === 'father' || vztah === 'mother') return diff <= 0 && diff >= -50;  // rodič starší, najviac o 50 rokov
+  if (vztah === 'child') return diff > 0;        // dieťa mladšie
+  if (vztah === 'spouse') {
+    if (ja && ja.gender === 'F') return diff >= -20 && diff <= 50;  // muž: starší najviac 20, mladší najviac 50
+    return diff >= -50 && diff <= 20;                               // žena: staršia najviac 50, mladšia najviac 20
+  }
+  return true;
+}
 // Filtrovanie výberov: zhoda na priezvisko/meno/rodné meno (bez diakritiky) alebo rok narodenia.
 function applyPersonPickerFilter(input, selects) {
   const q = String(input.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -2251,9 +2283,12 @@ function populateParentSelects(currentId, person) {
   const fatherSelect = document.getElementById('editFatherSelect'); const motherSelect = document.getElementById('editMotherSelect');
   fatherSelect.innerHTML = `<option value="">${t('tOptNoFather')}</option>`; motherSelect.innerHTML = `<option value="">${t('tOptNoMother')}</option>`;
   const parents = currentId ? getParentsOf(currentId) : { father: null, mother: null };
+  const ja = (currentId && treeData.persons[currentId]) || null;
+  const otecId = parents.father ? parents.father.id : null, matkaId = parents.mother ? parents.mother.id : null;
   personPickerList(currentId).forEach(other => {
     const opt = `<option value="${other.id}">${esc(personPickerLabel(other))}</option>`;
-    if (other.gender === 'M') fatherSelect.innerHTML += opt; else if (other.gender === 'F') motherSelect.innerHTML += opt;
+    if (other.gender === 'M' && (other.id === otecId || pickerVekovaPasuje(other, 'father', ja))) fatherSelect.innerHTML += opt;
+    else if (other.gender === 'F' && (other.id === matkaId || pickerVekovaPasuje(other, 'mother', ja))) motherSelect.innerHTML += opt;
   });
   if (parents.father) fatherSelect.value = parents.father.id; if (parents.mother) motherSelect.value = parents.mother.id;
   const pf = document.getElementById('parentPickerFilter'); if (pf) { pf.value = ''; applyPersonPickerFilter(pf, [fatherSelect, motherSelect]); }
@@ -2264,7 +2299,8 @@ function addSpouseFieldRow(selectedSpouseId = "", marrDate = "") {
   const container = document.getElementById('spousesContainer'); if (container.children.length >= 4) { showToast(t('tMaxSpouses'), "error"); return; }
   const row = document.createElement('div'); row.className = "spouse-row flex flex-col sm:flex-row items-center gap-3 p-3 rounded-2xl bg-white shadow-sm border border-slate-200";
   let optionsHtml = `<option value="">${t('tOptSelSpouse')}</option>`; const currId = document.getElementById('editPersonId').value;
-  personPickerList(currId).forEach(p => { optionsHtml += `<option value="${p.id}" ${p.id === selectedSpouseId ? 'selected' : ''}>${esc(personPickerLabel(p))}</option>`; });
+  const jaSp = (currId && treeData.persons[currId]) || null;
+  personPickerList(currId).forEach(p => { if (p.id !== selectedSpouseId && !pickerVekovaPasuje(p, 'spouse', jaSp)) return; optionsHtml += `<option value="${p.id}" ${p.id === selectedSpouseId ? 'selected' : ''}>${esc(personPickerLabel(p))}</option>`; });
   row.innerHTML = `<div class="spouse-avatar-preview w-10 h-10 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0 border border-slate-300"><i class="ph-bold ph-user text-slate-400"></i></div><div class="flex-1 w-full"><select class="spouse-select w-full p-2 rounded-xl border border-slate-300 bg-white" onchange="updateSpouseRowAvatar(this)">${optionsHtml}</select></div><div class="w-full sm:w-44"><input type="text" value="${esc(marrDate || '')}" placeholder="${t('tPhDateMarr')}" class="spouse-date w-full p-2 rounded-xl border border-slate-300 bg-white"></div><button type="button" onclick="this.closest('.spouse-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`;
   container.appendChild(row); updateSpouseRowAvatar(row.querySelector('.spouse-select'));
 }
@@ -2279,7 +2315,8 @@ function populateChildrenEditor(currentId, person) { const container = document.
 function addChildFieldRow(selectedChildId = "") {
   const container = document.getElementById('childrenContainer'); const row = document.createElement('div'); row.className = "child-row flex items-center gap-2 p-2 rounded-xl bg-white shadow-sm border border-slate-200";
   let optionsHtml = `<option value="">${t('tOptSelChild')}</option>`; const currId = document.getElementById('editPersonId').value;
-  personPickerList(currId).forEach(p => { optionsHtml += `<option value="${p.id}" ${p.id === selectedChildId ? 'selected' : ''}>${esc(personPickerLabel(p))}</option>`; });
+  const jaCh = (currId && treeData.persons[currId]) || null;
+  personPickerList(currId).forEach(p => { if (p.id !== selectedChildId && !pickerVekovaPasuje(p, 'child', jaCh)) return; optionsHtml += `<option value="${p.id}" ${p.id === selectedChildId ? 'selected' : ''}>${esc(personPickerLabel(p))}</option>`; });
   row.innerHTML = `<select class="child-select flex-1 p-2 rounded-xl border border-slate-300 bg-white">${optionsHtml}</select><button type="button" onclick="this.closest('.child-row').remove()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl"><i class="ph-bold ph-trash text-base"></i></button>`; container.appendChild(row);
 }
 
