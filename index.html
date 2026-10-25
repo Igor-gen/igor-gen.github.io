@@ -353,7 +353,7 @@
 
     <div id="personDetailContent" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 custom-scroll">
       <div class="flex flex-col items-center text-center">
-        <div id="detailAvatarContainer" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 shadow-md overflow-hidden bg-slate-100 flex items-center justify-center relative mb-2 sm:mb-3"></div>
+        <div id="detailAvatarContainer" class="w-24 h-28 sm:w-28 sm:h-32 rounded-xl border-4 shadow-md overflow-hidden bg-slate-100 flex items-center justify-center relative mb-2 sm:mb-3"></div>
         <div class="inline-block px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold mb-1" id="detailGenderBadge"></div>
         <h3 id="detailFullName" class="text-lg sm:text-xl font-bold text-slate-900 leading-tight"></h3>
         <p id="detailDates" class="text-[11px] sm:text-xs text-slate-500 font-medium mt-1"></p>
@@ -1906,7 +1906,7 @@ c.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
 
 function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidth) return str; let s = str; while (s.length > 0 && ctx.measureText(s + '...').width > maxWidth) s = s.slice(0, -1); return s + '...'; }
 
-// Hlavná fotografia v hornej časti karty osoby (vyplní celý kruh, bez deformácie). Volá sa aj po dodatočnom stiahnutí príloh zo servera.
+// Hlavná fotografia v hornej časti karty osoby (obdĺžnikový portrét, vyplní celý rám, bez deformácie). Volá sa aj po dodatočnom stiahnutí príloh zo servera.
 function vykresliAvatarKarty(p) {
   const avatarContainer = document.getElementById('detailAvatarContainer'); if (!avatarContainer || !p) return;
   const isMale = (p.gender === 'M');
@@ -1935,7 +1935,7 @@ function selectPerson(personId, openPanel = true) {
   document.getElementById('detailPlace').innerText = p.birthPlace ? `${t('tPlace')} ${p.birthPlace}, ${p.birthCountry || ''}` : '';
 
   const avatarContainer = document.getElementById('detailAvatarContainer');
-  avatarContainer.className = `w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 shadow-md overflow-hidden bg-slate-100 flex items-center justify-center relative mb-2 sm:mb-3 ${isMale ? 'border-maleBorder' : 'border-femaleBorder'}`;
+  avatarContainer.className = `w-24 h-28 sm:w-28 sm:h-32 rounded-xl border-4 shadow-md overflow-hidden bg-slate-100 flex items-center justify-center relative mb-2 sm:mb-3 ${isMale ? 'border-maleBorder' : 'border-femaleBorder'}`;
   vykresliAvatarKarty(p);
 
   const spouseInfoEl = document.getElementById('detailSpouseInfo'); spouseInfoEl.innerHTML = ""; const spouses = getSpousesOf(p.id);
