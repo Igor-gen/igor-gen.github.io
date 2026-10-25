@@ -228,6 +228,7 @@
         <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i><span data-i18n="menuSaveGdz">Uložiť súbor Gedzip</span></button>
         <button id="btnAiInvestigative" onclick="closeFileMenu();spustiAiInvestigativu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-robot mr-2 text-indigo-600"></i><span data-i18n="menuAi">AI investigatíva</span></button>
         <button id="btnAiChat" onclick="closeFileMenu();spustiAiChat()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-chats-circle mr-2 text-emerald-600"></i><span data-i18n="menuAiChat">ChatGPT investigatíva</span></button>
+        <button id="btnPdfBook" onclick="closeFileMenu();vytvorPdfKnihu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-book-open-text mr-2 text-amber-600"></i><span data-i18n="menuPdfBook">Vytvor PDF knihu</span></button>
         <div id="adminMenuSection" class="hidden pt-1 mt-1 border-t border-slate-200">
           <button id="btnInviteUser" onclick="closeFileMenu();inviteGenealogyUser()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-envelope-simple mr-2 text-emerald-600"></i><span data-i18n="menuInvite">Pozvať používateľa</span></button>
         </div>
@@ -697,7 +698,7 @@ const i18n = {
     menuLbl: "Menu",
     menuOpenGdz: "Otvoriť zložku Gedzip",
     menuSaveGdz: "Uložiť súbor Gedzip",
-    menuAi: "AI investigatíva", menuAiChat: "ChatGPT investigatíva", aiChatCopied: "Prompt bol skopírovaný do schránky. Vložte ho do ChatGPT (Ctrl+V) a odošlite.", aiChatCopyFail: "Skopírovanie promptu zlyhalo – otvorte ChatGPT a skopírujte ho ručne.",
+    menuPdfBook: "Vytvor PDF knihu", menuAi: "AI investigatíva", menuAiChat: "ChatGPT investigatíva", aiChatCopied: "Prompt bol skopírovaný do schránky. Vložte ho do ChatGPT (Ctrl+V) a odošlite.", aiChatCopyFail: "Skopírovanie promptu zlyhalo – otvorte ChatGPT a skopírujte ho ručne.",
     menuInvite: "Pozvať používateľa",
     btnFanChart: "Vejárový graf",
     tRootFromPerson: "Zobraziť rodokmeň od tejto osoby (koreň)",
@@ -771,7 +772,7 @@ const i18n = {
     menuLbl: "Menu",
     menuOpenGdz: "Otevřít složku Gedzip",
     menuSaveGdz: "Uložit soubor Gedzip",
-    menuAi: "AI investigativa", menuAiChat: "ChatGPT investigativa", aiChatCopied: "Prompt byl zkopírován do schránky. Vložte jej do ChatGPT (Ctrl+V) a odešlete.", aiChatCopyFail: "Kopírování promptu selhalo – otevřete ChatGPT a zkopírujte jej ručně.",
+    menuPdfBook: "Vytvořit PDF knihu", menuAi: "AI investigativa", menuAiChat: "ChatGPT investigativa", aiChatCopied: "Prompt byl zkopírován do schránky. Vložte jej do ChatGPT (Ctrl+V) a odešlete.", aiChatCopyFail: "Kopírování promptu selhalo – otevřete ChatGPT a zkopírujte jej ručně.",
     menuInvite: "Pozvat uživatele",
     btnFanChart: "Vějířový graf",
     tRootFromPerson: "Zobrazit rodokmen od této osoby (kořen)",
@@ -834,7 +835,7 @@ const i18n = {
     menuLbl: "Menu",
     menuOpenGdz: "Open Gedzip folder",
     menuSaveGdz: "Save Gedzip file",
-    menuAi: "AI investigation", menuAiChat: "ChatGPT investigation", aiChatCopied: "The prompt was copied to the clipboard. Paste it into ChatGPT (Ctrl+V) and send it.", aiChatCopyFail: "Copying the prompt failed – open ChatGPT and copy it manually.",
+    menuPdfBook: "Create PDF book", menuAi: "AI investigation", menuAiChat: "ChatGPT investigation", aiChatCopied: "The prompt was copied to the clipboard. Paste it into ChatGPT (Ctrl+V) and send it.", aiChatCopyFail: "Copying the prompt failed – open ChatGPT and copy it manually.",
     menuInvite: "Invite user",
     btnFanChart: "Fan chart",
     tRootFromPerson: "Show the tree from this person (root)",
@@ -897,7 +898,7 @@ const i18n = {
     menuLbl: "Menü",
     menuOpenGdz: "Gedzip-Ordner öffnen",
     menuSaveGdz: "Gedzip-Datei speichern",
-    menuAi: "KI-Recherche", menuAiChat: "ChatGPT-Recherche", aiChatCopied: "Der Prompt wurde in die Zwischenablage kopiert. Fügen Sie ihn in ChatGPT ein (Strg+V) und senden Sie ihn.", aiChatCopyFail: "Kopieren des Prompts fehlgeschlagen – öffnen Sie ChatGPT und kopieren Sie ihn manuell.",
+    menuPdfBook: "PDF-Buch erstellen", menuAi: "KI-Recherche", menuAiChat: "ChatGPT-Recherche", aiChatCopied: "Der Prompt wurde in die Zwischenablage kopiert. Fügen Sie ihn in ChatGPT ein (Strg+V) und senden Sie ihn.", aiChatCopyFail: "Kopieren des Prompts fehlgeschlagen – öffnen Sie ChatGPT und kopieren Sie ihn manuell.",
     menuInvite: "Benutzer einladen",
     btnFanChart: "Fächerdiagramm",
     tRootFromPerson: "Stammbaum ab dieser Person anzeigen (Wurzel)",
@@ -4658,6 +4659,431 @@ function updateUndoRedoButtons() {
   const u = document.getElementById('btnUndo'), r = document.getElementById('btnRedo');
   if (u) { u.classList.toggle('opacity-40', !undoStack.length); u.classList.toggle('cursor-not-allowed', !undoStack.length); }
   if (r) { r.classList.toggle('opacity-40', !redoStack.length); r.classList.toggle('cursor-not-allowed', !redoStack.length); }
+}
+
+// ============================================================
+// ===== PDF KNIHA V SECESNOM ŠTÝLE („Vytvor PDF knihu“) =====
+// ============================================================
+// Titulná strana: názov knihy + secesný ornament + zoznam rodov (obsah).
+// Každá strana orámovaná secesným vzorom (SVG šablóna používateľa).
+// Kapitoly: 1. rod Sklenčár, potom ostatné rody podľa výberovníka.
+// Členovia: od najstaršieho predka → partner(ka) → deti → vnúčatá → pravnúčatá.
+
+const PDF_BOOK = {
+  W: 595, H: 842, SC: 2,           // A4 v bodoch (pt), render v merítku 2x
+  MARGIN_X: 62, TOP: 72, BOTTOM: 788,
+  COLOR: '#3B4E29',
+};
+
+const PDF_BOOK_FRAME_SVG = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+  <g id="art-nouveau-frame" stroke="#3B4E29" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="25" y="25" width="545" height="792" stroke-width="1.8" />
+    <rect x="31" y="31" width="533" height="780" stroke-width="0.8" />
+    <g id="corner-top-left" stroke-width="0">
+      <path d="M 25 105 C 25 65, 38 42, 60 38 C 75 35, 95 38, 120 30 C 95 24, 60 20, 42 35 C 28 47, 26 70, 25 105 Z" fill="#3B4E29" />
+      <path d="M 28 85 C 32 50, 52 40, 78 45 C 105 50, 95 78, 70 80 C 50 82, 45 60, 62 55 C 72 52, 78 60, 72 68 C 68 72, 60 70, 60 64" fill="none" stroke="#3B4E29" stroke-width="2.2" />
+      <path d="M 50 25 C 50 45, 35 60, 42 90 C 46 108, 38 130, 25 145" fill="none" stroke="#3B4E29" stroke-width="1.6" />
+      <path d="M 32 32 C 45 20, 80 22, 100 26 C 70 34, 45 36, 32 32 Z" fill="#3B4E29" />
+    </g>
+    <g id="corner-top-right">
+      <path d="M 485 30 C 525 30, 555 24, 570 42 C 580 55, 563 70, 568 95 C 571 115, 557 135, 570 150" stroke-width="2" fill="none" />
+      <path d="M 530 25 C 550 25, 565 35, 560 55 C 555 72, 577 85, 565 115 C 559 130, 570 140, 570 140" stroke-width="1.4" fill="none" />
+      <path d="M 555 31 C 565 35, 567 50, 560 62 C 557 48, 547 42, 555 31 Z" fill="#3B4E29" stroke-width="0" />
+    </g>
+    <g id="corner-bottom-left">
+      <path d="M 25 777 C 25 802, 40 817, 65 817" stroke-width="1.8" fill="none" />
+      <path d="M 25 797 C 25 812, 30 817, 45 817 C 32 817, 25 810, 25 797 Z" fill="#3B4E29" stroke-width="0" />
+    </g>
+    <g id="corner-bottom-right">
+      <path d="M 570 777 C 570 802, 555 817, 530 817" stroke-width="1.8" fill="none" />
+      <path d="M 570 797 C 570 812, 565 817, 550 817 C 563 817, 570 810, 570 797 Z" fill="#3B4E29" stroke-width="0" />
+    </g>
+  </g>
+</svg>`;
+
+// Sekcesný ornamentový oddelovač pre titulnú stranu a záhlavia kapitol
+const PDF_BOOK_DIVIDER_SVG = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 60" width="300" height="60">
+  <g stroke="#3B4E29" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 150 38 C 120 38, 100 30, 80 22 C 60 14, 40 22, 30 34 C 22 44, 12 46, 4 40" stroke-width="1.8"/>
+    <path d="M 150 38 C 180 38, 200 30, 220 22 C 240 14, 260 22, 270 34 C 278 44, 288 46, 296 40" stroke-width="1.8"/>
+    <path d="M 40 28 C 34 22, 26 26, 24 33 C 22 40, 16 42, 10 38" stroke-width="1.2"/>
+    <path d="M 260 28 C 266 22, 274 26, 276 33 C 278 40, 284 42, 290 38" stroke-width="1.2"/>
+    <path d="M 150 42 C 138 42, 132 50, 138 54 C 143 57, 148 53, 146 48" stroke-width="1.4"/>
+    <path d="M 150 42 C 162 42, 168 50, 162 54 C 157 57, 152 53, 154 48" stroke-width="1.4"/>
+    <path d="M 130 26 C 140 18, 160 18, 170 26 C 160 24, 140 24, 130 26 Z" fill="#3B4E29" stroke-width="0"/>
+    <path d="M 128 27 C 118 22, 108 24, 104 30 C 112 27, 122 26, 128 27 Z" fill="#3B4E29" stroke-width="0"/>
+    <path d="M 172 27 C 182 22, 192 24, 196 30 C 188 27, 178 26, 172 27 Z" fill="#3B4E29" stroke-width="0"/>
+    <circle cx="150" cy="34" r="2.4" fill="#3B4E29" stroke-width="0"/>
+    <circle cx="70" cy="28" r="2" fill="#3B4E29" stroke-width="0"/>
+    <circle cx="230" cy="28" r="2" fill="#3B4E29" stroke-width="0"/>
+  </g>
+</svg>`;
+
+function pdfBookSvgToCanvas(svgStr, wPt, hPt) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(wPt * PDF_BOOK.SC); cv.height = Math.round(hPt * PDF_BOOK.SC);
+      const cx = cv.getContext('2d');
+      cx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url); resolve(cv);
+    };
+    img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} resolve(null); };
+    img.src = url;
+  });
+}
+
+function pdfBookLoadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function pdfBookBezDia(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+
+// Zoznam rodov knihy: hlavný rod (koreň diagramu) ako prvý, potom rody z výberovníka
+function pdfBookRody() {
+  const ciele = rodCieleMapa();
+  const zoznam = [];
+  const koren = treeData.persons[HREBEN.koren];
+  const hlavny = koren ? rodNazov(koren) : '';
+  if (hlavny) zoznam.push(hlavny);
+  Array.from(ciele.keys()).sort((a, b) => a.localeCompare(b, 'sk', { sensitivity: 'base' }))
+    .forEach(n => { if (!zoznam.includes(n)) zoznam.push(n); });
+  return zoznam;
+}
+
+function pdfBookStarsiPredok(startId, rod) {
+  const P = treeData.persons; let cur = P[startId]; let guard = 0;
+  while (cur && guard++ < 60) {
+    const r = hrebenRodicia(cur); if (!r) break;
+    const o = r.otec, m = r.matka;
+    const kand = (o && rodNazov(o) === rod) ? o : ((m && rodNazov(m) === rod) ? m : (o || m));
+    if (!kand || kand.id === cur.id) break;
+    cur = kand;
+  }
+  return cur || P[startId];
+}
+
+// Generácie: [0]=najstarší predok, [1]=deti, [2]=vnúčatá, [3]=pravnúčatá
+function pdfBookGeneracie(korenId) {
+  const P = treeData.persons; const videne = new Set([korenId]);
+  const gen = [[P[korenId]]]; let cur = [P[korenId]];
+  for (let g = 0; g < 3; g++) {
+    const next = [];
+    cur.forEach(p => {
+      (p.fams || []).forEach(fid => {
+        const fam = (HREBEN.rodinyMapa || {})[fid] || treeData.families[fid];
+        if (!fam || !fam.children) return;
+        fam.children.forEach(cid => { if (P[cid] && !videne.has(cid)) { videne.add(cid); next.push(P[cid]); } });
+      });
+    });
+    if (!next.length) break;
+    next.sort((a, b) => (hrebenRok(a) === Infinity ? 9999 : hrebenRok(a)) - (hrebenRok(b) === Infinity ? 9999 : hrebenRok(b)));
+    gen.push(next); cur = next;
+  }
+  return gen;
+}
+
+function pdfBookMeno(p) {
+  if (!p) return '';
+  return [p.title, p.firstName, p.middleName, (p.lastName || p.birthName)].filter(Boolean).join(' ').trim();
+}
+
+function pdfBookRokHodnota(p) { const r = hrebenRok(p); return (r === Infinity || isNaN(r)) ? 9999 : r; }
+
+// Základné riadky s údajmi osoby (Slovak labels – pekná kniha je v slovenčine)
+function pdfBookRiadky(p, rodPages) {
+  const riadky = [];
+  const push = (l, v) => { if (v && String(v).trim()) riadky.push({ l, v: String(v).trim() }); };
+  const ev = p.events || [];
+  const notes = (p.notes || []).map(n => String(n));
+  // narodenie / úmrtie
+  push('nar.', [p.birthDate, p.birthPlace].filter(Boolean).join(', '));
+  push('†', [p.deathDate, p.deathPlace].filter(Boolean).join(', '));
+  // vierovyznanie (ak existuje)
+  const relKw = /vierovyznan|nabozenstv|narodens|katol|evanjel|pravoslav|zidov|judais|islam|krestan|luter/i;
+  const rel = notes.find(n => relKw.test(pdfBookBezDia(n)));
+  const relEv = ev.find(e => relKw.test(pdfBookBezDia(e.title)) || relKw.test(pdfBookBezDia(e.place)));
+  if (rel) push('vierovyznanie', rel);
+  else if (relEv) push('vierovyznanie', [relEv.title, relEv.place].filter(Boolean).join(', '));
+  // krst
+  const bapm = ev.find(e => e.type === 'BAPM');
+  if (bapm) push('krst', [bapm.date, bapm.place].filter(Boolean).join(', '));
+  // birmovanie
+  const birmEv = ev.find(e => /birm/i.test(pdfBookBezDia(e.title)) || /birm/i.test(pdfBookBezDia(e.type)));
+  const birmN = notes.find(n => /birm/i.test(pdfBookBezDia(n)));
+  if (birmEv) push('birmovanie', [birmEv.date, birmEv.place || birmEv.title].filter(Boolean).join(', '));
+  else if (birmN) push('birmovanie', birmN);
+  // sobáše
+  getSpousesOf(p.id).forEach(s => {
+    push('sobáš', [s.marrDate, 's ' + pdfBookMeno(s.person)].filter(Boolean).join(' '));
+  });
+  // školy s dátumami od–do
+  const skLabels = { EDUC_ZS: 'základná škola', EDUC_SS: 'stredná škola', EDUC_VS: 'vysoká škola' };
+  ev.filter(e => e.type && e.type.startsWith('EDUC')).forEach(e => {
+    push(skLabels[e.type] || 'škola', [e.date, e.place || e.title].filter(Boolean).join(', '));
+  });
+  // vzdelanie
+  const vzKw = /vzdelan|diplom|promoce|titul|absolvent/i;
+  const vzN = notes.find(n => vzKw.test(pdfBookBezDia(n)));
+  if (vzN) push('vzdelanie', vzN);
+  else if (ev.some(e => e.type === 'EDUC_VS')) push('vzdelanie', 'vysokoškolské');
+  // povolanie s obdobím od–do
+  (p.occupations || []).slice(0, 2).forEach(o => {
+    const per = [o.dateFrom, o.dateTo].filter(Boolean).join('–');
+    push('povolanie', [o.title, o.city, per].filter(Boolean).join(', '));
+  });
+  // rodné meno a odkaz na rod partnerky/partnera
+  if (p.birthName) {
+    const rodSp = pdfBookRodPartnera(p);
+    const str = (rodSp && rodPages && rodPages.get(rodSp)) ? ' – rod ' + rodSp + ' je na strane ' + rodPages.get(rodSp) : '';
+    push('rodné meno', p.birthName + str);
+  }
+  return riadky;
+}
+
+// Rod, z ktorého pochádza partner/partnerka (ak má rodičov v rodokmeni)
+function pdfBookRodPartnera(sp) {
+  if (!sp) return null;
+  const r = hrebenRodicia(sp); if (!r) return null;
+  const rodic = r.otec || r.matka; if (!rodic) return null;
+  const n = rodNazov(rodic); return n || null;
+}
+
+// ---- zalamovanie dlhých textov (rovnaké pre layout aj vykresľovanie) ----
+const pdfBookMeasureCtx = document.createElement('canvas').getContext('2d');
+const PDF_BOOK_LINE_FONT = '8.7pt Georgia, serif';
+function pdfBookWrapText(text, maxW) {
+  pdfBookMeasureCtx.font = PDF_BOOK_LINE_FONT;
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = []; let cur = '';
+  words.forEach(w => {
+    const test = cur ? cur + ' ' + w : w;
+    if (!cur || pdfBookMeasureCtx.measureText(test).width <= maxW) cur = test;
+    else { lines.push(cur); cur = w; }
+  });
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [''];
+}
+function pdfBookWrapRiadky(riadky) {
+  const tx = PDF_BOOK.MARGIN_X + 60 + 14;   // pozícia textu vpravo od portrétu
+  const maxW = PDF_BOOK.W - PDF_BOOK.MARGIN_X - tx;
+  return riadky.map(r => ({ l: r.l, lines: pdfBookWrapText(r.v, maxW) }));
+}
+
+// ---- rozvrhnutie (layout) knihy: kapitoly → strany → bloky ----
+function pdfBookLayout(rodPages) {
+  const L = { pages: [], rodPages: new Map(), pageNum: 1 }; // strana 1 = titulná
+  const newPage = (rod) => { L.pageNum++; const pg = { num: L.pageNum, rod, items: [] }; L.pages.push(pg); return pg; };
+  const rody = pdfBookRody();
+  rody.forEach(rod => {
+    const startId = (treeData.persons[HREBEN.koren] && rodNazov(treeData.persons[HREBEN.koren]) === rod)
+      ? HREBEN.koren
+      : (() => { const ciele = rodCieleMapa(); const v = ciele.get(rod); return v ? v.split('|')[0] : null; })();
+    const predok = (startId && treeData.persons[startId]) ? pdfBookStarsiPredok(startId, rod) : null;
+    if (!predok) return;
+    L.rodPages.set(rod, L.pageNum + 1);               // nová kapitola vždy od novej strany
+    let pg = newPage(rod); let y = PDF_BOOK.TOP + 52; // miesto pre hlavičku kapitoly
+    const geny = pdfBookGeneracie(predok.id);
+    const genNadpis = ['Najstarší predkovia', 'Deti', 'Vnúčatá', 'Pravnúčatá'];
+    const videne = new Set();
+    geny.forEach((gen, gi) => {
+      if (!gen || !gen.length) return;
+      const nadpisH = 26;
+      if (y + nadpisH > PDF_BOOK.BOTTOM) { pg = newPage(rod); y = PDF_BOOK.TOP; }
+      pg.items.push({ kind: 'genHeader', y, text: genNadpis[gi] }); y += nadpisH;
+      gen.forEach(p => {
+        const bloky = [p];
+        getSpousesOf(p.id).forEach(s => { if (s.person && !videne.has(s.person.id)) bloky.push(s.person); });
+        bloky.forEach(os => {
+          if (videne.has(os.id)) return;
+          videne.add(os.id);
+          const riadky = pdfBookWrapRiadky(pdfBookRiadky(os, L.rodPages));
+          const h = Math.max(84, 20 + riadky.reduce((s, r) => s + r.lines.length, 0) * 12.5 + 8);
+          if (y + h > PDF_BOOK.BOTTOM) { pg = newPage(rod); y = PDF_BOOK.TOP; }
+          pg.items.push({ kind: 'person', y, p: os, riadky });
+          y += h;
+        });
+      });
+    });
+  });
+  return L;
+}
+
+// ---- vykreslenie jednej strany na canvas ----
+function pdfBookDrawPhotoFrame(ctx, x, y, w, h) {
+  const C = PDF_BOOK.COLOR;
+  ctx.save();
+  ctx.strokeStyle = C; ctx.lineWidth = 1.4; ctx.strokeRect(x, y, w, h);
+  ctx.lineWidth = 0.5; ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+  // secesné rohové akcenty (malé výhonky)
+  ctx.lineWidth = 1.1; ctx.beginPath();
+  ctx.moveTo(x + 16, y); ctx.quadraticCurveTo(x + 2, y + 2, x, y + 16);
+  ctx.moveTo(x + w - 16, y); ctx.quadraticCurveTo(x + w - 2, y + 2, x + w, y + 16);
+  ctx.moveTo(x + 16, y + h); ctx.quadraticCurveTo(x + 2, y + h - 2, x, y + h - 16);
+  ctx.moveTo(x + w - 16, y + h); ctx.quadraticCurveTo(x + w - 2, y + h - 2, x + w, y + h - 16);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(PDF_BOOK.SC, 0, 0, PDF_BOOK.SC, 0, 0);
+  const C = PDF_BOOK.COLOR, MX = PDF_BOOK.MARGIN_X;
+  if (frameCv) ctx.drawImage(frameCv, 0, 0, PDF_BOOK.W, PDF_BOOK.H);
+  ctx.textBaseline = 'alphabetic';
+  const center = (txt, font, y, color) => { ctx.font = font; ctx.fillStyle = color || C; ctx.textAlign = 'center'; ctx.fillText(txt, PDF_BOOK.W / 2, y); ctx.textAlign = 'left'; };
+
+  if (pg.isTitle) {
+    // Titulná strana knihy
+    center('Rodokmeň rodiny Sklenčár', '26pt Georgia, "Times New Roman", serif', 205);
+    ctx.font = '11pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+    ctx.fillText('Kniha rodov podľa diagramov rodokmeňa', PDF_BOOK.W / 2, 232); ctx.textAlign = 'left';
+    if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 220) / 2, 248, 220, 44);
+    // Obsah: zoznam rodov so stranami
+    ctx.font = '14pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+    ctx.fillText('O B S A H', PDF_BOOK.W / 2, 330); ctx.textAlign = 'left';
+    const rody = pg.toc; // [{rod, page}]
+    const gap = rody.length > 22 ? 17 : (rody.length > 14 ? 20 : 24);
+    let y = 360;
+    rody.forEach(r => {
+      ctx.font = '11.5pt Georgia, serif'; ctx.fillStyle = C;
+      ctx.fillText('Rod ' + r.rod, MX + 30, y);
+      const tw = ctx.measureText('Rod ' + r.rod).width;
+      const pw = ctx.measureText('strana ' + r.page).width;
+      ctx.strokeStyle = C; ctx.lineWidth = 0.4; ctx.setLineDash([1.5, 2.5]);
+      ctx.beginPath(); ctx.moveTo(MX + 36 + tw, y - 3); ctx.lineTo(PDF_BOOK.W - MX - 30 - pw, y - 3); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillText('strana ' + r.page, PDF_BOOK.W - MX - 30 - pw, y);
+      y += gap;
+    });
+  } else {
+    // Kapitola rodu
+    if (pg.isChapterStart) {
+      ctx.font = '19pt Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText('Rod ' + pg.rod, PDF_BOOK.W / 2, PDF_BOOK.TOP + 8); ctx.textAlign = 'left';
+      if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 180) / 2, PDF_BOOK.TOP + 18, 180, 36);
+    }
+    pg.items.forEach(it => {
+      const x = MX, maxW = PDF_BOOK.W - 2 * MX;
+      if (it.kind === 'genHeader') {
+        ctx.font = '9.5pt Georgia, serif'; ctx.fillStyle = '#7a8a6a';
+        const lbl = it.text.toUpperCase().split('').join(' ');
+        ctx.fillText(lbl, x, it.y + 8);
+        ctx.strokeStyle = '#9aab88'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(x + ctx.measureText(lbl).width + 10, it.y + 5); ctx.lineTo(x + maxW, it.y + 5); ctx.stroke();
+      } else if (it.kind === 'person') {
+        const p = it.p, ry = it.y;
+        // portrét v secesnom rámečku
+        const phW = 60, phH = 78;
+        const img = imgs.get(p.id);
+        ctx.save();
+        ctx.fillStyle = '#f4f6f0'; ctx.fillRect(x, ry, phW, phH);
+        if (img) {
+          const r = Math.min(phW / img.width, phH / img.height);
+          const iw = img.width * r, ih = img.height * r;
+          ctx.save(); ctx.beginPath(); ctx.rect(x, ry, phW, phH); ctx.clip();
+          ctx.drawImage(img, x + (phW - iw) / 2, ry + (phH - ih) / 2, iw, ih); ctx.restore();
+        } else {
+          ctx.strokeStyle = '#c4cdb8'; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH / 2 - 6, 14, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x + phW / 2, ry + phH - 22, 20, Math.PI, 0); ctx.stroke();
+        }
+        ctx.restore();
+        pdfBookDrawPhotoFrame(ctx, x, ry, phW, phH);
+        // text vpravo od fotky
+        let ty = ry + 13; const tx = x + phW + 14;
+        ctx.font = 'bold 11.5pt Georgia, serif'; ctx.fillStyle = C;
+        let meno = pdfBookMeno(p);
+        if (p.gender === 'F' && p.birthName && p.lastName && p.birthName !== p.lastName) meno += '  (rodená ' + p.birthName + ')';
+        ctx.fillText(meno, tx, ty); ty += 15;
+        it.riadky.forEach(r => {
+          ctx.font = PDF_BOOK_LINE_FONT;
+          const lw = ctx.measureText(r.l + ':').width;
+          r.lines.forEach((ln, i) => {
+            if (i === 0) { ctx.fillStyle = '#77866a'; ctx.fillText(r.l + ':', tx, ty); }
+            ctx.fillStyle = '#2c3a22'; ctx.fillText(ln, tx + lw + 4, ty);
+            ty += 12.5;
+          });
+        });
+      }
+    });
+  }
+  // číslo strany
+  ctx.font = 'italic 8.5pt Georgia, serif'; ctx.fillStyle = '#8b9a7c'; ctx.textAlign = 'center';
+  ctx.fillText(String(pg.num), PDF_BOOK.W / 2, 806); ctx.textAlign = 'left';
+}
+
+// ---- hlavná funkcia: vytvorenie a uloženie PDF knihy ----
+async function vytvorPdfKnihu() {
+  try {
+    if (!window.jspdf || !window.jspdf.jsPDF) { showToast(t('fanNoPdf') || 'PDF knižnica nie je načítaná.', 'error'); return; }
+    if (!Object.keys(treeData.persons || {}).length) { showToast('Najprv otvorte alebo vytvorte rodokmeň.', 'error'); return; }
+    showToast('Generujem PDF knihu…', 'info');
+    try { closeFileMenu(); } catch (e) {}
+
+    const frameCv = await pdfBookSvgToCanvas(PDF_BOOK_FRAME_SVG, PDF_BOOK.W, PDF_BOOK.H);
+    const dividerCv = await pdfBookSvgToCanvas(PDF_BOOK_DIVIDER_SVG, 300, 60);
+
+    // 1. priechod – čísla strán kapitol (pre odkazy „rod na strane X“)
+    let L = pdfBookLayout(null);
+    const rodPages = L.rodPages;
+    // 2. priechod – finálne rozvrhnutie s odkazmi na strany
+    L = pdfBookLayout(rodPages);
+
+    // prednačítanie hlavných fotografií
+    const imgs = new Map();
+    const promises = [];
+    L.pages.forEach(pg => pg.items.forEach(it => {
+      if (it.kind === 'person') {
+        const p = it.p;
+        const main = (p.photos || []).find(ph => ph.isMain) || (p.photos || [])[0];
+        if (main && main.data && !imgs.has(p.id)) {
+          promises.push(pdfBookLoadImage(main.data).then(im => imgs.set(p.id, im)));
+        }
+      }
+    }));
+    await Promise.all(promises);
+
+    // titulná strana (strana 1) – obsah so stranami kapitol
+    const rodyZoznam = Array.from(rodPages.keys()).map(rod => ({ rod, page: rodPages.get(rod) }));
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
+
+    const renderPage = async (pg) => {
+      const cv = document.createElement('canvas');
+      cv.width = PDF_BOOK.W * PDF_BOOK.SC; cv.height = PDF_BOOK.H * PDF_BOOK.SC;
+      pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv);
+      const idx = pg.num - 1;
+      if (idx > 0) pdf.addPage();
+      pdf.setPage(idx + 1);
+      pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PDF_BOOK.W, PDF_BOOK.H, undefined, 'FAST');
+    };
+
+    await renderPage({ num: 1, isTitle: true, toc: rodyZoznam });
+    for (const pg of L.pages) {
+      pg.isChapterStart = (pg.num === rodPages.get(pg.rod));
+      await renderPage(pg);
+    }
+
+    pdf.save('Rodokmen-rodiny-Sklencar.pdf');
+    showToast('PDF kniha bola vytvorená a uložená.', 'success');
+  } catch (err) {
+    console.error(err);
+    showToast('Vytvorenie PDF knihy zlyhalo: ' + (err && err.message ? err.message : ''), 'error');
+  }
 }
 </script>
 
