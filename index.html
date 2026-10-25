@@ -3679,6 +3679,8 @@ async function submitDbForm(e) {
 }
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
+// Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
+console.log('Genealogy index16c-v19 – rev. 3: vekové/pohlavné filtre výberov (pickerVekovaPasuje), favicon, PDF kniha podľa rodín');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
