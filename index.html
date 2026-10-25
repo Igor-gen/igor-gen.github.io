@@ -1958,7 +1958,7 @@ function selectPerson(personId, openPanel = true) {
       childrenListEl.innerHTML += `
         <div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition cursor-pointer" onclick="selectPerson('${c.id}')">
           <div class="flex items-center gap-2"><i class="ph-bold ${c.gender === 'M' ? 'ph-gender-male text-blue-500' : 'ph-gender-female text-pink-500'}"></i><span class="font-medium text-slate-700">${esc(c.firstName)} ${esc(c.lastName)}</span></div>
-          <div class="flex items-center gap-2"><span class="text-[10px] text-slate-400">${c.birthDate || '?'}</span><button onclick="event.stopPropagation(); centerOnPerson('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>
+          <div class="flex items-center gap-2"><span class="text-[10px] text-slate-400">${esc(c.birthDate || '?')}</span><button onclick="event.stopPropagation(); centerOnPerson('${c.id}')" class="p-1 text-slate-400 hover:text-indigo-600"><i class="ph-bold ph-crosshair text-xs"></i></button></div>
         </div>`;
     });
   }
@@ -2128,7 +2128,7 @@ function updateRecentListUI() {
     const p = treeData.persons[id];
     if (p) {
       const isMale = p.gender === 'M';
-      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${p.birthDate || '?'}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
+      container.innerHTML += `<div onclick="selectPerson('${p.id}')" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 cursor-pointer flex items-center justify-between transition"><div class="flex items-center gap-2 truncate"><span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMale ? 'bg-blue-500' : 'bg-pink-500'}"></span><div class="truncate"><p class="text-[10px] sm:text-xs font-semibold text-slate-800 truncate">${esc(p.firstName)} ${esc(p.lastName)}</p><p class="text-[9px] sm:text-[10px] text-slate-400 truncate">${esc(p.birthDate || '?')}</p></div></div><div class="flex items-center gap-1 flex-shrink-0"><button onclick="event.stopPropagation(); centerOnPerson('${p.id}')" class="text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-crosshair text-sm"></i></button><button onclick="event.stopPropagation(); openPersonEditor('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-white"><i class="ph-bold ph-pencil-simple text-xs"></i></button></div></div>`;
     }
   });
 }
@@ -2272,7 +2272,7 @@ function updateSpouseRowAvatar(selectEl) {
   const row = selectEl.closest('.spouse-row'); const preview = row.querySelector('.spouse-avatar-preview'); const partnerId = selectEl.value;
   if (!partnerId || !treeData.persons[partnerId]) { preview.innerHTML = `<i class="ph-bold ph-user text-slate-400"></i>`; return; }
   const partner = treeData.persons[partnerId]; const mainPhoto = partner.photos.find(ph => ph.isMain) || partner.photos[0];
-  if (mainPhoto && mainPhoto.data) preview.innerHTML = `<img src="${mainPhoto.data}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
+  if (mainPhoto && mainPhoto.data) preview.innerHTML = `<img src="${esc(mainPhoto.data)}" class="w-full h-full object-cover">`; else preview.innerHTML = `<i class="ph-bold ph-user ${partner.gender === 'M' ? 'text-blue-500' : 'text-pink-500'}"></i>`;
 }
 
 function populateChildrenEditor(currentId, person) { const container = document.getElementById('childrenContainer'); container.innerHTML = ""; const children = currentId ? getChildrenOf(currentId) : []; children.forEach(c => addChildFieldRow(c.id)); }
@@ -2322,7 +2322,7 @@ function renderAttachedFilesList() {
   const list = document.getElementById('attachedFilesList'); if (!list) return;
   const photos = tempAttachedFiles.filter(isPhotoFile), docs = tempAttachedFiles.filter(f => !isPhotoFile(f));
   const main = photos.find(f => f.isMain) || photos[0], doc = docs[0];
-  const photoBox = main && main.data ? `<img src="${main.data}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
+  const photoBox = main && main.data ? `<img src="${esc(main.data)}" class="w-full h-full object-cover">` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-image text-3xl"></i><span class="text-[11px]">${main ? '' : esc(gt('noMain'))}</span></div>`;
   const docBox = doc ? `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-3xl"></i><span class="font-bold uppercase text-[10px]">${esc(doc.type)}</span></div>` : `<div class="flex flex-col items-center gap-1 text-slate-400"><i class="ph-bold ph-file-text text-3xl"></i><span class="text-[11px]">${esc(gt('noDoc'))}</span></div>`;
   list.innerHTML = `
     <div class="flex flex-col gap-2 p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -2371,7 +2371,7 @@ function renderMediaGallery() {
   grid.innerHTML = galleryItems.map(f => {
     const sel = gallerySelected.has(f.id);
     const body = isPh
-      ? (f.data ? `<img src="${f.data}" draggable="false" class="w-full h-full object-cover" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
+      ? (f.data ? `<img src="${esc(f.data)}" draggable="false" class="w-full h-full object-cover" style="pointer-events: none; -webkit-user-drag: none; user-select: none;" alt="">` : `<i class="ph-bold ph-image text-4xl text-slate-300"></i>`)
       : `<div class="flex flex-col items-center gap-1 text-amber-600"><i class="ph-bold ph-file-text text-4xl"></i><span class="font-bold uppercase text-xs">${esc(f.type)}</span></div>`;
     const star = isPh ? `<button type="button" title="${esc(gt('setMain'))}" onclick="galleryMakeMain('${f.id}')" class="absolute top-2 right-2 w-7 h-7 rounded-full shadow flex items-center justify-center ${f.isMain ? 'bg-amber-400 text-white' : 'bg-white/95 text-slate-400 hover:text-amber-500'}"><i class="ph-bold ph-star text-sm"></i></button>` : '';
     return `<div class="flex flex-col gap-2 p-2 rounded-2xl bg-white border shadow-sm ${sel ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-slate-200'}">
@@ -2646,13 +2646,13 @@ function showPhotoMosaic() {
   isMosaicActive = true; document.getElementById('mosaicBtnText').innerText = t('btnSlide'); document.getElementById('photoSliderView').classList.add('hidden'); document.getElementById('photoMosaicView').classList.remove('hidden');
   const grid = document.getElementById('mosaicGrid'); grid.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const photos = p.photos || [];
   if (photos.length === 0) { grid.innerHTML = `<div class="col-span-4 text-center text-slate-400 py-12">${t('tNoPhotoDisplay')}</div>`; return; }
-  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${ph.data}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
+  photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${esc(ph.data)}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
 }
 
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${doc.type || 'DOC'}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${doc.data}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${esc(doc.type || 'DOC')}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${esc(doc.data)}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
 }
 
 async function saveGedzipTree() {
