@@ -1597,36 +1597,41 @@ function hrebenOtvorZonu(ustrednaId, spatId, odId, okamzite) {
 }
 
 // ===== VÝBER DIAGRAMU PODĽA RODU (bočný panel) =====
-// Zoznam: hlavný diagram + všetky rody (priezviská) z ORANŽOVÝCH ŠÍPOK všetkých
-// otvorených diagramov (aj ešte neotvorených cieľov). Každý rod je v zozname len raz.
+// Zoznam sa NEPOČÍTA z už otvorených diagramov, ale GLOBÁLNE z celého rodokmeňa:
+// každý partner (manžel/manželka), ktorý má rodičov v rodokmeni, je možný cieľ
+// odskoku „rod <priezvisko rodiča>“ – presne tie isté rody, na ktoré ukazujú
+// oranžové šípky v diagramoch. Každý rod je v zozname len raz, abecedne.
 function rodNazov(p) { return String((p && (p.lastName || p.birthName)) || '').trim(); }
+
+// Všetky možné ciele „rod …“ v celom rodokmeni: Map priezviskoRodu → kluc zóny (ustredna|spat).
+function rodCieleMapa() {
+  const ciele = new Map();
+  Object.values(treeData.families || {}).forEach(fam => {
+    const par = [fam.husbandId, fam.wifeId].filter(id => id && treeData.persons[id]);
+    par.forEach(sid => {
+      const sp = treeData.persons[sid];
+      const pr = hrebenRodicia(sp); if (!pr) return;            // odskok existuje len pre partnera s rodičmi
+      const rodic = pr.otec || pr.matka; if (!rodic) return;
+      const nazov = rodNazov(rodic); if (!nazov) return;
+      if (ciele.has(nazov)) return;                             // rod už v zozname – neopakuj
+      const druhy = par.find(x => x !== sid);
+      ciele.set(nazov, sid + '|' + (druhy || ''));
+    });
+  });
+  return ciele;
+}
+
 function updateRodDiagramSelect() {
   const sel = document.getElementById('rodDiagramSelect'); if (!sel) return;
-  const opts = []; const rody = new Set();          // rody = priezviská, už uvedené v zozname
+  const opts = [];
   const hlavna = HREBEN.zony && HREBEN.zony[0];
   if (hlavna) {
     const koren = treeData.persons[HREBEN.koren];
     opts.push({ value: '__main__', label: t('rodMainOpt') + (rodNazov(koren) ? ' – ' + rodNazov(koren) : '') });
   }
-  const pridaj = (rodId, kluc, person) => {
-    if (!rodId || !kluc || !person) return;
-    if (rody.has(rodId)) return;                     // rod už je v zozname – neopakuj
-    rody.add(rodId);
-    opts.push({ value: kluc, label: t('rodFamily').replace('{N}', rodId) });
-  };
-  (HREBEN.zony || []).forEach(z => {
-    if (z === hlavna) return;
-    const osa = treeData.persons[z.ustredna];        // rod otvoreného pod-plátna = osoba na ose
-    pridaj(rodNazov(osa), z.kluc, osa);
-  });
-  (HREBEN.zony || []).forEach(z => {
-    (z.odkazy || []).forEach(o => {
-      if (!o || o.typ === 'spat' || !o.ustredna) return;   // len oranžové šípky dopredu
-      const partner = treeData.persons[o.ustredna];         // rod, do ktorého šípka vedie
-      pridaj(rodNazov(partner), o.ustredna + '|' + (o.spat || ''), partner);
-    });
-  });
-  opts.sort((a, b) => a.value === '__main__' ? -1 : b.value === '__main__' ? 1 : String(a.label).localeCompare(String(b.label), 'sk', { sensitivity: 'base' }));
+  const ciele = rodCieleMapa();
+  Array.from(ciele.keys()).sort((a, b) => a.localeCompare(b, 'sk', { sensitivity: 'base' }))
+    .forEach(nazov => opts.push({ value: ciele.get(nazov), label: t('rodFamily').replace('{N}', nazov) }));
   const povodna = sel.value;
   sel.innerHTML = '<option value="">' + esc(t('rodSelectPh')) + '</option>' +
     opts.map(o => `<option value="${esc(o.value)}" ${o.value === povodna ? 'selected' : ''}>${esc(o.label)}</option>`).join('');
