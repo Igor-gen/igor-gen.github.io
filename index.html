@@ -3680,7 +3680,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v28 – rev. 4: PDF kniha – skloňované názvy rodín (Rodina Igora Sklenčara / Gabriely Sklenčarovej), prvá poznámka ako odstavec, odkaz na rodinu otca partnera so stranou');
+console.log('Genealogy index16c-v28 – rev. 5: PDF kniha – prvá poznámka v tenkom zaoblenom rámčeku na celú šírku pod fotografiou a údajmi osoby, ozdobná iniciála 5× väčšia než text; skloňované názvy rodín, odkaz na rodinu otca partnera so stranou');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -4952,13 +4952,11 @@ function pdfBookWrapRiadky(riadky) {
   const maxW = PDF_BOOK.W - PDF_BOOK.MARGIN_X - tx;
   return riadky.map(r => ({ l: r.l, lines: pdfBookWrapText(r.v, maxW) }));
 }
-// Samostatné odsece osoby: prvá poznámka + odkaz na rodinu partnera
+// Samostatné odseky osoby vedľa fotografie: odkaz na rodinu partnera (poznámka je v rámčeku pod osobou)
 function pdfBookOdstavceOsoby(p, jePartner, fam, famPages) {
   const tx = PDF_BOOK.MARGIN_X + 60 + 14;
   const maxW = PDF_BOOK.W - PDF_BOOK.MARGIN_X - tx;
   const odstavce = [];
-  const prvaPozn = (p.notes || []).map(String).filter(s => s && s.trim())[0];
-  if (prvaPozn) odstavce.push({ lines: pdfBookWrapTextFont(prvaPozn.trim(), maxW, PDF_BOOK_ODSTAVEC_FONT), ref: false });
   if (jePartner) {
     const famc = p.famc && treeData.families[p.famc];
     if (famc && famc.husbandId && famc.id !== fam.id) {         // partner má svoju vetvu (otca) a vlastnú kapitolu
@@ -4968,9 +4966,72 @@ function pdfBookOdstavceOsoby(p, jePartner, fam, famPages) {
   }
   return odstavce;
 }
-function pdfBookBlockVyska(wrapped, odstavce) {
+// Výška „horného“ bloku osoby: fotografia + základné údaje (a odkaz na rodinu partnera) vedľa nej
+function pdfBookTopVyska(wrapped, odstavce) {
   const odstavceH = (odstavce || []).reduce((s, od) => s + od.lines.length * 13 + 4, 0);
   return Math.max(84, 20 + wrapped.reduce((s, r) => s + r.lines.length, 0) * 13 + 8) + odstavceH;
+}
+function pdfBookBlockVyska(topH, pozn) {
+  return topH + (pozn ? PDF_BOOK_NOTE.GAP + pozn.boxH + PDF_BOOK_NOTE.AFTER : 0);
+}
+
+// ---- poznámka v tenkom zaobleonom rámčeku na celú šírku, začína ozdobnou iniciálou (5× väčšia než text) ----
+const PDF_BOOK_NOTE_PT = 9.5;                                                   // veľkosť písma textu poznámky
+const PDF_BOOK_NOTE_FONT = 'italic ' + PDF_BOOK_NOTE_PT + 'pt Cormorant, Georgia, serif';
+const PDF_BOOK_CAP_FONT = 'italic 600 ' + (PDF_BOOK_NOTE_PT * 5) + 'pt Cormorant, Georgia, serif';   // 5× väčšie
+const PDF_BOOK_NOTE = { LINE: 13, PADX: 12, PADY: 10, R: 8, GAP: 6, AFTER: 12, ASC: 9, DESC: 5, CAPGAP: 9, CAPPAD: 7 };
+
+function pdfBookPoznamkaWrap(text, innerW, indentW, nInd, font) {
+  pdfBookMeasureCtx.font = font;
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = []; let cur = '';
+  const avail = () => innerW - (lines.length < nInd ? indentW : 0);
+  words.forEach(w => {
+    const test = cur ? cur + ' ' + w : w;
+    if (!cur || pdfBookMeasureCtx.measureText(test).width <= avail()) cur = test;
+    else { lines.push(cur); cur = w; }
+  });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// Pripraví rámček s PRVOU poznámkou osoby (alebo null, ak osoba poznámku nemá).
+// maxLines chráni pred poznámkou dlhšou než strana – text sa potom skráti „…“.
+function pdfBookPoznamkaOsoby(p, topH) {
+  const raw = (p.notes || []).map(n => String(n == null ? '' : n).replace(/\s+/g, ' ').trim()).filter(Boolean)[0];
+  if (!raw) return null;
+  const N = PDF_BOOK_NOTE;
+  const innerW = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X - 2 * N.PADX;
+  const m = /^[^\p{L}\p{N}]*[\p{L}\p{N}]/u.exec(raw);
+  const cap = m ? m[0] : raw.charAt(0);
+  const rest = raw.slice(cap.length).replace(/^\s+/, '');
+  pdfBookMeasureCtx.font = PDF_BOOK_CAP_FONT;
+  const mt = pdfBookMeasureCtx.measureText(cap);
+  const capW = mt.width;
+  const capSize = PDF_BOOK_NOTE_PT * 5 * 4 / 3;                                 // pt → px canvasu
+  const capAsc = mt.actualBoundingBoxAscent > 0 ? mt.actualBoundingBoxAscent : capSize * 0.68;
+  const capDesc = mt.actualBoundingBoxDescent > 0 ? mt.actualBoundingBoxDescent : 0;
+  // iniciála je vložená do ozdobného štvorca (rovnaký rámik ako pri fotografiách)
+  const panelW = Math.max(42, capW + 2 * N.CAPPAD);
+  const panelH = capAsc + capDesc + 2 * N.CAPPAD;
+  const nInd = Math.max(2, Math.ceil((panelH + 1) / N.LINE));                   // koľko riadkov textu obteká štvorec
+  const indentW = panelW + N.CAPGAP;
+  // najviac riadkov, aby sa osoba aj s rámčekom zmestila na jednu stranu
+  const pageH = PDF_BOOK.BOTTOM - (PDF_BOOK.TOP + 62);
+  const maxLines = Math.max(nInd, Math.floor((pageH - topH - N.GAP - N.AFTER - 2 * N.PADY - N.ASC - N.DESC) / N.LINE) + 1);
+  let lines = pdfBookPoznamkaWrap(rest, innerW, indentW, nInd, PDF_BOOK_NOTE_FONT);
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    let last = lines[maxLines - 1];
+    const lim = innerW - (maxLines - 1 < nInd ? indentW : 0);
+    pdfBookMeasureCtx.font = PDF_BOOK_NOTE_FONT;
+    while (last && pdfBookMeasureCtx.measureText(last + '…').width > lim) last = last.replace(/\s*\S+$/, '');
+    lines[maxLines - 1] = (last || '').trim() + '…';
+  }
+  if (!lines.length) lines = [''];
+  const rows = Math.max(lines.length, nInd);                                    // štvorec s iniciálou potrebuje aspoň nInd riadkov
+  const boxH = Math.max(2 * N.PADY + N.ASC + N.DESC + (rows - 1) * N.LINE, 2 * N.PADY + panelH);
+  return { cap, capW, capAsc, capDesc, panelW, panelH, capSize, nInd, indentW, lines, rows, boxH };
 }
 
 // ---- rozvrhnutie (layout) knihy: rodiny → strany → bloky ----
@@ -4989,7 +5050,9 @@ function pdfBookLayout(famPages) {
       const jePartner = (muz && p.id === muz.id) || (zena && p.id === zena.id);
       const riadky = pdfBookWrapRiadky(pdfBookRiadky(p, L.famPages));
       const odstavce = pdfBookOdstavceOsoby(p, jePartner, fam, L.famPages);
-      return { p, riadky, odstavce, h: pdfBookBlockVyska(riadky, odstavce) };
+      const topH = pdfBookTopVyska(riadky, odstavce);
+      const pozn = pdfBookPoznamkaOsoby(p, topH);
+      return { p, riadky, odstavce, topH, pozn, h: pdfBookBlockVyska(topH, pozn) };
     });
     // predvýpočet počtu strán kapitoly (kvôli odkazom „Rodina … – strana X“)
     let pages = 1, y = PDF_BOOK.TOP + 62;
@@ -5000,7 +5063,7 @@ function pdfBookLayout(famPages) {
     let yy = PDF_BOOK.TOP + 62;
     blocks.forEach(b => {
       if (yy + b.h > PDF_BOOK.BOTTOM) { pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP; }
-      pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky, odstavce: b.odstavce });
+      pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky, odstavce: b.odstavce, topH: b.topH, pozn: b.pozn });
       yy += b.h;
     });
   });
@@ -5008,18 +5071,55 @@ function pdfBookLayout(famPages) {
 }
 
 // ---- vykreslenie jednej strany na canvas ----
-function pdfBookDrawPhotoFrame(ctx, x, y, w, h) {
-  const C = PDF_BOOK.COLOR;
+function pdfBookDrawPhotoFrame(ctx, x, y, w, h, k) {
+  const C = PDF_BOOK.COLOR; k = k || 1;
   ctx.save();
-  ctx.strokeStyle = C; ctx.lineWidth = 1.4; ctx.strokeRect(x, y, w, h);
-  ctx.lineWidth = 0.5; ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
-  ctx.lineWidth = 1.1; ctx.beginPath();
+  ctx.strokeStyle = C; ctx.lineWidth = 1.4 * k; ctx.strokeRect(x, y, w, h);
+  ctx.lineWidth = 0.5 * k; ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+  ctx.lineWidth = 1.1 * k; ctx.beginPath();
   ctx.moveTo(x + 16, y); ctx.quadraticCurveTo(x + 2, y + 2, x, y + 16);
   ctx.moveTo(x + w - 16, y); ctx.quadraticCurveTo(x + w - 2, y + 2, x + w, y + 16);
   ctx.moveTo(x + 16, y + h); ctx.quadraticCurveTo(x + 2, y + h - 2, x, y + h - 16);
   ctx.moveTo(x + w - 16, y + h); ctx.quadraticCurveTo(x + w - 2, y + h - 2, x + w, y + h - 16);
   ctx.stroke();
   ctx.restore();
+}
+
+// Rámček poznámky: tenká čiara, zaoblené rohy
+function pdfBookRoundRectPath(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// Ozdobná iniciála: písmeno Cormorant (5× väčšie než text) v ozdobnom štvorci s rohovými ornamentmi
+function pdfBookDrawOzdobnaIniciala(ctx, x, y, pz, C) {
+  const N = PDF_BOOK_NOTE;
+  ctx.save();
+  ctx.fillStyle = '#f4f6f0'; ctx.fillRect(x, y, pz.panelW, pz.panelH);
+  pdfBookDrawPhotoFrame(ctx, x, y, pz.panelW, pz.panelH, 0.75);
+  ctx.fillStyle = C; ctx.font = PDF_BOOK_CAP_FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(pz.cap, x + (pz.panelW - pz.capW) / 2, y + N.CAPPAD + pz.capAsc);
+  ctx.restore();
+}
+
+function pdfBookDrawPoznamka(ctx, it, C) {
+  const pz = it.pozn, N = PDF_BOOK_NOTE;
+  const bx = PDF_BOOK.MARGIN_X, bw = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X;
+  const by = it.y + it.topH + N.GAP;
+  ctx.save();
+  ctx.strokeStyle = C; ctx.lineWidth = 0.6;
+  pdfBookRoundRectPath(ctx, bx, by, bw, pz.boxH, N.R); ctx.stroke();
+  ctx.restore();
+  const tx0 = bx + N.PADX, b0 = by + N.PADY + N.ASC;
+  pdfBookDrawOzdobnaIniciala(ctx, tx0, by + N.PADY, pz, C);
+  ctx.font = PDF_BOOK_NOTE_FONT; ctx.fillStyle = '#55663f'; ctx.textAlign = 'left';
+  pz.lines.forEach((ln, i) => ctx.fillText(ln, tx0 + (i < pz.nInd ? pz.indentW : 0), b0 + i * N.LINE));
 }
 
 function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
@@ -5104,7 +5204,7 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
           ty += 13;
         });
       });
-      // samostatné odsece: prvá poznámka + odkaz na rodinu partnera
+      // samostatné odseky vedľa fotografie: odkaz na rodinu partnera
       (it.odstavce || []).forEach(od => {
         ctx.font = PDF_BOOK_ODSTAVEC_FONT;
         od.lines.forEach(ln => {
@@ -5114,6 +5214,8 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
         });
         ty += 4;
       });
+      // prvá poznámka: tenký zaoblený rámček na celú šírku pod fotografiou a údajmi osoby
+      if (it.pozn) pdfBookDrawPoznamka(ctx, it, C);
     });
   }
   // číslo strany
