@@ -3680,7 +3680,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v28 – rev. 5: PDF kniha – prvá poznámka v tenkom zaoblenom rámčeku na celú šírku pod fotografiou a údajmi osoby, ozdobná iniciála 5× väčšia než text; skloňované názvy rodín, odkaz na rodinu otca partnera so stranou');
+console.log('Genealogy index16c-v28 – rev. 6: PDF kniha – prvá poznámka v tenkom zaoblenom rámčeku na celú šírku pod fotografiou a údajmi osoby, ozdobná iniciála 5× väčšia než text (štvorec s ružicami, mašľami a stuhami); skloňované názvy rodín, odkaz na rodinu otca partnera so stranou');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -4978,7 +4978,7 @@ function pdfBookBlockVyska(topH, pozn) {
 // ---- poznámka v tenkom zaobleonom rámčeku na celú šírku, začína ozdobnou iniciálou (5× väčšia než text) ----
 const PDF_BOOK_NOTE_PT = 9.5;                                                   // veľkosť písma textu poznámky
 const PDF_BOOK_NOTE_FONT = 'italic ' + PDF_BOOK_NOTE_PT + 'pt Cormorant, Georgia, serif';
-const PDF_BOOK_CAP_FONT = 'italic 600 ' + (PDF_BOOK_NOTE_PT * 5) + 'pt Cormorant, Georgia, serif';   // 5× väčšie
+const PDF_BOOK_CAP_FONT = 'bold ' + (PDF_BOOK_NOTE_PT * 5) + 'pt Cormorant, Georgia, serif';   // 5× väčšie než text poznámky
 const PDF_BOOK_NOTE = { LINE: 13, PADX: 12, PADY: 10, R: 8, GAP: 6, AFTER: 12, ASC: 9, DESC: 5, CAPGAP: 9, CAPPAD: 7 };
 
 function pdfBookPoznamkaWrap(text, innerW, indentW, nInd, font) {
@@ -5012,8 +5012,8 @@ function pdfBookPoznamkaOsoby(p, topH) {
   const capAsc = mt.actualBoundingBoxAscent > 0 ? mt.actualBoundingBoxAscent : capSize * 0.68;
   const capDesc = mt.actualBoundingBoxDescent > 0 ? mt.actualBoundingBoxDescent : 0;
   // iniciála je vložená do ozdobného štvorca (rovnaký rámik ako pri fotografiách)
-  const panelW = Math.max(42, capW + 2 * N.CAPPAD);
-  const panelH = capAsc + capDesc + 2 * N.CAPPAD;
+  const S = Math.max(74, Math.min(96, capW + 40), capAsc + capDesc + 28);      // štvorec: podľa šírky písmena, 74–96 pt
+  const panelH = S, panelW = S;
   const nInd = Math.max(2, Math.ceil((panelH + 1) / N.LINE));                   // koľko riadkov textu obteká štvorec
   const indentW = panelW + N.CAPGAP;
   // najviac riadkov, aby sa osoba aj s rámčekom zmestila na jednu stranu
@@ -5097,14 +5097,97 @@ function pdfBookRoundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// Ozdobná iniciála: písmeno Cormorant (5× väčšie než text) v ozdobnom štvorci s rohovými ornamentmi
+// ---- Ozdobná iniciála v štýle ilustrovaných kníh: hrubé písmeno v štvorci s dvojitým rámikom,
+//      ružicami s mašľami v hornom rohoch, stuhami v girlandách cez písmeno a mašľou dole ----
+function pdfBookStuha(ctx, p0, c1, c2, p1, wd, fill) {
+  const N = 30, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, u = 1 - t;
+    pts.push([u*u*u*p0[0] + 3*u*u*t*c1[0] + 3*u*t*t*c2[0] + t*t*t*p1[0], u*u*u*p0[1] + 3*u*u*t*c1[1] + 3*u*t*t*c2[1] + t*t*t*p1[1]]);
+  }
+  const L = [], R = [];
+  pts.forEach((q, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)];
+    let dx = b[0] - a[0], dy = b[1] - a[1]; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    const wv = wd * (0.82 + 0.18 * Math.sin(Math.PI * 3 * i / N));          // stuha sa mierne zužuje a rozširuje
+    L.push([q[0] - dy * wv / 2, q[1] + dx * wv / 2]); R.push([q[0] + dy * wv / 2, q[1] - dx * wv / 2]);
+  });
+  ctx.beginPath();
+  L.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]));
+  for (let i = N; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]);
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  const line = arr => { ctx.beginPath(); arr.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); };
+  line(L); line(R);
+  ctx.beginPath();                                                           // priečne záhyby stuhy
+  for (let i = 2; i < N - 1; i += 3) { ctx.moveTo(L[i][0], L[i][1]); ctx.lineTo(R[i][0], R[i][1]); }
+  ctx.stroke();
+}
+
+function pdfBookMasla(ctx, cx, cy, s, tails, fill) {
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+  ctx.lineWidth = 0.5 / s;
+  if (tails) [-1, 1].forEach(sg => {                                         // konce mašle s výrezom
+    ctx.beginPath();
+    ctx.moveTo(sg * 0.8, 1.5);
+    ctx.bezierCurveTo(sg * 2, 9, sg * 8, 10, sg * 9.5, 19);
+    ctx.lineTo(sg * 7, 16.8); ctx.lineTo(sg * 5.2, 21.5);
+    ctx.bezierCurveTo(sg * 4.5, 13, sg * 1, 11, sg * 2.4, 3);
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  });
+  [-1, 1].forEach(sg => {                                                    // slučky
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(sg * 4, -10, sg * 15, -11, sg * 14, -2);
+    ctx.bezierCurveTo(sg * 13, 6, sg * 5, 4, 0, 0);
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sg * 3, -1); ctx.bezierCurveTo(sg * 7, -6, sg * 11, -5, sg * 10.5, -2); ctx.stroke();
+  });
+  ctx.beginPath(); ctx.arc(0, 0, 2.3, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();   // uzol
+  ctx.restore();
+}
+
+function pdfBookRuzica(ctx, cx, cy, r, fill) {
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.8, 0, Math.PI * 2); ctx.stroke();
+  for (let i = 0; i < 8; i++) {                                              // lupienky
+    const a = i * Math.PI / 4, ix = cx + Math.cos(a) * r * 0.26, iy = cy + Math.sin(a) * r * 0.26;
+    ctx.beginPath(); ctx.moveTo(ix, iy);
+    ctx.bezierCurveTo(cx + Math.cos(a - 0.62) * r * 0.95, cy + Math.sin(a - 0.62) * r * 0.95,
+                      cx + Math.cos(a + 0.62) * r * 0.95, cy + Math.sin(a + 0.62) * r * 0.95, ix, iy);
+    ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.24, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.09, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+}
+
 function pdfBookDrawOzdobnaIniciala(ctx, x, y, pz, C) {
-  const N = PDF_BOOK_NOTE;
+  const w = pz.panelW, h = pz.panelH, k = 1, FILL = '#f7f5ec';          // veľkosť ornamentov je pevná, rozloženie sa prispôsobí štvorcu
   ctx.save();
-  ctx.fillStyle = '#f4f6f0'; ctx.fillRect(x, y, pz.panelW, pz.panelH);
-  pdfBookDrawPhotoFrame(ctx, x, y, pz.panelW, pz.panelH, 0.75);
+  ctx.fillStyle = FILL; ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = C; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 0.9; ctx.strokeRect(x, y, w, h);                           // dvojitý tenký rámik
+  ctx.lineWidth = 0.35; ctx.strokeRect(x + 2.6, y + 2.6, w - 5.2, h - 5.2);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x + 2.6, y + 2.6, w - 5.2, h - 5.2); ctx.clip();
+  ctx.lineWidth = 0.42;
+  const lx = x + 12.5 * k, rx = x + w - 12.5 * k, ry = y + 17 * k, rr = 7 * k;
+  const wd = 3.4 * k;
+  // visiace stuhy po bokoch
+  pdfBookStuha(ctx, [lx - 1, ry + rr], [lx - 9 * k, y + h * 0.45], [lx + 4 * k, y + h * 0.68], [lx - 2 * k, y + h - 11 * k], wd, FILL);
+  pdfBookStuha(ctx, [rx + 1, ry + rr], [rx + 9 * k, y + h * 0.45], [rx - 4 * k, y + h * 0.68], [rx + 2 * k, y + h - 11 * k], wd, FILL);
+  // dve girlandy cez písmeno
+  pdfBookStuha(ctx, [lx, ry + 2 * k], [x + w * 0.33, y + h * 0.50], [x + w * 0.67, y + h * 0.50], [rx, ry + 2 * k], wd, FILL);
+  pdfBookStuha(ctx, [lx, ry + 4 * k], [x + w * 0.30, y + h * 0.86], [x + w * 0.70, y + h * 0.86], [rx, ry + 4 * k], wd, FILL);
+  // ružice a mašle nad nimi
+  pdfBookRuzica(ctx, lx, ry, rr, FILL); pdfBookRuzica(ctx, rx, ry, rr, FILL);
+  pdfBookMasla(ctx, lx, y + 8 * k, 0.5 * k, false, FILL); pdfBookMasla(ctx, rx, y + 8 * k, 0.5 * k, false, FILL);
+  // mašľa dole v strede a malé mašle v dolných rohoch
+  pdfBookMasla(ctx, x + w / 2, y + h - 17 * k, 0.62 * k, true, FILL);
+  pdfBookMasla(ctx, lx - 2 * k, y + h - 11 * k, 0.4 * k, true, FILL); pdfBookMasla(ctx, rx + 2 * k, y + h - 11 * k, 0.4 * k, true, FILL);
+  ctx.restore();
+  // písmeno (je navrchu, aby bolo čitateľné)
   ctx.fillStyle = C; ctx.font = PDF_BOOK_CAP_FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-  ctx.fillText(pz.cap, x + (pz.panelW - pz.capW) / 2, y + N.CAPPAD + pz.capAsc);
+  ctx.fillText(pz.cap, x + (w - pz.capW) / 2, y + (h + pz.capAsc - pz.capDesc) / 2);
   ctx.restore();
 }
 
