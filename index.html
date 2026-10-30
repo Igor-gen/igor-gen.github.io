@@ -964,6 +964,9 @@ function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&
 
 function setLanguage(lang) {
   currentLang = lang;
+  // interný chat rodiny: prepnutie jazyka aj v samostatnej chat aplikácii
+  const chatFr = document.getElementById('chatIframe');
+  if (chatFr && chatFr.contentWindow) { try { chatFr.contentWindow.postMessage({ type: 'chat-lang', lang: lang }, '*'); } catch (e) {} }
   document.querySelectorAll('.lang-btn').forEach(btn => {
     btn.classList.remove('border-indigo-500', 'scale-110', 'opacity-100');
     btn.classList.add('border-transparent', 'opacity-60');
@@ -2816,6 +2819,7 @@ async function ensureClerkReady() {
     window.Clerk.addListener(() => {
       if (window.Clerk.isSignedIn && window.Clerk.session) {
         checkAdminRole();
+        if (typeof window.initChatIframe === 'function') window.initChatIframe();
         if (pendingDbMode) {
           const mode = pendingDbMode;
           pendingDbMode = null;
@@ -2823,6 +2827,7 @@ async function ensureClerkReady() {
         }
       } else {
         isAdmin = false; adminCheckedFor = null; updateAdminMenuUI();
+        if (typeof window.hideChatIframe === 'function') window.hideChatIframe();
       }
     });
     clerkListenerAdded = true;
@@ -3680,7 +3685,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v28 – rev. 6: PDF kniha – prvá poznámka v tenkom zaoblenom rámčeku na celú šírku pod fotografiou a údajmi osoby, ozdobná iniciála 5× väčšia než text (štvorec s ružicami, mašľami a stuhami); skloňované názvy rodín, odkaz na rodinu otca partnera so stranou');
+console.log('Genealogy index16c-v31 – rev. 7: interný chat rodiny – samostatná aplikácia chat.html privolaná cez iframe, jazyk podľa hlavnej aplikácie (sk/cs/en/de), výber príjemcu (Všetci + súkromné správy), 15 s refresh, 45 s auto-srolovanie');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5397,5 +5402,54 @@ async function vytvorPdfKnihu() {
 </script>
 
 
+<!-- ===== INTERNÝ CHAT RODINY: privolanie samostatnej aplikácie (chat.html na GitHub Pages) =====
+     Iframe zobrazuje jeden riadok v rovine s legendou; po rozbalení sa zväčší. -->
+<iframe id="chatIframe" src="https://igor-gen.github.io/chat.html" title="Chat rodiny"
+  style="position:fixed;right:0;bottom:0;width:260px;height:60px;border:none;background:transparent;z-index:40;transition:width .2s ease,height .2s ease;display:none;"
+  referrerpolicy="no-referrer"></iframe>
+<script>
+/* Interný chat rodiny – komunikácia s iframe (samostatný chat.html):
+   - chat-init: backend URL + jazyk + userId
+   - chat-token-request → chat-token: Clerk session token pre /api/chat
+   - chat-expand: zväčšenie/zmenšenie iframe pri rozbalení/srolovaní chatu */
+(function () {
+  const fr = document.getElementById('chatIframe');
+  if (!fr) return;
+
+  window.initChatIframe = function () {
+    if (!fr) return;
+    fr.style.display = 'block';
+    if (!isBackendConfigured() || !window.Clerk || !window.Clerk.isSignedIn || !window.Clerk.session) return;
+    try {
+      const userId = window.Clerk.user ? window.Clerk.user.id : null;
+      fr.contentWindow.postMessage({
+        type: 'chat-init',
+        url: BACKEND_URL.replace(/\/+$/, ''),
+        lang: currentLang,
+        userId: userId
+      }, '*');
+    } catch (e) {}
+  };
+  window.hideChatIframe = function () { if (fr) fr.style.display = 'none'; };
+
+  window.addEventListener('message', function (e) {
+    if (!fr || e.source !== fr.contentWindow) return;
+    const d = e.data || {};
+    if (d.type === 'chat-token-request') {
+      if (window.Clerk && window.Clerk.isSignedIn && window.Clerk.session) {
+        window.Clerk.session.getToken().then(function (tok) {
+          try { fr.contentWindow.postMessage({ type: 'chat-token', token: tok }, '*'); } catch (err) {}
+        }).catch(function () {});
+      }
+    } else if (d.type === 'chat-expand') {
+      if (d.value) { fr.style.width = '380px'; fr.style.height = '500px'; }
+      else { fr.style.width = '260px'; fr.style.height = '60px'; }
+    }
+  });
+
+  fr.addEventListener('load', function () { window.initChatIframe(); });
+  window.initChatIframe();
+})();
+</script>
 </body>
 </html>
