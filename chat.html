@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat rodiny – Genealogy</title>
+<style>
+  :root { font-family: 'Segoe UI', system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; height: 100%; }
+
+  /* ===== RIADOK – rovnaký tvar ako legenda v rodokmeni ===== */
+  #chatRiadok {
+    position: fixed; right: 20px; bottom: 20px; z-index: 60;
+    height: 40px; padding: 0 16px;
+    display: flex; align-items: center; gap: 8px;
+    background: #fdfbf7;
+    color: #5a4a35;
+    border: 1px solid #d8cbb2; border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(90, 74, 53, .25);
+    font-size: 12.5px; font-weight: 600; white-space: nowrap;
+    user-select: none;
+  }
+  #chatRiadok:hover { border-color: #8a6d3b; color: #6b5228; }
+  #chatRiadok svg { width: 16px; height: 16px; flex: 0 0 16px; color: #8a6d3b; }
+  #chatRiadok .sipka { transition: transform .2s ease; font-size: 11px; opacity: .7; color: #8a6d3b; }
+  #chatRiadok.rozbaly .sipka { transform: rotate(180deg); }
+  #chatRiadok .bodky { display: none; }
+  #chatRiadok.maNeprecitane .bodky {
+    display: inline-flex; margin-left: 2px;
+    background: #c0392b; color: #fff; border-radius: 999px;
+    font-size: 11px; font-weight: 700; min-width: 18px; height: 18px;
+    align-items: center; justify-content: center; padding: 0 5px;
+    border: 2px solid rgba(255,255,255,.85);
+    animation: chatBlik 1.6s ease infinite;
+  }
+  @keyframes chatBlik { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+  /* ===== PANEL (smerom nahor) ===== */
+  #chatPanel {
+    position: fixed; right: 20px; bottom: 68px; z-index: 59;
+    width: 340px; max-width: calc(100vw - 32px);
+    height: 420px; max-height: calc(100vh - 100px);
+    background: #fdfbf7; border-radius: 14px 14px 4px 4px;
+    border: 1px solid #d8cbb2;
+    box-shadow: 0 10px 34px rgba(90, 74, 53, .35);
+    display: none; flex-direction: column; overflow: hidden;
+    transform-origin: bottom right;
+    animation: chatNahor .2s ease;
+  }
+  #chatPanel.rozbaly { display: flex; }
+  @keyframes chatNahor { from { transform: scaleY(.85) translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .chatHlava {
+    background: linear-gradient(145deg, #8a6d3b, #6b5228);
+    color: #fff; padding: 8px 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600;
+  }
+  .chatHlava .bodka { width: 8px; height: 8px; border-radius: 50%; background: #7ec97e; }
+  .chatHlava .nazov { flex: 1; }
+
+  .chatVyberRiadok {
+    background: #f0e9da; border-bottom: 1px solid #e2d7c1;
+    padding: 7px 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .chatVyberRiadok label { font-size: 12px; color: #6b5228; font-weight: 600; white-space: nowrap; }
+  #chatVyber {
+    flex: 1; font-family: inherit; font-size: 13px;
+    border: 1px solid #d8cbb2; border-radius: 8px;
+    padding: 5px 8px; background: #fff; color: #4a3d2a;
+    outline: none; cursor: pointer; min-width: 0;
+  }
+  #chatVyber:focus { border-color: #8a6d3b; }
+
+  #chatZoznam {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    background:
+      radial-gradient(circle at 12px 18px, rgba(138,109,59,.05) 2px, transparent 2.5px) 0 0/34px 34px,
+      #fdfbf7;
+  }
+  .sprava { max-width: 82%; font-size: 13px; line-height: 1.45; }
+  .sprava .meta { font-size: 11px; color: #9a8a70; margin-bottom: 2px; }
+  .sprava .meta b { color: #6b5228; font-weight: 600; }
+  .sprava .meta .sukromne { color: #a93226; font-style: italic; }
+  .sprava .bublina {
+    padding: 7px 11px; border-radius: 12px;
+    background: #f0e9da; color: #4a3d2a;
+    border: 1px solid #e2d7c1;
+    overflow-wrap: break-word;
+  }
+  .sprava.moja { align-self: flex-end; text-align: right; }
+  .sprava.moja .bublina {
+    background: linear-gradient(145deg, #8a6d3b, #74591f);
+    color: #fff; border-color: #6b5228; text-align: left;
+  }
+  .prazdno { align-self: center; text-align: center; font-size: 12.5px; color: #9a8a70; padding: 24px 12px; line-height: 1.6; }
+
+  .chatPata { border-top: 1px solid #e2d7c1; padding: 8px; background: #faf6ee; }
+  .chatPata form { display: flex; gap: 6px; }
+  #chatInput {
+    flex: 1; border: 1px solid #d8cbb2; border-radius: 10px;
+    padding: 8px 10px; font-size: 13px; outline: none;
+    background: #fff; font-family: inherit; resize: none; height: 38px;
+  }
+  #chatInput:focus { border-color: #8a6d3b; }
+  #chatOdosli {
+    border: none; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(145deg, #8a6d3b, #6b5228);
+    color: #fff; width: 38px; height: 38px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #chatOdosli:disabled { opacity: .5; cursor: default; }
+  #chatOdosli svg { width: 17px; height: 17px; }
+  #chatPocitadlo { font-size: 10.5px; color: #9a8a70; text-align: right; margin: 4px 2px 0 0; height: 12px; }
+  #chatPocitadlo.blizko { color: #c0392b; font-weight: 700; }
+  .chatChyba { background: #fdecea; color: #a93226; font-size: 12px; padding: 6px 10px; text-align: center; }
+  .chatPatkaInfo {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 10px; color: #b3a488; padding: 4px 2px 1px;
+  }
+  #chatZroluj {
+    background: none; border: 1px solid #d8cbb2; border-radius: 8px;
+    color: #6b5228; font-size: 10.5px; font-weight: 600;
+    padding: 2px 10px; cursor: pointer; font-family: inherit;
+  }
+  #chatZroluj:hover { border-color: #8a6d3b; color: #8a6d3b; }
+</style>
+</head>
+<body>
+
+<div id="chatRiadok" role="button" tabindex="0">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+  </svg>
+  <span class="text" id="chatNazovRiadok">Chat rodiny</span>
+  <span class="bodky">0</span>
+  <span class="sipka">▲</span>
+</div>
+
+<div id="chatPanel" role="dialog" aria-label="Chat rodiny">
+  <div class="chatHlava">
+    <span class="bodka"></span>
+    <span id="chatNazov" class="nazov">Chat rodiny</span>
+  </div>
+  <div class="chatVyberRiadok">
+    <label for="chatVyber" id="chatKomu">Komu:</label>
+    <select id="chatVyber" aria-label="Príjemca správy"></select>
+  </div>
+  <div id="chatZoznam"></div>
+  <div id="chatChybaRiadok"></div>
+  <div class="chatPata">
+    <form id="chatFormular">
+      <textarea id="chatInput" maxlength="250" rows="1"></textarea>
+      <button id="chatOdosli" type="submit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </form>
+    <div id="chatPocitadlo">0 / 250</div>
+    <div class="chatPatkaInfo">
+      <span id="chatAutoInfo"></span>
+      <button id="chatZroluj" type="button"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   CHAT RODINY – samostatná aplikácia (chat.html)
+   Hostuje sa na GitHub Pages, rodokmeň ju privolá cez <iframe>.
+   Komunikácia s rodičom (postMessage):
+     rodokmeň → chat:  { type:'chat-init', url, lang, userId }
+                       { type:'chat-lang', lang }
+                       { type:'chat-token', token }
+     chat → rodokmeň:  { type:'chat-token-request' }
+   API: GET /api/chat, GET /api/chat?after=<id>,
+        GET /api/chat?users=1, POST /api/chat
+   ============================================================ */
+
+/* ---------- i18n: sk / cs / en / de (podľa jazyka hlavnej aplikácie) ---------- */
+var CHAT_I18N = {
+  sk: {
+    title: 'Chat rodiny', to: 'Komu:', all: 'Všetci (rodina)',
+    placeholder: 'Napíš správu…', send: 'Odoslať', rollUp: 'Zrolovať ▼',
+    autoInfo: 'Po 45 s bez aktivity sa chat sroluje',
+    tooFast: 'Príliš rýchlo – chvíľu počkaj medzi správami.',
+    emptyGroup: 'Žiadne správy. Napíš rodine prvú správu!',
+    emptyDm: 'Žiadne správy. Začni súkromný rozhovor.',
+    private: 'súkromné', today: 'Dnes', user: 'Používateľ',
+    offline: 'Chat je nedostupný – skontroluj pripojenie.', chars: 'znakov'
+  },
+  cs: {
+    title: 'Chat rodiny', to: 'Komu:', all: 'Všichni (rodina)',
+    placeholder: 'Napiš zprávu…', send: 'Odeslat', rollUp: 'Zrolovat ▼',
+    autoInfo: 'Po 45 s bez aktivity se chat zroluje',
+    tooFast: 'Příliš rychle – chvíli počkej mezi zprávami.',
+    emptyGroup: 'Žádné zprávy. Napiš rodině první zprávu!',
+    emptyDm: 'Žádné zprávy. Začni soukromý rozhovor.',
+    private: 'soukromé', today: 'Dnes', user: 'Uživatel',
+    offline: 'Chat není dostupný – zkontroluj připojení.', chars: 'znaků'
+  },
+  en: {
+    title: 'Family chat', to: 'To:', all: 'Everyone (family)',
+    placeholder: 'Type a message…', send: 'Send', rollUp: 'Roll up ▼',
+    autoInfo: 'The chat rolls up after 45 s of inactivity',
+    tooFast: 'Too fast – wait a moment between messages.',
+    emptyGroup: 'No messages yet. Write the first message to the family!',
+    emptyDm: 'No messages yet. Start a private conversation.',
+    private: 'private', today: 'Today', user: 'User',
+    offline: 'Chat is unavailable – check your connection.', chars: 'chars'
+  },
+  de: {
+    title: 'Familienchat', to: 'An:', all: 'Alle (Familie)',
+    placeholder: 'Schreibe eine Nachricht…', send: 'Senden', rollUp: 'Zusammenrollen ▼',
+    autoInfo: 'Der Chat rollt sich nach 45 s Inaktivität zusammen',
+    tooFast: 'Zu schnell – warte einen Moment zwischen Nachrichten.',
+    emptyGroup: 'Noch keine Nachrichten. Schreibe der Familie die erste Nachricht!',
+    emptyDm: 'Noch keine Nachrichten. Beginne eine private Unterhaltung.',
+    private: 'privat', today: 'Heute', user: 'Benutzer',
+    offline: 'Chat nicht verfügbar – überprüfe die Verbindung.', chars: 'Zeichen'
+  }
+};
+
+var lang = 'sk';
+function L(k) { return (CHAT_I18N[lang] && CHAT_I18N[lang][k]) || CHAT_I18N.sk[k] || k; }
+
+/* ---------- stav ---------- */
+var apiUrl = null;      // BACKEND_URL hlavnej aplikácie
+var mojeId = null;     // clerk userId (príde z rodiča)
+var tokenCachovany = null, tokenCas = 0;
+var spravy = [];       // všetky moje správy (skupinové + moje DM)
+var pouzivatelia = []; // [{id, name}]
+var aktivna = 'vsetci';
+var neprecitane = {};  // konverzacia → počet
+var rozbaly = false;
+var casovac = null;
+var posledneId = 0;
+var poslednyOdoslany = 0;
+
+var riadok = document.getElementById('chatRiadok');
+var panel = document.getElementById('chatPanel');
+var zoznam = document.getElementById('chatZoznam');
+var input = document.getElementById('chatInput');
+var formular = document.getElementById('chatFormular');
+var pocitadlo = document.getElementById('chatPocitadlo');
+var odosli = document.getElementById('chatOdosli');
+var chybovyRiadok = document.getElementById('chatChybaRiadok');
+var vyber = document.getElementById('chatVyber');
+var nazovPanelu = document.getElementById('chatNazov');
+var nazovRiadku = document.getElementById('chatNazovRiadok');
+
+/* ---------- komunikácia s rodičom (rodokmeňom) ---------- */
+window.addEventListener('message', function (e) {
+  var d = e.data || {};
+  if (d.type === 'chat-init') {
+    apiUrl = String(d.url || '').replace(/\/+$/, '');
+    mojeId = d.userId || null;
+    nastavJazyk(d.lang || 'sk');
+    start();
+  } else if (d.type === 'chat-lang') {
+    nastavJazyk(d.lang || lang);
+  } else if (d.type === 'chat-token') {
+    tokenCachovany = d.token; tokenCas = Date.now();
+    if (tokenCakal) { var cb = tokenCakal; tokenCakal = null; cb(d.token); }
+  }
+});
+
+var tokenCakal = null;
+function ziadajToken() {
+  return new Promise(function (resolve) {
+    if (tokenCachovany && Date.now() - tokenCas < 50000) return resolve(tokenCachovany);
+    tokenCakal = resolve;
+    try { window.parent.postMessage({ type: 'chat-token-request' }, '*'); } catch (e) { resolve(null); }
+    setTimeout(function () {
+      if (tokenCakal === resolve) { tokenCakal = null; resolve(null); }
+    }, 8000);
+  });
+}
+
+function nastavJazyk(l) {
+  if (!CHAT_I18N[l]) l = 'sk';
+  lang = l;
+  document.documentElement.lang = l;
+  nazovPanelu.textContent = L('title');
+  nazovRiadku.textContent = L('title');
+  input.placeholder = L('placeholder');
+  odosli.title = L('send'); odosli.setAttribute('aria-label', L('send'));
+  document.getElementById('chatKomu').textContent = L('to');
+  document.getElementById('chatZroluj').textContent = L('rollUp');
+  document.getElementById('chatAutoInfo').textContent = L('autoInfo');
+  zrelodujPouzivatelov();
+  vykresliKonverzaciu();
+}
+
+/* ---------- pomocné ---------- */
+function esc(t) {
+  var d = document.createElement('div');
+  d.textContent = String(t == null ? '' : t);
+  return d.innerHTML;
+}
+function klucKonverzacie(s) {
+  if (!s.to) return 'vsetci';
+  return s.userId === mojeId ? s.to : s.userId;
+}
+function nazovKonverzacie(k) {
+  if (k === 'vsetci') return L('all');
+  var u = pouzivatelia.filter(function (p) { return p.id === k; })[0];
+  return u ? u.name : L('user');
+}
+function formatCas(sqlCas) {
+  // server posiela 'YYYY-MM-DD HH:MM:SS' (UTC)
+  var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(sqlCas || ''));
+  if (!m) return String(sqlCas || '');
+  var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]));
+  var teraz = new Date();
+  var cas = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  var rovnakyDen =
+    d.getFullYear() === teraz.getFullYear() &&
+    d.getMonth() === teraz.getMonth() &&
+    d.getDate() === teraz.getDate();
+  if (rovnakyDen) return L('today') + ' ' + cas;
+  return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear() + ' ' + cas;
+}
+
+/* ---------- API ---------- */
+function apiGet(param) {
+  return ziadajToken().then(function (token) {
+    if (!token || !apiUrl) throw new Error('no-token');
+    return fetch(apiUrl + '/api/chat' + (param || ''), {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
+    });
+  }).then(function (r) {
+    if (r.status === 401) throw new Error('unauthorized');
+    if (!r.ok) throw new Error('http ' + r.status);
+    return r.json();
+  });
+}
+function nacitajVsetko() {
+  return apiGet('').then(function (d) {
+    prijmi(d.messages || []);
+    return apiGet('?users=1');
+  }).then(function (d) {
+    pouzivatelia = d.users || [];
+    zrelodujPouzivatelov();
+  });
+}
+function refreshNovych() {
+  if (!posledneId) return Promise.resolve();
+  return apiGet('?after=' + posledneId).then(function (d) {
+    prijmi(d.messages || []);
+  });
+}
+function odosliSpravu(text, recipientId) {
+  return ziadajToken().then(function (token) {
+    if (!token || !apiUrl) throw new Error('no-token');
+    return fetch(apiUrl + '/api/chat', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, recipientId: recipientId || null })
+    });
+  }).then(function (r) {
+    if (r.status === 429) throw new Error('too-fast');
+    if (r.status === 401) throw new Error('unauthorized');
+    if (!r.ok) throw new Error('http ' + r.status);
+    return r.json();
+  });
+}
+
+function prijmi(nove) {
+  var doslo = false;
+  nove.forEach(function (s) {
+    if (s.id > posledneId) posledneId = s.id;
+    if (!spravy.some(function (x) { return x.id === s.id; })) {
+      spravy.push(s);
+      doslo = true;
+    }
+  });
+  if (!doslo) return;
+  var zoradene = spravy.slice().sort(function (a, b) { return a.id - b.id; });
+  spravy = zoradene;
+  nove.forEach(function (s) {
+    var k = klucKonverzacie(s);
+    var vidim = rozbaly && aktivna === k;
+    if (s.userId !== mojeId && !vidim) neprecitane[k] = (neprecitane[k] || 0) + 1;
+  });
+  if (rozbaly && (aktivna === 'vsetci' || nove.some(function (s) { return klucKonverzacie(s) === aktivna; }))) {
+    vykresliKonverzaciu();
+    nastavCasovac();
+  }
+  aktualizujRiadok();
+}
+
+/* ---------- vykresľovanie ---------- */
+function zrelodujPouzivatelov() {
+  var povodna = vyber.value;
+  vyber.innerHTML = '';
+  var opt = document.createElement('option');
+  opt.value = 'vsetci'; opt.textContent = L('all');
+  vyber.appendChild(opt);
+  pouzivatelia.forEach(function (u) {
+    var o = document.createElement('option');
+    o.value = u.id; o.textContent = u.name;
+    vyber.appendChild(o);
+  });
+  if (povodna && Array.prototype.slice.call(vyber.options).some(function (o) { return o.value === povodna; })) {
+    vyber.value = povodna;
+  } else vyber.value = 'vsetci';
+  aktualizujAktivnu();
+}
+function aktualizujAktivnu() {
+  var val = vyber.value || 'vsetci';
+  if (val !== aktivna) { aktivna = val; neprecitane[aktivna] = 0; }
+}
+function vykresliKonverzaciu() {
+  zoznam.innerHTML = '';
+  nazovPanelu.textContent = nazovKonverzacie(aktivna);
+  var kon = spravy.filter(function (s) { return klucKonverzacie(s) === aktivna; });
+  if (!kon.length) {
+    var p = document.createElement('div');
+    p.className = 'prazdno';
+    p.textContent = aktivna === 'vsetci' ? L('emptyGroup') : L('emptyDm');
+    zoznam.appendChild(p);
+    return;
+  }
+  kon.forEach(function (s) { pridajSpravu(s, false); });
+  zoznam.scrollTop = zoznam.scrollHeight;
+}
+function pridajSpravu(s, scroll) {
+  var el = document.createElement('div');
+  el.className = 'sprava' + (s.userId === mojeId ? ' moja' : '');
+  var sukromnyOznac = klucKonverzacie(s) !== 'vsetci' ? ' <span class="sukromne">· ' + esc(L('private')) + '</span>' : '';
+  el.innerHTML =
+    '<div class="meta"><b>' + esc(s.name) + '</b> · ' + esc(formatCas(s.at)) + sukromnyOznac + '</div>' +
+    '<div class="bublina">' + esc(s.message) + '</div>';
+  zoznam.appendChild(el);
+  if (scroll !== false) zoznam.scrollTop = zoznam.scrollHeight;
+}
+function celkovoNeprecitane() {
+  var n = 0;
+  Object.keys(neprecitane).forEach(function (k) { n += neprecitane[k] || 0; });
+  return n;
+}
+function aktualizujRiadok() {
+  var n = celkovoNeprecitane();
+  riadok.classList.toggle('maNeprecitane', n > 0 && !rozbaly);
+  if (n > 0) riadok.querySelector('.bodky').textContent = String(n);
+}
+
+/* ---------- rolovanie: 45 s bez aktivity ---------- */
+function nastavCasovac() {
+  if (casovac) clearTimeout(casovac);
+  casovac = setTimeout(zroluj, 45000);
+}
+function rozbal() {
+  rozbaly = true;
+  panel.classList.add('rozbaly');
+  riadok.classList.add('rozbaly');
+  try { window.parent.postMessage({ type: 'chat-expand', value: true }, '*'); } catch (e) {}
+  neprecitane[aktivna] = 0;
+  aktualizujRiadok();
+  vykresliKonverzaciu();
+  input.focus();
+  nastavCasovac();
+}
+function zroluj() {
+  rozbaly = false;
+  panel.classList.remove('rozbaly');
+  riadok.classList.remove('rozbaly');
+  try { window.parent.postMessage({ type: 'chat-expand', value: false }, '*'); } catch (e) {}
+  if (casovac) { clearTimeout(casovac); casovac = null; }
+  aktualizujRiadok();
+}
+riadok.addEventListener('click', function () { rozbaly ? zroluj() : rozbal(); });
+riadok.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); rozbaly ? zroluj() : rozbal(); }
+});
+document.getElementById('chatZroluj').addEventListener('click', zroluj);
+
+vyber.addEventListener('change', function () {
+  aktualizujAktivnu();
+  vykresliKonverzaciu();
+  aktualizujRiadok();
+  input.focus();
+  nastavCasovac();
+});
+
+input.addEventListener('input', function () {
+  var n = input.value.length;
+  pocitadlo.textContent = n + ' / 250';
+  pocitadlo.classList.toggle('blizko', n >= 230);
+  odosli.disabled = n === 0;
+  nastavCasovac();
+});
+
+formular.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var text = input.value.replace(/\s+/g, ' ').trim().slice(0, 250);
+  if (!text) return;
+  if (Date.now() - poslednyOdoslany < 2100) {
+    chybovyRiadok.innerHTML = '<div class="chatChyba">' + esc(L('tooFast')) + '</div>';
+    return;
+  }
+  chybovyRiadok.innerHTML = '';
+  var recipientId = aktivna === 'vsetci' ? null : aktivna;
+  odosli.disabled = true;
+  odosliSpravu(text, recipientId).then(function () {
+    poslednyOdoslany = Date.now();
+    input.value = ''; input.dispatchEvent(new Event('input'));
+    return refreshNovych();
+  }).then(function () {
+    vykresliKonverzaciu();
+    nastavCasovac();
+  }).catch(function (err) {
+    odosli.disabled = input.value.length === 0;
+    if (err.message === 'too-fast') {
+      chybovyRiadok.innerHTML = '<div class="chatChyba">' + esc(L('tooFast')) + '</div>';
+    } else {
+      chybovyRiadok.innerHTML = '<div class="chatChyba">' + esc(L('offline')) + '</div>';
+    }
+  });
+});
+
+/* ---------- štart: 15 s refresh len nových správ ---------- */
+var spusteny = false;
+function start() {
+  if (spusteny || !apiUrl) return;
+  spusteny = true;
+  nacitajVsetko().then(function () {
+    aktualizujRiadok();
+    vykresliKonverzaciu();
+  }).catch(function () {
+    // pri neprihlásení rodokmeň iframe nezobrazí / skryje – bez akcie
+  });
+  setInterval(function () {
+    if (document.visibilityState !== 'visible') return; // pauza v skrytej záložke
+    refreshNovych().catch(function () {});
+  }, 15000);
+}
+
+odosli.disabled = true;
+</script>
+</body>
+</html>
