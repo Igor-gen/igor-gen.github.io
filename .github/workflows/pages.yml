@@ -1,5 +1,4 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches: [main]
@@ -37,6 +36,9 @@ jobs:
           html = html.replace(placeholder, os.environ['BACKEND_URL'].strip())
           open('site/index.html', 'w', encoding='utf-8').write(html)
           PY
+
+      - name: Copy chat application to site
+        run: cp chat.html site/chat.html
 
       - uses: actions/configure-pages@v5
 
