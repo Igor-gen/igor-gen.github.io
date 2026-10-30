@@ -324,6 +324,11 @@
       <span class="text-slate-300 hidden md:inline">|</span>
       <span class="whitespace-nowrap hidden md:inline" data-i18n="legendControls">1x klik = Detail • 2x klik = Úprava</span>
     </div>
+
+    <!-- INTERNÝ CHAT RODINY: jeden riadok vpravo dole NAD CANVASOM (ako legenda vľavo dole) -->
+    <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html" title="Chat rodiny"
+      style="position:absolute;right:16px;bottom:16px;width:260px;height:40px;border:none;background:transparent;z-index:16;transition:width .2s ease,height .2s ease;display:none;"
+      referrerpolicy="no-referrer"></iframe>
   </main>
 
   <!-- RIGHT DETAIL PANEL (MOBILE OFF-CANVAS) -->
@@ -3685,7 +3690,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 7: interný chat rodiny – samostatná aplikácia chat.html privolaná cez iframe, jazyk podľa hlavnej aplikácie (sk/cs/en/de), výber príjemcu (Všetci + súkromné správy), 15 s refresh, 45 s auto-srolovanie');
+console.log('Genealogy index16c-v31 – rev. 8: chat umiestnený nad canvas vpravo dole (ako legenda vľavo), riadok zarovnaný s legendou');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5403,10 +5408,7 @@ async function vytvorPdfKnihu() {
 
 
 <!-- ===== INTERNÝ CHAT RODINY: privolanie samostatnej aplikácie (chat.html na GitHub Pages) =====
-     Iframe zobrazuje jeden riadok v rovine s legendou; po rozbalení sa zväčší. -->
-<iframe id="chatIframe" src="https://igor-gen.github.io/chat.html" title="Chat rodiny"
-  style="position:fixed;right:0;bottom:0;width:260px;height:60px;border:none;background:transparent;z-index:40;transition:width .2s ease,height .2s ease;display:none;"
-  referrerpolicy="no-referrer"></iframe>
+     Iframe je vložený v <main> nad canvasom (riadok vpravo dole); po rozbalení sa zväčší. -->
 <script>
 /* Interný chat rodiny – komunikácia s iframe (samostatný chat.html):
    - chat-init: backend URL + jazyk + userId
@@ -5442,8 +5444,8 @@ async function vytvorPdfKnihu() {
         }).catch(function () {});
       }
     } else if (d.type === 'chat-expand') {
-      if (d.value) { fr.style.width = '380px'; fr.style.height = '500px'; }
-      else { fr.style.width = '260px'; fr.style.height = '60px'; }
+      if (d.value) { fr.style.width = '380px'; fr.style.height = 'min(500px, calc(100vh - 32px))'; }
+      else { fr.style.width = '260px'; fr.style.height = '40px'; }
     }
   });
 
