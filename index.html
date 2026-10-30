@@ -326,7 +326,7 @@
     </div>
 
     <!-- INTERNÝ CHAT RODINY: jeden riadok vpravo dole NAD CANVASOM (ako legenda vľavo dole) -->
-    <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html" title="Chat rodiny"
+    <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html?v=1" title="Chat rodiny"
       style="position:absolute;right:16px;bottom:16px;width:260px;height:40px;border:none;background:transparent;z-index:16;transition:width .2s ease,height .2s ease;display:none;"
       referrerpolicy="no-referrer"></iframe>
   </main>
@@ -2921,6 +2921,8 @@ async function clerkAuthHeaders(extra = {}) {
 
 function updateDbStatusUI() {
   const box = document.getElementById('sidebarDbStatus'); if (!box) return;
+  // interný chat rodiny: zobrazuje sa len pri pripojení na serverovú databázu
+  if (typeof window.syncChatVisibility === 'function') window.syncChatVisibility();
   if (dbConnection) {
     let host = BACKEND_URL; try { host = new URL(BACKEND_URL).host; } catch (e) {}
     document.getElementById('sidebarDbHost').innerText = `${dbConnection.username} @ ${host}`;
@@ -3668,7 +3670,7 @@ function loadTreeFromServer(data, session) {
     families[raw.id] = { id: raw.id, husbandId: raw.husbandId || null, wifeId: raw.wifeId || null, marrDate: raw.marrDate || "", children: Array.isArray(raw.children) ? raw.children : [] };
   });
   if (Object.keys(persons).length === 0) {
-    createNewTree(); treeSource = 'server'; treeVersion = Number(data.version); updateSourceUI(); dbConnection = session; updateDbStatusUI(); showToast(t('msgDbEmpty'), 'info'); return;
+    createNewTree(); treeSource = 'server'; treeVersion = Number(data.version); updateSourceUI(); dbConnection = session; updateDbStatusUI(); if (typeof window.initChatIframe === 'function') window.initChatIframe(); showToast(t('msgDbEmpty'), 'info'); return;
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
@@ -3677,7 +3679,7 @@ treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files
   launchWorkspace();
   treeSource = 'server'; updateSourceUI();
   autoLayoutTree(true);
-  dbConnection = session; updateDbStatusUI();
+  dbConnection = session; updateDbStatusUI(); if (typeof window.initChatIframe === 'function') window.initChatIframe();
   hydratePromise = hydrateFiles(session);
   showToast(t('msgDbLoaded').replace('{X}', Object.keys(persons).length), 'success');
 }
@@ -3690,7 +3692,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 8: chat umiestnený nad canvas vpravo dole (ako legenda vľavo), riadok zarovnaný s legendou');
+console.log('Genealogy index16c-v31 – rev. 10: chat viditeľný len po pripojení na serverovú databázu (dbConnection); pri lokálnom súbore skrytý');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5420,8 +5422,10 @@ async function vytvorPdfKnihu() {
 
   window.initChatIframe = function () {
     if (!fr) return;
+    // chat len pre pripojených k serverovej databáze (rodina), nie pre lokálny súbor
+    window.syncChatVisibility();
+    if (!dbConnection || !isBackendConfigured() || !window.Clerk || !window.Clerk.isSignedIn || !window.Clerk.session) return;
     fr.style.display = 'block';
-    if (!isBackendConfigured() || !window.Clerk || !window.Clerk.isSignedIn || !window.Clerk.session) return;
     try {
       const userId = window.Clerk.user ? window.Clerk.user.id : null;
       fr.contentWindow.postMessage({
@@ -5431,6 +5435,13 @@ async function vytvorPdfKnihu() {
         userId: userId
       }, '*');
     } catch (e) {}
+  };
+  /* Chat je súčasťou rodiny na serveri: zobrazí sa, len keď je používateľ
+     pripojený na serverovú databázu (dbConnection); pri lokálnom súbore sa skryje. */
+  window.syncChatVisibility = function () {
+    if (!fr) return;
+    const zobraz = !!(dbConnection && window.Clerk && window.Clerk.isSignedIn && window.Clerk.session);
+    fr.style.display = zobraz ? 'block' : 'none';
   };
   window.hideChatIframe = function () { if (fr) fr.style.display = 'none'; };
 
