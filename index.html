@@ -3701,7 +3701,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 14: lokálna záloha servera (backup) – výber adresára: genealogy.sql + igor-gen-media/igor-gen-docs, import osôb, rodín aj médií offline');
+console.log('Genealogy index16c-v31 – rev. 15: lokálna záloha – oprava syntaktickej chyby regexu, výber adresára zálohy funguje');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -4447,7 +4447,7 @@ function bkpUnquote(s) { return s.replace(/^'|'$/g, '').replace(/''/g, "'"); }
 function bkpHodnota(tok) {
   tok = tok.trim();
   if (/^NULL$/i.test(tok)) return null;
-  if (/^X'/'i.test(tok)) return ''; // BLOB (obsah je v S3 zrkadle, nie v dumpy)
+  if (/^X'/.test(tok)) return ''; // BLOB (obsah je v S3 zrkadle, nie v dumpy)
   if (/^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(tok)) return Number(tok);
   if (tok.charAt(0) === "'") return bkpUnquote(tok);
   // replace('text','\n',char(10)) – používa turso db shell pri viacriadkových textoch
