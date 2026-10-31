@@ -3692,7 +3692,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 11: ChatGPT investigatíva s novým výskumným promptom GRA v9.2.0 (GPS, FAN, ochrana súkromia)');
+console.log('Genealogy index16c-v31 – rev. 12: zvýšený kontrast textov (slate-400/500/600 o 1–2 tóny tmavšie, zástupné symboly formulárov čitateľné); texty na tmavých plochách bez zmeny');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5457,5 +5457,17 @@ async function vytvorPdfKnihu() {
   window.initChatIframe();
 })();
 </script>
+<style>
+/* ===== ZVÝŠENIE KONTRASTU TEXTOV (čitateľnosť) =====
+   Svetlošedé texty na svetlých plochách sa stmavia o 1–2 stupne palety.
+   Texty na tmavých plochách (text-slate-200/300 v tmavých modáloch,
+   uvítacia obrazovka) sa NEMENIA – tam sú svetlé správne. */
+.text-slate-400 { color: #64748b !important; } /* #94a3b8 → slate-500 */
+.text-slate-500 { color: #475569 !important; } /* #64748b → slate-600 */
+.text-slate-600 { color: #3d4d63 !important; } /* #475569 → o dva tóny tmavšie */
+input::placeholder, textarea::placeholder { color: #64748b !important; opacity: 1; }
+/* Kurzorové/základné texty vo formulároch */
+.text-\[9px\].text-slate-400, .text-\[10px\].text-slate-400, .text-\[11px\].text-slate-400 { color: #475569 !important; }
+</style>
 </body>
 </html>
