@@ -144,6 +144,7 @@
 
       <div id="dropZone" class="w-full border-2 border-dashed border-sky-400/30 hover:border-sky-400/70 bg-white/5 hover:bg-white/10 transition-all rounded-2xl p-5 sm:p-6 cursor-pointer flex flex-col items-center justify-center space-y-4">
         <input type="file" id="fileInput" class="hidden" accept=".gdz,.gedzip,.zip,.ged">
+        <input type="file" id="backupDirInput" class="hidden" webkitdirectory directory multiple onchange="spracujLokalnuZalohu(this.files)">
         <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(35,123,230,0.15); border: 1px solid rgba(82,165,255,0.3); color:#52a5ff;">
           <i class="ph-bold ph-upload-simple text-2xl"></i>
         </div>
@@ -153,6 +154,9 @@
         </div>
         <button type="button" onclick="event.stopPropagation(); document.getElementById('fileInput').click()" class="btn-glow px-8 py-3 rounded-lg text-white font-semibold text-sm flex items-center justify-center gap-2 w-full max-w-[260px]">
           <i class="ph ph-folder-open text-base"></i> <span data-i18n="btnLoadGed">GDZ / GEDCOM</span>
+        </button>
+        <button type="button" onclick="event.stopPropagation(); otvorLokalnuZalohu()" class="btn-glass px-8 py-3 rounded-xl text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 w-full max-w-[260px]">
+          <i class="ph ph-database text-base"></i> <span data-i18n="menuBackup">Otvoriť zálohu (backup)</span>
         </button>
       </div>
 
@@ -227,6 +231,7 @@
       </button>
       <div id="fileMenuPanel" class="hidden mt-2 p-2 bg-white border border-slate-200 rounded-xl shadow-lg space-y-1">
         <button onclick="closeFileMenu();document.getElementById('fileInput').click()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-folder-open mr-2 text-indigo-600"></i><span data-i18n="menuOpenGdz">Otvoriť zložku Gedzip</span></button>
+        <button onclick="closeFileMenu();otvorLokalnuZalohu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-database mr-2 text-amber-600"></i><span data-i18n="menuBackup">Otvoriť zálohu (backup)</span></button>
         <button onclick="closeFileMenu();saveGedzipTree()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-floppy-disk mr-2 text-emerald-600"></i><span data-i18n="menuSaveGdz">Uložiť súbor Gedzip</span></button>
         <button id="btnAiInvestigative" onclick="closeFileMenu();spustiAiInvestigativu()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-robot mr-2 text-indigo-600"></i><span data-i18n="menuAi">AI investigatíva</span></button>
         <button id="btnAiChat" onclick="closeFileMenu();spustiAiChat()" class="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-100"><i class="ph ph-chats-circle mr-2 text-emerald-600"></i><span data-i18n="menuAiChat">ChatGPT investigatíva</span></button>
@@ -770,7 +775,7 @@ const i18n = {
     tUnknown: "Neznáme", tBorn: "Narodenie:", tDied: "Úmrtie:", tLives: "Žije", tPlace: "Miesto:", tNoSpouse: "Žiadny evidovaný zväzok", tNoChildren: "Žiadne evidované deti", tNoParents: "Neznámi rodičia", tNoEvents: "Žiadne ďalšie evidované udalosti", tFather: "Otec", tMother: "Matka", tMarr: "Sobáš:", tEvBaptism: "Krst", tEvBasic: "Základná škola", tEvHigh: "Stredná škola", tEvUni: "Vysoká škola", tEvOther: "Iná udalosť", tNoRecent: "Zatiaľ žiadne nedávne úpravy.", tNoSearch: "Nenašla sa žiadna zodpovedajúca osoba", tNewPerson: "Pridať novú osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otca / Neznámy --", tOptNoMother: "-- Bez matky / Neznáma --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvoľte dieťa --", tPhDateMarr: "Dátum sobáša", tPhEventName: "Názov udalosti", tPhEventDate: "Dátum/Rok", tPhEventPlace: "Miesto konania", tMainPhoto: "Hlavná foto", tDoc: "Dokument", tNoFiles: "Zatiaľ žiadne priložené súbory.", tMaxSources: "Maximálny počet zdrojov (25) bol dosiahnutý.", tMaxSpouses: "Maximálny povolený počet partnerov (4) bol dosiahnutý.", tFileBanned: "je spustiteľný a nemôže byť priložený.", tNoPhotoDisplay: "K tejto osobe zatiaľ neboli priložené žiadne fotografie.", tMainPhLbl: "(Hlavná fotografia)", tNoDocsDisplay: "K tejto osobe nie sú priložené žiadne dokumenty.", tSafeDoc: "Bezpečný priložený rodinný záznam", tDownload: "Stiahnuť",
     msgLoaded: "Ukážkový rodokmeň bol načítaný s prísnym hierarchickým prepojením.", msgNew: "Nový rodokmeň bol vytvorený.", msgProcess: "Spracovávam súbor:", msgErrZip: "Archív neobsahuje hlavný súbor .ged (GEDCOM 7.0).", msgReadErr: "Chyba pri čítaní súboru:", msgReadOk: "Načítaných {X} osôb.", msgSaveOk: "Osoba bola úspešne uložená.", msgDelOk: "Osoba bola vymazaná.", msgPrepGdz: "Pripravujem GDZ archív (GEDCOM 7.0)...", msgGdzOk: "GDZ archív bol úspešne uložený.", msgGdzErr: "Chyba pri ukladaní GDZ:", msgPrepPdf: "Generujem viacstranové PDF...", msgPdfOk: "PDF bolo úspešne vygenerované!", msgPdfErr: "Chyba pri generovaní PDF:", msgPdfEmpty: "Rodokmeň je prázdny, nie je čo exportovať.",
     confirmTitle: "Potvrdenie akcie", confirmDelPerson: "Naozaj chcete trvalo vymazať túto osobu z rodokmeňa?", confirmDelFile: "Naozaj chcete odstrániť tento súbor?", btnDelete: "Odstrániť",
-    btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "4. Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgFileUploading: "Nahrávam súbory na úložisko: {X} / {N}…", msgFileUploadFail: "Súbor sa nepodarilo nahrať", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "3. Uložiť zložku SQLite"
+    btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "4. Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgFileUploading: "Nahrávam súbory na úložisko: {X} / {N}…", msgFileUploadFail: "Súbor sa nepodarilo nahrať", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "3. Uložiť zložku SQLite", menuBackup: "Otvoriť zálohu (backup)", bkpNoSql: "V adresári sa nenašiel súbor databázy (genealogy.sql).", bkpLoading: "Načítavam zálohu servera…", bkpEmpty: "Záloha neobsahuje žiadne osoby.", bkpLoaded: "Zo zálohy sa načítalo {X} osôb a {M} súborov ({D} médií sa v zálohe nenašlo).", bkpFail: "Otvorenie zálohy zlyhalo:"
   },
   cs: {
     pageTitle: "Genealogy - Rodokmen",
@@ -833,7 +838,7 @@ const i18n = {
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Přidejte doplňující poznámky k osobě (max 250 znaků). Nezobrazují se na veřejné kartě.", phNoteText: "Zadejte text poznámky...",
     tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.",
     confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit",
-    btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "4. Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgFileUploading: "Nahrávám soubory do úložiště: {X} / {N}…", msgFileUploadFail: "Soubor se nepodařilo nahrát", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "3. Uložit složku SQLite"
+    btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "4. Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgFileUploading: "Nahrávám soubory do úložiště: {X} / {N}…", msgFileUploadFail: "Soubor se nepodařilo nahrát", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "3. Uložit složku SQLite", menuBackup: "Otevřít zálohu (backup)", bkpNoSql: "V adresáři se nenašel soubor databáze (genealogy.sql).", bkpLoading: "Načítám zálohu serveru…", bkpEmpty: "Záloha neobsahuje žádné osoby.", bkpLoaded: "Ze zálohy se načetlo {X} osob a {M} souborů ({D} médií se v záloze nenašlo).", bkpFail: "Otevření zálohy selhalo:"
   },
   en: {
     pageTitle: "Genealogy - Family Tree",
@@ -896,7 +901,7 @@ const i18n = {
     tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Add supplementary notes for this person (max 250 chars). Hidden from public card.", phNoteText: "Enter note text...",
     tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.",
     confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete",
-    btnConnectDb: "Connect to database on server", btnSaveServer: "4. Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgFileUploading: "Uploading files to storage: {X} / {N}…", msgFileUploadFail: "File upload failed", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "3. Save SQLite Folder"
+    btnConnectDb: "Connect to database on server", btnSaveServer: "4. Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgFileUploading: "Uploading files to storage: {X} / {N}…", msgFileUploadFail: "File upload failed", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "3. Save SQLite Folder", menuBackup: "Open backup", bkpNoSql: "Database file (genealogy.sql) not found in the folder.", bkpLoading: "Loading server backup…", bkpEmpty: "The backup contains no persons.", bkpLoaded: "Loaded {X} persons and {M} files from the backup ({D} media not found).", bkpFail: "Opening the backup failed:"
   },
   de: {
     pageTitle: "Genealogy - Stammbaum",
@@ -959,7 +964,7 @@ const i18n = {
     tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Zusätzliche Notizen hinzufügen (max 250 Zeichen). Auf der öffentlichen Karte ausgeblendet.", phNoteText: "Notiztext eingeben...",
     tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.",
     confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen",
-    btnConnectDb: "Mit Datenbank auf dem Server verbinden", btnSaveServer: "4. Auf Server schreiben (SQL)", dbModalTitleLoad: "Mit Serverdatenbank verbinden", dbModalTitleSave: "In Serverdatenbank schreiben", lblDbUser: "Benutzer", lblDbPassword: "Passwort", phDbUser: "Benutzername", phDbPassword: "Passwort", msgDbErrCreds: "Benutzername oder Passwort ist falsch.", msgDbSessionExpired: "Die Sitzung ist abgelaufen, bitte melden Sie sich erneut an.", msgDbErrForbidden: "Der Server hat die Anfrage abgelehnt (ungültiges Verifizierungs-Token der Anwendung).", msgDbErrRate: "Zu viele Versuche, bitte später erneut versuchen.", msgDbTooLarge: "Der Stammbaum ist für einen einzelnen Schreibvorgang zu groß (Serverlimit 4,5 MB). Verkleinern oder entfernen Sie einige Fotos und Dokumente.", msgDbNotConfigured: "Die App ist nicht konfiguriert (Backend-Adresse oder Verifizierungs-Token fehlt).", dbHintLoad: "Melden Sie sich mit Benutzername und Passwort an. Nach der Überprüfung werden die Daten aus der Datenbank geladen und die App wird geöffnet.", dbHintSave: "Melden Sie sich mit Benutzername und Passwort an. Die Daten werden in die Serverdatenbank geschrieben und ersetzen alle vorhandenen Daten in der Datenbank.", btnDbConnect: "Verbinden", btnDbSave: "Schreiben", dbConnectedLbl: "Mit Server verbunden", msgDbFill: "Geben Sie Benutzername und Passwort ein.", msgDbBadUrl: "Die Datenbankadresse ist ungültig.", msgDbErrNet: "Der Server ist nicht erreichbar. Prüfen Sie Adresse, Verbindung und CORS (liegt die App auf https, muss auch der Server auf https liegen).", msgDbErrTimeout: "Der Server hat nicht rechtzeitig geantwortet.", msgDbErrAuth: "Ungültiger Schlüssel.", msgDbErrServer: "Serverfehler", msgDbErrData: "Der Server hat ungültige Daten geliefert.", msgDbLoaded: "{X} Personen aus der Datenbank geladen.", msgDbEmpty: "Die Datenbank ist leer – ein neuer Stammbaum wurde erstellt. Speichern Sie ihn mit „Auf Server schreiben“.", msgFileUploading: "Dateien werden hochgeladen: {X} / {N}…", msgFileUploadFail: "Datei konnte nicht hochgeladen werden", msgDbSaving: "Schreibe Daten in die Datenbank...", msgDbSaved: "Daten in der Datenbank gespeichert.", msgDbEmptyTree: "Der Stammbaum ist leer; Schreiben würde die Daten in der Datenbank löschen.", lblImportSidebar: "Andere Datei öffnen", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Ordner", btnSaveSqlite: "3. SQLite Ordner speichern"
+    btnConnectDb: "Mit Datenbank auf dem Server verbinden", btnSaveServer: "4. Auf Server schreiben (SQL)", dbModalTitleLoad: "Mit Serverdatenbank verbinden", dbModalTitleSave: "In Serverdatenbank schreiben", lblDbUser: "Benutzer", lblDbPassword: "Passwort", phDbUser: "Benutzername", phDbPassword: "Passwort", msgDbErrCreds: "Benutzername oder Passwort ist falsch.", msgDbSessionExpired: "Die Sitzung ist abgelaufen, bitte melden Sie sich erneut an.", msgDbErrForbidden: "Der Server hat die Anfrage abgelehnt (ungültiges Verifizierungs-Token der Anwendung).", msgDbErrRate: "Zu viele Versuche, bitte später erneut versuchen.", msgDbTooLarge: "Der Stammbaum ist für einen einzelnen Schreibvorgang zu groß (Serverlimit 4,5 MB). Verkleinern oder entfernen Sie einige Fotos und Dokumente.", msgDbNotConfigured: "Die App ist nicht konfiguriert (Backend-Adresse oder Verifizierungs-Token fehlt).", dbHintLoad: "Melden Sie sich mit Benutzername und Passwort an. Nach der Überprüfung werden die Daten aus der Datenbank geladen und die App wird geöffnet.", dbHintSave: "Melden Sie sich mit Benutzername und Passwort an. Die Daten werden in die Serverdatenbank geschrieben und ersetzen alle vorhandenen Daten in der Datenbank.", btnDbConnect: "Verbinden", btnDbSave: "Schreiben", dbConnectedLbl: "Mit Server verbunden", msgDbFill: "Geben Sie Benutzername und Passwort ein.", msgDbBadUrl: "Die Datenbankadresse ist ungültig.", msgDbErrNet: "Der Server ist nicht erreichbar. Prüfen Sie Adresse, Verbindung und CORS (liegt die App auf https, muss auch der Server auf https liegen).", msgDbErrTimeout: "Der Server hat nicht rechtzeitig geantwortet.", msgDbErrAuth: "Ungültiger Schlüssel.", msgDbErrServer: "Serverfehler", msgDbErrData: "Der Server hat ungültige Daten geliefert.", msgDbLoaded: "{X} Personen aus der Datenbank geladen.", msgDbEmpty: "Die Datenbank ist leer – ein neuer Stammbaum wurde erstellt. Speichern Sie ihn mit „Auf Server schreiben“.", msgFileUploading: "Dateien werden hochgeladen: {X} / {N}…", msgFileUploadFail: "Datei konnte nicht hochgeladen werden", msgDbSaving: "Schreibe Daten in die Datenbank...", msgDbSaved: "Daten in der Datenbank gespeichert.", msgDbEmptyTree: "Der Stammbaum ist leer; Schreiben würde die Daten in der Datenbank löschen.", lblImportSidebar: "Andere Datei öffnen", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Ordner", btnSaveSqlite: "3. SQLite Ordner speichern", menuBackup: "Backup öffnen", bkpNoSql: "Datenbankdatei (genealogy.sql) wurde im Ordner nicht gefunden.", bkpLoading: "Server-Backup wird geladen…", bkpEmpty: "Das Backup enthält keine Personen.", bkpLoaded: "{X} Personen und {M} Dateien aus dem Backup geladen ({D} Medien nicht gefunden).", bkpFail: "Öffnen des Backups fehlgeschlagen:"
   }
 };
 
@@ -1093,6 +1098,7 @@ dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classLis
 function handleFileSelect(e) { if (e.target.files.length) processFile(e.target.files[0]); }
 
 async function processFile(file) {
+  loaderZaciatok();
   const fileName = file.name;
   const ext = fileName.split('.').pop().toLowerCase();
   
@@ -1113,6 +1119,7 @@ async function processFile(file) {
       parseGedcomString(gedcomContent, fileName, attachedFiles);
     } else { const reader = new FileReader(); reader.onload = function(e) { parseGedcomString(e.target.result, fileName, {}); }; reader.readAsText(file); }
   } catch (err) { showToast(t('msgReadErr') + " " + err.message, "error"); }
+  loaderKoniec();
 }
 
 function getMimeTypeFromExt(ext) { switch (ext) { case 'jpg': case 'jpeg': return 'image/jpeg'; case 'png': return 'image/png'; case 'webp': return 'image/webp'; case 'pdf': return 'application/pdf'; case 'doc': return 'application/msword'; case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; case 'txt': return 'text/plain'; default: return 'application/octet-stream'; } }
@@ -2964,6 +2971,7 @@ async function openDbModal(mode) {
 
 
 async function runDbAction(mode) {
+  loaderZaciatok();
   try {
     const session = await getClerkSession();
 
@@ -2997,6 +3005,7 @@ async function runDbAction(mode) {
       'error'
     );
   }
+  loaderKoniec();
 }
 
 function closeDbModal() {
@@ -3692,7 +3701,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 12: zvýšený kontrast textov (slate-400/500/600 o 1–2 tóny tmavšie, zástupné symboly formulárov čitateľné); texty na tmavých plochách bez zmeny');
+console.log('Genealogy index16c-v31 – rev. 14: lokálna záloha servera (backup) – výber adresára: genealogy.sql + igor-gen-media/igor-gen-docs, import osôb, rodín aj médií offline');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -4406,6 +4415,195 @@ function spustiAiChat() {
   } catch (e) {}
   if (!skopirovany) oznam(false);
   if (!okno) { showToast(t('aiPopupBlocked'), 'error'); return; }
+}
+</script>
+
+<script>
+// ===================== LOKÁLNA ZÁLOHA SERVERA (BACKUP) =====================
+// Otvorí adresár so zálohou: genealogy.sql (dump Turso) + podpriečinky
+// igor-gen-media a igor-gen-docs (zrkadlo S3 úložiska). Načíta osoby, rodiny,
+// udalosti, povolania, poznámky aj fotky/dokumenty – ako pri pripojení na server.
+
+function otvorLokalnuZalohu() {
+  const inp = document.getElementById('backupDirInput');
+  if (inp) { inp.value = ''; inp.click(); }
+}
+
+/* ---------- Parser SQL dumpu (INSERT INTO ... VALUES (...); ---------- */
+const BKP_STLPCE = {
+  persons: ['id','title','first_name','middle_name','last_name','birth_name','gender','birth_date','birth_place','birth_country','death_date','death_place','layout_x','layout_y'],
+  families: ['id','husband_id','wife_id','marriage_date'],
+  family_children: ['family_id','person_id','sort_order'],
+  person_events: ['id','person_id','type','title','event_date','place','sort_order'],
+  person_sources: ['id','person_id','url','sort_order'],
+  person_addresses: ['id','person_id','type','address','date_from','date_to','sort_order'],
+  person_occupations: ['id','person_id','title','city','date_from','date_to','sort_order'],
+  person_notes: ['id','person_id','note_text','sort_order'],
+  person_files: ['id','person_id','kind','name','ext','mime_type','is_main','content','sort_order','storage_key','size_bytes','caption']
+};
+
+function bkpUnquote(s) { return s.replace(/^'|'$/g, '').replace(/''/g, "'"); }
+
+function bkpHodnota(tok) {
+  tok = tok.trim();
+  if (/^NULL$/i.test(tok)) return null;
+  if (/^X'/'i.test(tok)) return ''; // BLOB (obsah je v S3 zrkadle, nie v dumpy)
+  if (/^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(tok)) return Number(tok);
+  if (tok.charAt(0) === "'") return bkpUnquote(tok);
+  // replace('text','\n',char(10)) – používa turso db shell pri viacriadkových textoch
+  const m = /^replace\('((?:[^']|'')*)'/.exec(tok);
+  if (m) return m[1].replace(/''/g, "'").replace(/\\n/g, '\n');
+  return tok;
+}
+
+function bkpRozdelHodnoty(text) {
+  const out = []; let cur = '', inStr = false, depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) {
+      cur += c;
+      if (c === "'") { if (text[i + 1] === "'") { cur += "'"; i++; } else inStr = false; }
+    } else if (c === "'") { inStr = true; cur += c; }
+    else if (c === '(') { depth++; cur += c; }
+    else if (c === ')') { depth--; cur += c; }
+    else if (c === ',' && depth === 0) { out.push(bkpHodnota(cur)); cur = ''; }
+    else cur += c;
+  }
+  if (cur.trim() !== '') out.push(bkpHodnota(cur));
+  return out;
+}
+
+function bkpParseDump(sql) {
+  const tabulky = { metadata: [], persons: [], families: [], family_children: [], person_events: [], person_sources: [], person_addresses: [], person_occupations: [], person_notes: [], person_files: [] };
+  const re = /INSERT\s+INTO\s+([A-Za-z_]+)\s+VALUES\s*\(/gi;
+  let m;
+  while ((m = re.exec(sql)) !== null) {
+    const tab = m[1].toLowerCase();
+    if (!tabulky[tab]) continue;
+    let i = re.lastIndex, depth = 1, inS = false, end = -1;
+    for (; i < sql.length; i++) {
+      const c = sql[i];
+      if (inS) { if (c === "'") { if (sql[i + 1] === "'") i++; else inS = false; } }
+      else if (c === "'") inS = true;
+      else if (c === '(') depth++;
+      else if (c === ')') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end < 0) break;
+    const vals = bkpRozdelHodnoty(sql.substring(re.lastIndex, end));
+    if (tab === 'metadata') { tabulky.metadata.push({ key: vals[0], value: vals[1] }); }
+    else {
+      const stlpce = BKP_STLPCE[tab] || [];
+      const row = {};
+      stlpce.forEach((s, idx) => { row[s] = vals[idx] !== undefined ? vals[idx] : null; });
+      tabulky[tab].push(row);
+    }
+    re.lastIndex = end + 1;
+  }
+  return tabulky;
+}
+
+/* ---------- Nájdenie súboru v zrkadle S3 podľa storage_key ---------- */
+function bkpNajdiSubor(mapa, key) {
+  const k = String(key || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!k) return null;
+  const kandidati = [k];
+  const casti = k.split('/');
+  if (casti.length > 1) kandidati.push(casti.slice(1).join('/')); // bez 'media/' alebo 'docs/'
+  if (casti.length > 2) kandidati.push(casti.slice(2).join('/'));
+  kandidati.push(casti[casti.length - 1]); // len názov súboru
+  for (const kand of kandidati) {
+    const f = mapa.get(kand);
+    if (f) return f;
+  }
+  return null;
+}
+
+function bkpFileToDataUrl(file) {
+  return new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(file); });
+}
+
+/* ---------- Hlavná funkcia: spracuje adresár so zálohou ---------- */
+async function spracujLokalnuZalohu(fileList) {
+  const files = Array.from(fileList || []).filter(f => f && f.size > 0);
+  if (!files.length) return;
+
+  // 1) nájdi SQL dump databázy (genealogy.sql / genealogt.sql / *.sql)
+  const sqlFile = files.find(f => /genealog[^\\/]*\.sql$/i.test(f.name)) || files.find(f => /\.sql$/i.test(f.name));
+  if (!sqlFile) { showToast(t('bkpNoSql'), 'error'); return; }
+
+  loaderZaciatok(t('bkpLoading'));
+  try {
+    const db = bkpParseDump(await sqlFile.text());
+
+    // 2) mapa relatívnych ciest -> File (pre napárovanie S3 kľúčov)
+    const mapa = new Map();
+    files.forEach(f => {
+      const rel = (f.webkitRelativePath || f.name).replace(/\\/g, '/');
+      mapa.set(rel, f);
+      const casti = rel.split('/');
+      for (let i = 1; i < casti.length; i++) { const cesta = casti.slice(i).join('/'); if (!mapa.has(cesta)) mapa.set(cesta, f); }
+      const baza = casti[casti.length - 1];
+      if (!mapa.has(baza)) mapa.set(baza, f);
+    });
+
+    // 3) osoby
+    const persons = {};
+    db.persons.forEach(r => {
+      const p = createPersonObj(r.id, r.title, r.first_name, r.last_name, r.gender, r.birth_date, r.birth_place, r.birth_country, r.death_date, r.death_place);
+      p.middleName = r.middle_name || ''; p.birthName = r.birth_name || '';
+      p.x = Number(r.layout_x) || 0; p.y = Number(r.layout_y) || 0;
+      persons[p.id] = p;
+    });
+
+    // 4) rodiny + deti + prepojenia (fams/famc)
+    const families = {};
+    db.families.forEach(r => {
+      families[r.id] = { id: r.id, husbandId: r.husband_id || null, wifeId: r.wife_id || null, marrDate: r.marriage_date || '', children: [] };
+    });
+    db.family_children.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).forEach(r => {
+      const f = families[r.family_id]; if (f) f.children.push(r.person_id);
+      const p = persons[r.person_id]; if (p && !p.famc) p.famc = r.family_id;
+    });
+    Object.values(families).forEach(f => {
+      if (f.husbandId && persons[f.husbandId] && !persons[f.husbandId].fams.includes(f.id)) persons[f.husbandId].fams.push(f.id);
+      if (f.wifeId && persons[f.wifeId] && !persons[f.wifeId].fams.includes(f.id)) persons[f.wifeId].fams.push(f.id);
+    });
+
+    // 5) povolania, poznámky, udalosti, zdroje, adresy
+    db.person_occupations.forEach(r => { const p = persons[r.person_id]; if (p) p.occupations.push({ id: r.id, title: r.title || '', city: r.city || '', dateFrom: r.date_from || '', dateTo: r.date_to || '' }); });
+    db.person_notes.forEach(r => { const p = persons[r.person_id]; if (p && r.note_text) p.notes.push(String(r.note_text)); });
+    db.person_events.forEach(r => { const p = persons[r.person_id]; if (p) p.events.push({ id: r.id, type: r.type || 'EVEN', title: r.title || '', date: r.event_date || '', place: r.place || '' }); });
+    db.person_sources.forEach(r => { const p = persons[r.person_id]; if (p && r.url) p.sources.push(String(r.url)); });
+    db.person_addresses.forEach(r => { const p = persons[r.person_id]; if (p) p.addresses.push({ id: r.id, type: r.type || 'PERM', address: r.address || '', dateFrom: r.date_from || '', dateTo: r.date_to || '' }); });
+
+    // 6) fotky a dokumenty – obsah z igor-gen-media / igor-gen-docs
+    let nahrane = 0, nenajdene = 0;
+    for (const r of db.person_files) {
+      const p = persons[r.person_id]; if (!p) continue;
+      const subor = bkpNajdiSubor(mapa, r.storage_key);
+      let data = '';
+      if (subor) { try { data = await bkpFileToDataUrl(subor); nahrane++; } catch (e) { nenajdene++; } }
+      else nenajdene++;
+      const obj = { id: r.id, name: r.name, type: r.kind, isMain: !!Number(r.is_main), caption: r.caption || '', key: r.storage_key || '', mime: r.mime_type || '', size: Number(r.size_bytes) || (subor ? subor.size : 0), data: data };
+      (r.kind === 'doc' ? p.documents : p.photos).push(obj);
+    }
+
+    if (!Object.keys(persons).length) { showToast(t('bkpEmpty'), 'error'); return; }
+
+    // 7) otvor rodokmeň z lokálnej zálohy
+    const meta = {}; db.metadata.forEach(m => { meta[m.key] = m.value; });
+    treeData = { fileName: meta.file_name || 'zaloha.gdz', persons, families, files: {} };
+    originalTreeData = JSON.parse(JSON.stringify(treeData));
+    recentEditedIds = Object.keys(persons).slice(0, 5);
+    launchWorkspace();
+    treeSource = 'local'; hydratePromise = null; dbConnection = null; updateDbStatusUI(); updateSourceUI();
+    showToast(t('bkpLoaded').replace('{X}', Object.keys(persons).length).replace('{M}', nahrane).replace('{D}', nenajdene), 'success');
+  } catch (err) {
+    console.error('backup', err);
+    showToast(t('bkpFail') + ' ' + (err && err.message ? err.message : ''), 'error');
+  } finally {
+    loaderKoniec();
+  }
 }
 </script>
 
@@ -5317,6 +5515,7 @@ function pdfBookTocMaxW(dvaStlpce) {
 
 // ---- hlavná funkcia: vytvorenie a stiahnutie PDF knihy ----
 async function vytvorPdfKnihu() {
+  loaderZaciatok('Generujem PDF knihu…');
   try {
     if (!window.jspdf || !window.jspdf.jsPDF) { showToast(t('fanNoPdf') || 'PDF knižnica nie je načítaná.', 'error'); return; }
     if (!Object.keys(treeData.persons || {}).length) { showToast('Najprv otvorte alebo vytvorte rodokmeň.', 'error'); return; }
@@ -5398,6 +5597,7 @@ async function vytvorPdfKnihu() {
     console.error(err);
     showToast('Vytvorenie PDF knihy zlyhalo: ' + (err && err.message ? err.message : ''), 'error');
   }
+  loaderKoniec();
 }
 </script>
 
@@ -5457,6 +5657,36 @@ async function vytvorPdfKnihu() {
   window.initChatIframe();
 })();
 </script>
+<!-- ===== ROTUJÚCE KOLIESKO NAČÍTAVANIA (zobrazí sa až po 0,5 s) ===== -->
+<div id="appLoader" aria-hidden="true" style="position:fixed;inset:0;z-index:200;background:rgba(13,19,26,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;">
+  <div style="text-align:center;">
+    <svg width="56" height="56" viewBox="0 0 24 24" style="animation:appLoaderRot 1s linear infinite;transform-origin:center;">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="#d8cbb2" stroke-width="2" opacity="0.35"/>
+      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <div id="appLoaderText" style="margin-top:10px;color:#f5e6c8;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;font-weight:600;">Načítavam…</div>
+  </div>
+</div>
+<style>@keyframes appLoaderRot { to { transform: rotate(360deg); } } #appLoader.zobrazeny { display: flex; }</style>
+<script>
+(function () {
+  var timer = null;
+  /* Zobrazí koliesko až vtedy, ak operácia trvá dlhšie než 0,5 s. */
+  window.loaderZaciatok = function (text) {
+    if (text) { var el = document.getElementById('appLoaderText'); if (el) el.textContent = text; }
+    if (timer) return;
+    timer = setTimeout(function () { document.getElementById('appLoader').classList.add('zobrazeny'); }, 500);
+  };
+  window.loaderKoniec = function () {
+    if (timer) { clearTimeout(timer); timer = null; }
+    document.getElementById('appLoader').classList.remove('zobrazeny');
+  };
+  loaderZaciatok(); // počiatočné načítanie stránky – koliesko sa ukáže, ak trvá > 0,5 s
+  window.addEventListener('load', function () { loaderKoniec(); });
+  setTimeout(function () { loaderKoniec(); }, 15000); // bezpečnostná poistka
+})();
+</script>
+
 <style>
 /* ===== ZVÝŠENIE KONTRASTU TEXTOV (čitateľnosť) =====
    Svetlošedé texty na svetlých plochách sa stmavia o 1–2 stupne palety.
