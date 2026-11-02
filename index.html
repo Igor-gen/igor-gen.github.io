@@ -2734,8 +2734,6 @@ function keepItemIds(oldList, newList, fields) {
 function savePersonForm(e) {
   e.preventDefault(); pushUndoSnapshot(); const personId = document.getElementById('editPersonId').value; const isNew = !personId;
   const id = isNew ? generateId("I") : personId; const p = isNew ? createPersonObj(id) : treeData.persons[id];
-  // Pred uložením: bola komponenta tejto osoby spojená s hlavným rodokmeňom?
-  const preSpojeneSHlavnym = (() => { try { if (isNew) return false; const comp = komponentaOsobSet(id); const hl = hlavnaKomponenta(); return hl.size > 0 && [...comp].some(x => hl.has(x)); } catch (e) { return false; } })();
 
   p.title = document.getElementById('editTitle').value.trim(); p.firstName = document.getElementById('editFirstName').value.trim(); p.middleName = document.getElementById('editMiddleName').value.trim(); p.lastName = document.getElementById('editLastName').value.trim(); p.birthName = document.getElementById('editBirthName').value.trim(); p.gender = document.getElementById('editGender').value; p.birthDate = document.getElementById('editBirthDate').value.trim(); p.birthPlace = document.getElementById('editBirthPlace').value.trim(); p.birthCountry = document.getElementById('editBirthCountry').value; p.deathDate = document.getElementById('editDeathDate').value.trim(); p.deathPlace = document.getElementById('editDeathPlace').value.trim();
 
@@ -2812,10 +2810,10 @@ function savePersonForm(e) {
   // celá jej vetva sa automaticky stáva súčasťou rodokmeňa a zmizne z plátna kandidátov.
   let prepojeno = false;
   try { prepojeno = zruKandidatovAkSuPrepojeni(id); } catch (e) {}
-  // Odpojenie od hlavného rodokmeňa: komponenta PRED uložením patrila do hlavného rodokmeňa,
-  // ale po zmenách už nemá žiadne spojenie s ním → vráti sa na plátno kandidátov.
+  // Odpojenie od hlavného rodokmeňa: ak komponenta uloženej osoby po zmenách nemá žiadne
+  // spojenie s hlavným rodokmeňom (a neobsahuje kandidátov), celá sa vracia na plátno kandidátov.
   let vrateneKandidati = false;
-  try { if (preSpojeneSHlavnym) vrateneKandidati = vratOdpojenychNaKandidatov(id); } catch (e) {}
+  try { if (!isNew) vrateneKandidati = vratOdpojenychNaKandidatov(id); } catch (e) {}
 
   closePersonEditor(); autoLayoutTree(false);
   if (isNew && canvas && !CANDIDATE_MODE) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
@@ -2906,9 +2904,23 @@ function hlavnaKomponenta() {
   });
   return najlepsi;
 }
+// Oprava sirôt: každá ne-kandidátska vetva, ktorá nemá žiadne spojenie s hlavným rodokmeňom
+// (najväčšou ne-kandidátskou komponentou), sa presunie na plátno kandidátov –
+// inak by bola neviditeľná v oboch plátnach. Vracia počet presunutých osôb.
+function opravSirotov() {
+  const P = treeData.persons; const hl = hlavnaKomponenta();
+  if (hl.size === 0) return 0;
+  const videne = new Set(); let presun = 0;
+  Object.values(P).forEach(p => {
+    if (p.candidate || videne.has(p.id) || hl.has(p.id)) return;
+    const comp = komponentaOsobSet(p.id); comp.forEach(id2 => videne.add(id2));
+    if (comp.size === 0 || [...comp].some(id2 => hl.has(id2))) return;
+    comp.forEach(id2 => { const q = P[id2]; if (q && !q.candidate) { q.candidate = true; presun++; } });
+  });
+  return presun;
+}
 // Ak komponenta uloženej osoby nemá po uložení žiadne spojenie s hlavným rodokmeňom
-// a neobsahuje žiadneho kandidáta, celá sa vracia na plátno kandidátov
-// (inak by bola neviditeľná v oboch plátnach).
+// a neobsahuje žiadneho kandidáta, celá sa vracia na plátno kandidátov.
 function vratOdpojenychNaKandidatov(personId) {
   const P = treeData.persons; const comp = komponentaOsobSet(personId);
   if ([...comp].some(id2 => P[id2] && P[id2].candidate)) return false;
@@ -3988,6 +4000,7 @@ function loadTreeFromServer(data, session) {
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
+  try { const sir = opravSirotov(); if (sir > 0) setTimeout(() => showToast(t('msgUnlinkedCand').replace('– vrátila sa', `(${sir}) – vrátili sa`), "info"), 400); } catch (e) {}
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
@@ -4006,7 +4019,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 22: odpojenie vetvy od rodokmeňa (zrušenie otca/partnera) automaticky vráti celú vetvu na plátno kandidátov – osoby už nikdy „nezmiznú“ medzi plátnami');
+console.log('Genealogy index16c-v31 – rev. 23: celá vetva sa pri odpojení od rodokmeňa (zrušenie otca/matky/partnera) vracia na plátno kandidátov + automatická oprava „stratených“ sirôt pri načítaní dát');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
