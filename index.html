@@ -1831,11 +1831,13 @@ function hrebenPrejdiNa(z, okamzite) {
   HREBEN.animacia = requestAnimationFrame(krok);
 }
 function hrebenOdkazV(x, y) {
-  const z = HREBEN.aktualna; if (!z) return null;
-  const lx = x - z.dx;
-  for (const o of z.odkazy) {
-    const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
-    if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
+  const zony = CANDIDATE_MODE ? HREBEN.zony : (HREBEN.aktualna ? [HREBEN.aktualna] : []);
+  for (const z of zony) {
+    const lx = x - z.dx;
+    for (const o of z.odkazy) {
+      const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
+      if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
+    }
   }
   return null;
 }
@@ -1888,10 +1890,15 @@ function hrebenNakresli(c, z) {
   c.restore();
 }
 function hrebenOsobaV(x, y) {
-  const z = HREBEN.aktualna; if (!z) return null;
-  const lx = x - z.dx;
-  for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) return u.os.fiktivna ? null : u.os; }
-  return null;
+  // Na plátne kandidátov je viac zón vedľa seba – hit-test musí prehľadať všetky,
+  // inak by sa dali označiť len osoby z prvej zóny (a klik na inú zónu by vybral osobu z prvej).
+  const zony = CANDIDATE_MODE ? HREBEN.zony : (HREBEN.aktualna ? [HREBEN.aktualna] : []);
+  let najdeny = null;
+  for (const z of zony) {
+    const lx = x - z.dx;
+    for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) { if (!u.os.fiktivna) najdeny = u.os; } }
+  }
+  return najdeny;
 }
 
 // Hlavný vstup: prepočíta všetky zóny a (voliteľne) prispôsobí pohľad
@@ -3954,7 +3961,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 20: plátno KANDIDÁTI – prehľad celého plátna (fit všetkých vetiev naraz) pri prepnutí, po uložení osoby aj cez tlačidlo Preusporiadať; nová osoba už neskáče mimo obrazovky');
+console.log('Genealogy index16c-v31 – rev. 21: oprava klikania na plátne KANDIDÁTI – hit-test cez VŠETKY zóny (každá bublina aj odkaz klikateľný, výber správnej osoby aj pri viacerých kandidátskych rodinách vedľa seba)');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
