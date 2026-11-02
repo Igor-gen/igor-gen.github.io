@@ -1382,6 +1382,22 @@ let CANDIDATE_MODE = false;
 const HREBEN_ZALOHA = { koren: null, cesta: [] };
 function osViditelna(p) { return !!p && (CANDIDATE_MODE ? !!p.candidate : !p.candidate); }
 function kandidatiPocet() { return Object.values(treeData.persons || {}).filter(p => p && p.candidate).length; }
+// Celkový pohľad na plátno kandidátov: vycentruje VŠETKY zóny (každá nezávislá vetva) naraz,
+// aby žiadna osoba nezmizla mimo obrazovky.
+function fitCandidateView() {
+  if (!canvas || !HREBEN.zony.length) { drawTree(); return; }
+  const pad = 80;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  HREBEN.zony.forEach(z => {
+    minX = Math.min(minX, z.hr.minX + z.dx); maxX = Math.max(maxX, z.hr.maxX + z.dx);
+    minY = Math.min(minY, z.hr.minY); maxY = Math.max(maxY, z.hr.maxY);
+  });
+  const w = maxX - minX + pad * 2, h = maxY - minY + pad * 2;
+  scale = Math.min(Math.max(0.12, Math.min(canvas.width / w, canvas.height / h)), 1.2);
+  panX = canvas.width / 2 - (minX + maxX) / 2 * scale;
+  panY = canvas.height / 2 - (minY + maxY) / 2 * scale;
+  drawTree();
+}
 function updateCandidatesBtn() {
   const b = document.getElementById('btnCandidates'); if (!b) return;
   const n = kandidatiPocet();
@@ -1399,7 +1415,8 @@ function prepniKandidati(on) {
     HREBEN.cesta = HREBEN_ZALOHA.cesta || [];
   }
   hrebenObnov();
-  if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, false); else { panX = 0; panY = 0; scale = 1; drawTree(); }
+  if (CANDIDATE_MODE) { fitCandidateView(); }
+  else if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, false); else { panX = 0; panY = 0; scale = 1; drawTree(); }
   updateCandidatesBtn(); updateCountsUI();
   if (CANDIDATE_MODE && !kandidatiPocet()) showToast(t('tNoCandidates'), "info");
 }
@@ -1888,6 +1905,7 @@ function autoLayoutTree(andFitToView = true) {
 function hrebenPreusporiadat() {
   if (!Object.keys(treeData.persons || {}).length) return;
   hrebenObnov();                                   // zachová cestu cez pod-plátna, takže ostane aktuálny ten istý diagram
+  if (CANDIDATE_MODE) { fitCandidateView(); return; }
   if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true);
 }
 // Tlačidlo „Návrat na hlavný diagram“: plynulo sa vráti na hlavný diagram a roztiahne ho na celú plochu.
@@ -1899,7 +1917,7 @@ function hrebenNavratNaHlavny() {
   HREBEN.aktualna = hl; HREBEN.cesta = hrebenCestaAktualnej();
   hrebenPrejdiNa(hl, false);
 }
-function fitTreeToView() { if (!canvas) return; if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
+function fitTreeToView() { if (!canvas) return; if (CANDIDATE_MODE) { if (!HREBEN.zony.length) hrebenObnov(); fitCandidateView(); return; } if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
 // Terčík „Vycentrovať na osobu“: prepne sa na diagram, na ktorom je osoba (ak nie je aktuálny), a vždy ho roztiahne na celú
 // plochu aj s označenou osobou.
 function centerOnPerson(personId) {
@@ -2787,8 +2805,9 @@ function savePersonForm(e) {
   try { prepojeno = zruKandidatovAkSuPrepojeni(id); } catch (e) {}
 
   closePersonEditor(); autoLayoutTree(false);
-  if (isNew && canvas) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
+  if (isNew && canvas && !CANDIDATE_MODE) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
   selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success"); autoSaveNow();
+  if (CANDIDATE_MODE) fitCandidateView();
   if (prepojeno) {
     showToast(t('msgLinked'), "success");
     if (CANDIDATE_MODE && !kandidatiPocet()) { prepniKandidati(false); centerOnPerson(p.id); }
@@ -3935,7 +3954,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 19: plátno KANDIDÁTI – viac samostatných rodín/osôb vedľa seba (každá = vlastná zóna); prepojenie aj priamo v editore (otec/matka/partner/dieťa z rodokmeňa) s automatickým zaradením vetvy do rodokmeňa');
+console.log('Genealogy index16c-v31 – rev. 20: plátno KANDIDÁTI – prehľad celého plátna (fit všetkých vetiev naraz) pri prepnutí, po uložení osoby aj cez tlačidlo Preusporiadať; nová osoba už neskáče mimo obrazovky');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
