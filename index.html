@@ -335,6 +335,11 @@
     <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html?v=1" title="Chat rodiny"
       style="position:absolute;right:16px;bottom:16px;width:260px;height:40px;border:none;background:transparent;z-index:16;transition:width .2s ease,height .2s ease;display:none;"
       referrerpolicy="no-referrer"></iframe>
+
+    <!-- KANDIDÁTI: oranžové tlačidlo vpravo hore – prepína medzi hlavným diagramom a plátnom kandidátov -->
+    <button id="btnCandidates" onclick="prepniKandidati(!CANDIDATE_MODE)" class="absolute top-4 right-4 z-[16] px-3.5 py-2 rounded-2xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-[11px] sm:text-xs font-semibold shadow-lg border border-orange-400/60 flex items-center gap-1.5 transition">
+      <i class="ph-bold ph-users-three"></i> <span id="btnCandidatesLabel">Kandidáti</span>
+    </button>
   </main>
 
   <!-- RIGHT DETAIL PANEL (MOBILE OFF-CANVAS) -->
@@ -360,6 +365,9 @@
         </button>
         <button onclick="openPersonEditor(currentSelectedPersonId)" class="px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center gap-1">
           <i class="ph-bold ph-pencil-simple"></i> <span data-i18n="btnEdit">Upraviť</span>
+        </button>
+        <button id="btnLinkCandidate" onclick="openLinkDialog(currentSelectedPersonId)" class="hidden px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white flex items-center gap-1" title="Prepojiť túto vetvu s existujúcim rodokmeňom" data-i18n-title="btnLinkTree">
+          <i class="ph-bold ph-plug-circle"></i> <span data-i18n="btnLinkTree">Prepojiť</span>
         </button>
       </div>
     </div>
@@ -428,6 +436,30 @@
       </div>
     </div>
   </aside>
+</div>
+
+<!-- PREPOJENIE KANDIDÁTSKEJ VETVY: výber osoby z rodokmeňa a vzťahu -->
+<div id="linkCandidateModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-5 border border-slate-200">
+    <div class="flex items-center justify-between mb-1">
+      <h3 class="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2"><i class="ph-bold ph-plug-circle text-orange-500"></i> <span data-i18n="linkDialogTitle">Prepojenie kandidátskej vetvy</span></h3>
+      <button onclick="closeLinkDialog()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200"><i class="ph-bold ph-x text-lg"></i></button>
+    </div>
+    <p class="text-[11px] sm:text-xs text-slate-500 mb-3"><span data-i18n="linkCandidateLbl">Kandidát:</span> <b id="linkCandName" class="text-slate-700"></b></p>
+    <label class="block text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" data-i18n="linkSelectPerson">Osoba z rodokmeňa</label>
+    <select id="linkTargetSelect" class="w-full p-2 rounded-xl border border-slate-300 bg-white mb-3 text-xs"></select>
+    <label class="block text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" data-i18n="linkRelation">Vzťah kandidáta k osobe</label>
+    <select id="linkRelationSelect" class="w-full p-2 rounded-xl border border-slate-300 bg-white mb-4 text-xs">
+      <option value="spouse" data-i18n="optLinkSpouse">je partner/ka osoby</option>
+      <option value="parent" data-i18n="optLinkParent">je rodič osoby</option>
+      <option value="child" data-i18n="optLinkChild">je dieťa osoby</option>
+    </select>
+    <p class="text-[10px] text-slate-400 mb-4" data-i18n="linkHint">Celá kandidátska vetva sa po prepojení presunie do hlavného diagramu a zmizne z plátna kandidátov.</p>
+    <div class="flex justify-end gap-2">
+      <button type="button" onclick="closeLinkDialog()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs" data-i18n="btnCancel">Zrušiť</button>
+      <button type="button" onclick="confirmLinkCandidate()" class="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs flex items-center gap-1"><i class="ph-bold ph-plug-circle"></i> <span data-i18n="btnLinkConfirm">Prepojiť</span></button>
+    </div>
+  </div>
 </div>
 
 <!-- EDITOR MODAL -->
@@ -769,7 +801,7 @@ const i18n = {
     aiUnknownName: "neznáme meno",
     appDesc: "Hrebeňový strom rodokmeňa s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Presuňte sem váš súbor rodokmeňa alebo kliknite pre výber", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged",
     btnSelectFile: "Vybrať súbor z počítača", btnSample: "Načítať ukážkový rodokmeň", btnNew: "Vytvoriť nový rodokmeň", footerText: "Genealogy HTML5 Single-File • Žiadne dáta neopúšťajú váš prehliadač",
-    btnAddPerson: "1. Pridať osobu", btnSaveGdz: "2. Uložiť rodokmeň (.gdz)", btnLayout: "Preusporiadať", btnMainDiagram: "Návrat na hlavný diagram", rodSelectPh: "Vybrať diagram rodu…", rodSelectLbl: "Priamy výber diagramu podľa rodu", rodMainOpt: "Hlavný diagram", rodFamily: "rod {N}", pickerFilterPh: "Filtrovať osobu (priezvisko / rok)…", btnExportPdf: "Export do PDF",
+    btnAddPerson: "1. Pridať osobu", btnSaveGdz: "2. Uložiť rodokmeň (.gdz)", btnLayout: "Preusporiadať", btnMainDiagram: "Návrat na hlavný diagram", btnCandidates: "Kandidáti", btnLinkTree: "Prepojiť", linkDialogTitle: "Prepojenie kandidátskej vetvy", linkCandidateLbl: "Kandidát:", linkSelectPerson: "Osoba z rodokmeňa", linkRelation: "Vzťah kandidáta k osobe", optLinkSpouse: "je partner/ka osoby", optLinkParent: "je rodič osoby", optLinkChild: "je dieťa osoby", btnLinkConfirm: "Prepojiť", linkHint: "Celá kandidátska vetva sa po prepojení presunie do hlavného diagramu a zmizne z plátna kandidátov.", msgLinked: "Kandidátska vetva bola prepojená s rodokmeňom.", msgUnlinkedCand: "Vetva bola odpojená od rodokmeňa – vrátila sa na plátno kandidátov.", tLinkSlotFull: "Vybraná osoba už má rodiča v tejto rodine.", tNoCandidates: "Zatiaľ žiadni kandidáti. Pridajte novú osobu tlačidlom „1. Pridať osobu“.", rodSelectPh: "Vybrať diagram rodu…", rodSelectLbl: "Priamy výber diagramu podľa rodu", rodMainOpt: "Hlavný diagram", rodFamily: "rod {N}", pickerFilterPh: "Filtrovať osobu (priezvisko / rok)…", btnExportPdf: "Export do PDF",
     zoomView: "Lupa & Pohľad:", searchPlaceholder: "Meno, priezvisko, rok, miesto...", recentEdited: "Posledne editované", statPersons: "Celkovo osôb:", statFamilies: "Rodín:",
     legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzol", legendControls: "1x klik = Označenie • 2x klik = Karta osoby • Úprava = tlačidlom Upraviť", lastSavedPrefix: "Posledné uloženie na server:",
     cardTitle: "Karta osoby", btnEdit: "Upraviť", sectSpouse: "Manžel / Manželka", sectChildren: "Potomkovia (Deti)", sectParents: "Rodičia", sectEvents: "Ďalšie udalosti", sectSources: "Zdroje", btnPhotos: "Fotografie", btnDocs: "Dokumenty",
@@ -841,7 +873,7 @@ const i18n = {
     aiOpening: "Otevírá se Perplexity.",
     aiOpeningCopied: " Pokud se vyhledávání nespustí samo, prompt je zkopírován (Ctrl+V).",
     aiUnknownName: "neznámé jméno",
-    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnMainDiagram: "Zpět na hlavní diagram", rodSelectPh: "Vybrat diagram rodu…", rodSelectLbl: "Přímý výběr diagramu podle rodu", rodMainOpt: "Hlavní diagram", rodFamily: "rod {N}", pickerFilterPh: "Filtrovat osobu (příjmení / rok)…", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Jméno, příjmení, rok, místo...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Označení • 2x klik = Karta osoby • Úprava = tlačítkem Upravit", lastSavedPrefix: "Poslední uložení na server:", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", sectSources: "Zdroje", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 zdrojů: URL odkaz + popis. Na kartě osoby se zobrazí klikatelný popis, který otevře zdroj v novém okně.", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
+    appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "1. Přidat osobu", btnSaveGdz: "2. Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnMainDiagram: "Zpět na hlavní diagram", btnCandidates: "Kandidáti", btnLinkTree: "Propojit", linkDialogTitle: "Propojení kandidátské větve", linkCandidateLbl: "Kandidát:", linkSelectPerson: "Osoba z rodokmenu", linkRelation: "Vztah kandidáta k osobě", optLinkSpouse: "je partner/ka osoby", optLinkParent: "je rodičem osoby", optLinkChild: "je dítětem osoby", btnLinkConfirm: "Propojit", linkHint: "Celá kandidátská větev se po propojení přesune do hlavního diagramu a zmizí z plátna kandidátů.", msgLinked: "Kandidátská větev byla propojena s rodokmenem.", msgUnlinkedCand: "Větev byla odpojena od rodokmenu – vrátila se na plátno kandidátů.", tLinkSlotFull: "Vybraná osoba už má rodiče v této rodině.", tNoCandidates: "Zatím žádní kandidáti. Přidejte novou osobu tlačítkem „1. Přidat osobu“.", rodSelectPh: "Vybrat diagram rodu…", rodSelectLbl: "Přímý výběr diagramu podle rodu", rodMainOpt: "Hlavní diagram", rodFamily: "rod {N}", pickerFilterPh: "Filtrovat osobu (příjmení / rok)…", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Jméno, příjmení, rok, místo...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Označení • 2x klik = Karta osoby • Úprava = tlačítkem Upravit", lastSavedPrefix: "Poslední uložení na server:", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", sectSources: "Zdroje", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 zdrojů: URL odkaz + popis. Na kartě osoby se zobrazí klikatelný popis, který otevře zdroj v novém okně.", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Přidejte doplňující poznámky k osobě (max 250 znaků). Nezobrazují se na veřejné kartě.", phNoteText: "Zadejte text poznámky...",
     tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tNoSources: "Žádné evidované zdroje", phSourceDesc: "Popis zdroje (zobrazí se na kartě)", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.",
     confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit",
@@ -904,7 +936,7 @@ const i18n = {
     aiOpening: "Opening Perplexity.",
     aiOpeningCopied: " If the search does not start by itself, the prompt is copied (Ctrl+V).",
     aiUnknownName: "unknown name",
-    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnMainDiagram: "Back to main diagram", rodSelectPh: "Select family diagram…", rodSelectLbl: "Direct selection of diagram by family", rodMainOpt: "Main diagram", rodFamily: "{N} family", pickerFilterPh: "Filter person (surname / year)…", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Name, surname, year, place...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Select • 2x click = Person card • Edit = Edit button", lastSavedPrefix: "Last saved to server:", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", sectSources: "Sources", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 sources: URL + description. The person card shows the clickable description, which opens the source in a new window.", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
+    appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "1. Add Person", btnSaveGdz: "2. Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnMainDiagram: "Back to main diagram", btnCandidates: "Candidates", btnLinkTree: "Link", linkDialogTitle: "Link candidate branch", linkCandidateLbl: "Candidate:", linkSelectPerson: "Person from the family tree", linkRelation: "Candidate's relation to the person", optLinkSpouse: "is the person's partner", optLinkParent: "is the person's parent", optLinkChild: "is the person's child", btnLinkConfirm: "Link", linkHint: "After linking, the whole candidate branch moves to the main diagram and disappears from the candidates canvas.", msgLinked: "The candidate branch has been linked to the family tree.", msgUnlinkedCand: "The branch has been unlinked from the family tree – it returned to the candidates canvas.", tLinkSlotFull: "The selected person already has a parent in this family.", tNoCandidates: "No candidates yet. Add a new person with the „1. Add Person“ button.", rodSelectPh: "Select family diagram…", rodSelectLbl: "Direct selection of diagram by family", rodMainOpt: "Main diagram", rodFamily: "{N} family", pickerFilterPh: "Filter person (surname / year)…", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Name, surname, year, place...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Select • 2x click = Person card • Edit = Edit button", lastSavedPrefix: "Last saved to server:", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", sectSources: "Sources", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 sources: URL + description. The person card shows the clickable description, which opens the source in a new window.", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
     tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Add supplementary notes for this person (max 250 chars). Hidden from public card.", phNoteText: "Enter note text...",
     tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tNoSources: "No sources recorded", phSourceDesc: "Source description (shown on card)", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.",
     confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete",
@@ -967,7 +999,7 @@ const i18n = {
     aiOpening: "Perplexity wird geöffnet.",
     aiOpeningCopied: " Falls die Suche nicht automatisch startet, wurde der Prompt kopiert (Strg+V).",
     aiUnknownName: "unbekannter Name",
-    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnMainDiagram: "Zurück zum Hauptdiagramm", rodSelectPh: "Familien-Diagramm wählen…", rodSelectLbl: "Direkte Auswahl des Diagramms nach Familie", rodMainOpt: "Hauptdiagramm", rodFamily: "Familie {N}", pickerFilterPh: "Person filtern (Nachname / Jahr)…", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Name, Nachname, Jahr, Ort...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Auswählen • 2x Klick = Personenkarte • Bearbeiten = Button Bearbeiten", lastSavedPrefix: "Zuletzt auf dem Server gespeichert:", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", sectSources: "Quellen", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Quellen hinzu: URL + Beschreibung. Auf der Personenkarte erscheint die klickbare Beschreibung, die die Quelle in einem neuen Fenster öffnet.", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
+    appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "1. Person hinzufügen", btnSaveGdz: "2. Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnMainDiagram: "Zurück zum Hauptdiagramm", btnCandidates: "Kandidaten", btnLinkTree: "Verbinden", linkDialogTitle: "Kandidaten-Zweig verbinden", linkCandidateLbl: "Kandidat:", linkSelectPerson: "Person aus dem Stammbaum", linkRelation: "Beziehung des Kandidaten zur Person", optLinkSpouse: "ist Partner/in der Person", optLinkParent: "ist Elternteil der Person", optLinkChild: "ist Kind der Person", btnLinkConfirm: "Verbinden", linkHint: "Nach dem Verbinden wandert der ganze Kandidaten-Zweig ins Hauptdiagramm und verschwindet von der Kandidatenfläche.", msgLinked: "Der Kandidaten-Zweig wurde mit dem Stammbaum verbunden.", msgUnlinkedCand: "Der Zweig wurde vom Stammbaum getrennt – er ist zurück auf der Kandidatenfläche.", tLinkSlotFull: "Die gewählte Person hat bereits ein Elternteil in dieser Familie.", tNoCandidates: "Noch keine Kandidaten. Fügen Sie eine neue Person mit „1. Person hinzufügen“ hinzu.", rodSelectPh: "Familien-Diagramm wählen…", rodSelectLbl: "Direkte Auswahl des Diagramms nach Familie", rodMainOpt: "Hauptdiagramm", rodFamily: "Familie {N}", pickerFilterPh: "Person filtern (Nachname / Jahr)…", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Name, Nachname, Jahr, Ort...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Auswählen • 2x Klick = Personenkarte • Bearbeiten = Button Bearbeiten", lastSavedPrefix: "Zuletzt auf dem Server gespeichert:", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", sectSources: "Quellen", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Quellen hinzu: URL + Beschreibung. Auf der Personenkarte erscheint die klickbare Beschreibung, die die Quelle in einem neuen Fenster öffnet.", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
     tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Zusätzliche Notizen hinzufügen (max 250 Zeichen). Auf der öffentlichen Karte ausgeblendet.", phNoteText: "Notiztext eingeben...",
     tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tNoSources: "Keine Quellen erfasst", phSourceDesc: "Quellenbeschreibung (auf der Personenkarte)", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.",
     confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen",
@@ -1009,6 +1041,7 @@ function setLanguage(lang) {
   });
   
   updateCountsUI(); updateRecentListUI();
+  try { updateCandidatesBtn(); } catch (e) {}
   try { updateSidebarTreeLabels(); updateSourceUI(); } catch (e) {}
   try { if (HREBEN.aktualna) { hrebenObnov(); drawTree(); } } catch (e) {}
   try { const fm = document.getElementById('fanChartModal'); if (fm && !fm.classList.contains('hidden')) { fanRender(false); fanRenderRootList(document.getElementById('fanRootSearch').value); } } catch (e) {}
@@ -1152,7 +1185,8 @@ function parseGedcomString(text, fileName, attachedFiles) {
             if (isSecondName) { currentEntity.birthName = nameParts[1] ? nameParts[1].trim() : ""; } 
             else { currentEntity.firstName = given[0] || ""; if (given.length > 1) currentEntity.middleName = given.slice(1).join(' '); if (nameParts[1]) currentEntity.lastName = nameParts[1].trim(); }
           } else if (tagOrId === "SEX") { const sv = value.toUpperCase(); currentEntity.gender = sv.startsWith("F") ? "F" : (sv.startsWith("M") ? "M" : "U"); } 
-          else if (tagOrId === "TITL") { currentEntity.title = value; } else if (tagOrId === "FAMS") { if (!currentEntity.fams.includes(value)) currentEntity.fams.push(value); } else if (tagOrId === "FAMC") { currentEntity.famc = value; } 
+          else if (tagOrId === "TITL") { currentEntity.title = value; } else if (tagOrId === "FAMS") { if (!currentEntity.fams.includes(value)) currentEntity.fams.push(value); } else if (tagOrId === "FAMC") { currentEntity.famc = value; }
+          else if (tagOrId === "_CAND") { if (String(value).trim().toUpperCase() === "Y") currentEntity.candidate = true; } 
           else if (tagOrId === "BAPM" || tagOrId === "EDUC" || tagOrId === "EVEN") { currentEntity.events.push({ id: generateId("E"), _gedTag: tagOrId, type: tagOrId === "BAPM" ? "BAPM" : (tagOrId === "EVEN" ? "EVEN" : "EDUC_ZS"), title: "", date: "", place: "" }); } 
           else if (tagOrId === "SOUR" || tagOrId === "WWW") { if (value) currentEntity.sources.push({ url: value, desc: "" }); }
           else if (tagOrId === "OCCU") { currentEntity.occupations = currentEntity.occupations || []; currentEntity.occupations.push({ id: generateId("O"), title: value, city: "", dateFrom: "", dateTo: "" }); }
@@ -1292,7 +1326,7 @@ function launchWorkspace() {
 }
 function closeCurrentTree() {
   treeSource = 'local'; hydratePromise = null; updateSourceUI(); dbConnection = null; updateDbStatusUI(); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('welcomeScreen').classList.remove('hidden'); }
-function updateCountsUI() { document.getElementById('statPersonsCount').innerText = Object.keys(treeData.persons).length; document.getElementById('statFamiliesCount').innerText = Object.keys(treeData.families).length; }
+function updateCountsUI() { document.getElementById('statPersonsCount').innerText = Object.values(treeData.persons).filter(p => osViditelna(p)).length; document.getElementById('statFamiliesCount').innerText = Object.keys(treeData.families).length; try { updateCandidatesBtn(); } catch (e) {} }
 
 // --- MERANIE TEXTU A GEOMETRIA BUBLÍN ---
 const MEASURE_CTX = document.createElement('canvas').getContext('2d');
@@ -1340,9 +1374,55 @@ const HREBEN_SLOVO_ROD = { sk: 'ROD', cs: 'ROD', en: 'FAMILY', de: 'FAMILIE' };
 function hrebenSlovoRod() { return HREBEN_SLOVO_ROD[currentLang] || 'ROD'; }
 
 function hrebenRok(p) { const m = String(p.birthDate || '').match(/(\d{4})/); return m ? +m[1] : Infinity; }
+
+// ===== KANDIDÁTI: nepotvrdené vetvy na samostatnom plátne =====
+// Osoba s príznakom candidate sa nezobrazuje v hlavnom diagrame; tlačidlom „Kandidáti“
+// sa prejaví samostatné plátno, kde vidno len kandidátov a ich rodiny.
+let CANDIDATE_MODE = false;
+const HREBEN_ZALOHA = { koren: null, cesta: [] };
+function osViditelna(p) { return !!p && (CANDIDATE_MODE ? !!p.candidate : !p.candidate); }
+function kandidatiPocet() { return Object.values(treeData.persons || {}).filter(p => p && p.candidate).length; }
+// Celkový pohľad na plátno kandidátov: vycentruje VŠETKY zóny (každá nezávislá vetva) naraz,
+// aby žiadna osoba nezmizla mimo obrazovky.
+function fitCandidateView() {
+  if (!canvas || !HREBEN.zony.length) { drawTree(); return; }
+  const pad = 80;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  HREBEN.zony.forEach(z => {
+    minX = Math.min(minX, z.hr.minX + z.dx); maxX = Math.max(maxX, z.hr.maxX + z.dx);
+    minY = Math.min(minY, z.hr.minY); maxY = Math.max(maxY, z.hr.maxY);
+  });
+  const w = maxX - minX + pad * 2, h = maxY - minY + pad * 2;
+  scale = Math.min(Math.max(0.12, Math.min(canvas.width / w, canvas.height / h)), 1.2);
+  panX = canvas.width / 2 - (minX + maxX) / 2 * scale;
+  panY = canvas.height / 2 - (minY + maxY) / 2 * scale;
+  drawTree();
+}
+function updateCandidatesBtn() {
+  const b = document.getElementById('btnCandidates'); if (!b) return;
+  const n = kandidatiPocet();
+  b.innerHTML = CANDIDATE_MODE
+    ? `<i class="ph-bold ph-arrow-u-up-left"></i> <span>${esc(t('btnMainDiagram'))}</span>`
+    : `<i class="ph-bold ph-users-three"></i> <span>${esc(t('btnCandidates'))}${n ? ' (' + n + ')' : ''}</span>`;
+}
+function prepniKandidati(on) {
+  CANDIDATE_MODE = !!on;
+  if (CANDIDATE_MODE) {
+    HREBEN_ZALOHA.koren = HREBEN.koren; HREBEN_ZALOHA.cesta = HREBEN.cesta || [];
+    HREBEN.koren = null; HREBEN.cesta = [];
+  } else {
+    HREBEN.koren = (HREBEN_ZALOHA.koren && treeData.persons[HREBEN_ZALOHA.koren]) ? HREBEN_ZALOHA.koren : null;
+    HREBEN.cesta = HREBEN_ZALOHA.cesta || [];
+  }
+  hrebenObnov();
+  if (CANDIDATE_MODE) { fitCandidateView(); }
+  else if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, false); else { panX = 0; panY = 0; scale = 1; drawTree(); }
+  updateCandidatesBtn(); updateCountsUI();
+  if (CANDIDATE_MODE && !kandidatiPocet()) showToast(t('tNoCandidates'), "info");
+}
 function hrebenDeti(fam) {
   const P = treeData.persons;
-  return (fam.children || []).filter(id => P[id]).map((id, i) => ({ id, i, r: hrebenRok(P[id]) }))
+  return (fam.children || []).filter(id => P[id] && osViditelna(P[id])).map((id, i) => ({ id, i, r: hrebenRok(P[id]) }))
     .sort((a, b) => (a.r - b.r) || (a.i - b.i)).map(x => P[x.id]);
 }
 // Viac záznamov rodiny toho istého páru (vznikli napr. súbežným zápisom) sa na diagrame zobrazí ako jedna rodina:
@@ -1380,10 +1460,11 @@ function hrebenPriprav() {
   HREBEN.spojnica = Math.max(44, Math.ceil(mx + 2 * cw));
 }
 function hrebenRodiny(p) { const M = HREBEN.rodinyMapa || {}, videne = new Set(), out = []; (p.fams || []).forEach(id => { const f = M[id]; if (f && !videne.has(f.id)) { videne.add(f.id); out.push(f); } }); return out; }
-function hrebenPartner(fam, p) { const P = treeData.persons; const id = fam.husbandId === p.id ? fam.wifeId : fam.husbandId; return (id && id !== p.id && P[id]) ? P[id] : null; }
+function hrebenPartner(fam, p) { const P = treeData.persons; const id = fam.husbandId === p.id ? fam.wifeId : fam.husbandId; return (id && id !== p.id && P[id] && osViditelna(P[id])) ? P[id] : null; }
 function hrebenRodicia(p) {
   const P = treeData.persons, f = p.famc && (HREBEN.rodinyMapa || {})[p.famc]; if (!f) return null;
-  const otec = (f.husbandId && P[f.husbandId]) || null, matka = (f.wifeId && P[f.wifeId]) || null;
+  const otec = (f.husbandId && P[f.husbandId] && osViditelna(P[f.husbandId])) ? P[f.husbandId] : null;
+  const matka = (f.wifeId && P[f.wifeId] && osViditelna(P[f.wifeId])) ? P[f.wifeId] : null;
   return (otec || matka) ? { fam: f, otec, matka } : null;
 }
 // Osoba na osi nad danou osobou: otec, inak matka
@@ -1596,6 +1677,7 @@ function hrebenPridajZonu(z) {
 function hrebenPredvolenyKoren() {
   const P = treeData.persons; let najlepsi = null, nd = -1, nr = -Infinity;
   Object.values(P).forEach(p => {
+    if (!osViditelna(p)) return;
     let d = 0, c = p; const videl = new Set([p.id]);
     while (d < HREBEN.GENERACII) { const r = hrebenOsovyRodic(c); if (!r || videl.has(r.rodic.id)) break; videl.add(r.rodic.id); c = r.rodic; d++; }
     const rok = hrebenRok(p) === Infinity ? -Infinity : hrebenRok(p);
@@ -1636,6 +1718,7 @@ function rodCieleMapa() {
     const par = [fam.husbandId, fam.wifeId].filter(id => id && treeData.persons[id]);
     par.forEach(sid => {
       const sp = treeData.persons[sid];
+      if (!osViditelna(sp)) return;
       const pr = hrebenRodicia(sp); if (!pr) return;            // odskok existuje len pre partnera s rodičmi
       const rodic = pr.otec || pr.matka; if (!rodic) return;
       const nazov = rodNazov(rodic); if (!nazov) return;
@@ -1665,6 +1748,7 @@ function updateRodDiagramSelect() {
 function rodDiagramGo(val) {
   if (!val) return;
   if (val === '__main__') {
+    if (CANDIDATE_MODE) { prepniKandidati(false); return; }
     const z = HREBEN.zony && HREBEN.zony[0];
     if (z) { HREBEN.aktualna = z; HREBEN.cesta = hrebenCestaAktualnej(); hrebenPrejdiNa(z, false); }
     return;
@@ -1684,6 +1768,34 @@ function hrebenObnov() {
   const cesta = HREBEN.cesta || [];
   HREBEN.zony = []; HREBEN.aktualna = null;
   if (!Object.keys(P).length) { HREBEN.cesta = []; return; }
+  if (CANDIDATE_MODE) {
+    // Plátno kandidátov: každá samostatná kandidátska rodina aj osoba bez rodiny = vlastná zóna vedľa seba.
+    const videne = new Set();
+    Object.values(P).filter(p => p.candidate).forEach(start => {
+      if (videne.has(start.id)) return;
+      const skupina = new Set([start.id]); const stek = [start.id];
+      const prejdi = id2 => { if (id2 && P[id2] && P[id2].candidate && !skupina.has(id2)) { skupina.add(id2); stek.push(id2); } };
+      while (stek.length) {
+        const pp = P[stek.pop()]; if (!pp) continue;
+        (pp.fams || []).forEach(fId => { const f = treeData.families[fId]; if (!f) return; prejdi(f.husbandId); prejdi(f.wifeId); (f.children || []).forEach(prejdi); });
+        if (pp.famc) { const f = treeData.families[pp.famc]; if (f) { prejdi(f.husbandId); prejdi(f.wifeId); (f.children || []).forEach(prejdi); } }
+      }
+      skupina.forEach(id2 => videne.add(id2));
+      // koreň komponenty: najdlhšia otcovská línia, pri zhode najmladšia osoba
+      let najlepsi = null, nd = -1, nr = -Infinity;
+      skupina.forEach(id2 => {
+        const p = P[id2]; let d = 0, c = p; const videl = new Set([p.id]);
+        while (d < HREBEN.GENERACII) { const r = hrebenOsovyRodic(c); if (!r || videl.has(r.rodic.id)) break; videl.add(r.rodic.id); c = r.rodic; d++; }
+        const rok = hrebenRok(p) === Infinity ? -Infinity : hrebenRok(p);
+        if (d > nd || (d === nd && rok > nr)) { najlepsi = p; nd = d; nr = rok; }
+      });
+      if (najlepsi) { const z = hrebenZostav(najlepsi.id, null, null); if (z) hrebenPridajZonu(z); }
+    });
+    HREBEN.aktualna = HREBEN.zony[0] || null;
+    HREBEN.cesta = [];
+    try { updateRodDiagramSelect(); } catch (e) {}
+    return;
+  }
   if (!HREBEN.koren || !P[HREBEN.koren]) { HREBEN.koren = hrebenPredvolenyKoren(); }
   const hl = hrebenZostav(HREBEN.koren, null, null); if (!hl) return;
   hrebenPridajZonu(hl); HREBEN.aktualna = hl;
@@ -1719,11 +1831,13 @@ function hrebenPrejdiNa(z, okamzite) {
   HREBEN.animacia = requestAnimationFrame(krok);
 }
 function hrebenOdkazV(x, y) {
-  const z = HREBEN.aktualna; if (!z) return null;
-  const lx = x - z.dx;
-  for (const o of z.odkazy) {
-    const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
-    if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
+  const zony = CANDIDATE_MODE ? HREBEN.zony : (HREBEN.aktualna ? [HREBEN.aktualna] : []);
+  for (const z of zony) {
+    const lx = x - z.dx;
+    for (const o of z.odkazy) {
+      const sm = o.smer, h2 = HREBEN.vyskaOdkazu / 2, dy = Math.abs(y - o.y), dx = sm * (lx - o.x), pl = -o.w / 2, tip = o.w / 2, zac = tip - HREBEN_HROT;
+      if (dy <= h2 && dx >= pl && (dx <= zac || dy <= h2 * (tip - dx) / HREBEN_HROT)) return o;
+    }
   }
   return null;
 }
@@ -1776,10 +1890,15 @@ function hrebenNakresli(c, z) {
   c.restore();
 }
 function hrebenOsobaV(x, y) {
-  const z = HREBEN.aktualna; if (!z) return null;
-  const lx = x - z.dx;
-  for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) return u.os.fiktivna ? null : u.os; }
-  return null;
+  // Na plátne kandidátov je viac zón vedľa seba – hit-test musí prehľadať všetky,
+  // inak by sa dali označiť len osoby z prvej zóny (a klik na inú zónu by vybral osobu z prvej).
+  const zony = CANDIDATE_MODE ? HREBEN.zony : (HREBEN.aktualna ? [HREBEN.aktualna] : []);
+  let najdeny = null;
+  for (const z of zony) {
+    const lx = x - z.dx;
+    for (let i = z.uzly.length - 1; i >= 0; i--) { const u = z.uzly[i]; if (lx >= u.x - u.w / 2 && lx <= u.x + u.w / 2 && y >= u.y - LAYOUT.bh / 2 && y <= u.y + LAYOUT.bh / 2) { if (!u.os.fiktivna) najdeny = u.os; } }
+  }
+  return najdeny;
 }
 
 // Hlavný vstup: prepočíta všetky zóny a (voliteľne) prispôsobí pohľad
@@ -1793,17 +1912,19 @@ function autoLayoutTree(andFitToView = true) {
 function hrebenPreusporiadat() {
   if (!Object.keys(treeData.persons || {}).length) return;
   hrebenObnov();                                   // zachová cestu cez pod-plátna, takže ostane aktuálny ten istý diagram
+  if (CANDIDATE_MODE) { fitCandidateView(); return; }
   if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true);
 }
 // Tlačidlo „Návrat na hlavný diagram“: plynulo sa vráti na hlavný diagram a roztiahne ho na celú plochu.
 function hrebenNavratNaHlavny() {
+  if (CANDIDATE_MODE) { prepniKandidati(false); return; }
   if (!Object.keys(treeData.persons || {}).length) return;
   if (!HREBEN.zony.length) hrebenObnov();
   const hl = HREBEN.zony[0]; if (!hl) return;
   HREBEN.aktualna = hl; HREBEN.cesta = hrebenCestaAktualnej();
   hrebenPrejdiNa(hl, false);
 }
-function fitTreeToView() { if (!canvas) return; if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
+function fitTreeToView() { if (!canvas) return; if (CANDIDATE_MODE) { if (!HREBEN.zony.length) hrebenObnov(); fitCandidateView(); return; } if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
 // Terčík „Vycentrovať na osobu“: prepne sa na diagram, na ktorom je osoba (ak nie je aktuálny), a vždy ho roztiahne na celú
 // plochu aj s označenou osobou.
 function centerOnPerson(personId) {
@@ -1885,6 +2006,10 @@ function drawTree() {
   if (!ctx) return; ctx.save(); ctx.clearRect(0, 0, canvas.width, canvas.height); drawSubtleGrid(); ctx.translate(panX, panY); ctx.scale(scale, scale);
   HREBEN.zony.forEach(z => { const l = (z.hr.minX + z.dx) * scale + panX, r = (z.hr.maxX + z.dx) * scale + panX; if (r < -200 || l > canvas.width + 200) return; hrebenNakresli(ctx, z); });
   ctx.restore();
+  if (CANDIDATE_MODE && !HREBEN.zony.length) {
+    ctx.fillStyle = '#94a3b8'; ctx.font = '600 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(t('tNoCandidates'), canvas.width / 2, canvas.height / 2);
+  }
 }
 
 function drawSubtleGrid() {
@@ -1934,6 +2059,7 @@ function truncateText(str, maxWidth) { if (ctx.measureText(str).width <= maxWidt
 // Hlavná fotografia v hornej časti karty osoby (obdĺžnikový portrét, vyplní celý rám, bez deformácie). Volá sa aj po dodatočnom stiahnutí príloh zo servera.
 function vykresliAvatarKarty(p) {
   const avatarContainer = document.getElementById('detailAvatarContainer'); if (!avatarContainer || !p) return;
+  const linkBtn = document.getElementById('btnLinkCandidate'); if (linkBtn) linkBtn.classList.toggle('hidden', !p.candidate);
   const isMale = (p.gender === 'M');
   const mainPhoto = (p.photos || []).find(ph => ph.isMain) || (p.photos || [])[0];
   if (mainPhoto && mainPhoto.data) {
@@ -2034,9 +2160,9 @@ function selectPerson(personId, openPanel = true) {
   if (openPanel) openPersonPanelMobile();
 }
 
-function getParentsOf(personId) { const p = treeData.persons[personId]; if (!p || !p.famc) return { father: null, mother: null }; const fam = treeData.families[p.famc]; if (!fam) return { father: null, mother: null }; return { father: treeData.persons[fam.husbandId] || null, mother: treeData.persons[fam.wifeId] || null }; }
-function getSpousesOf(personId) { const p = treeData.persons[personId]; if (!p) return []; const results = []; (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam) { const spouseId = (fam.husbandId === personId) ? fam.wifeId : fam.husbandId; if (spouseId && treeData.persons[spouseId]) { results.push({ familyId: fId, person: treeData.persons[spouseId], marrDate: fam.marrDate }); } } }); return results; }
-function getChildrenOf(personId) { const p = treeData.persons[personId]; if (!p) return []; const children = []; (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam && fam.children) { fam.children.forEach(cId => { if (treeData.persons[cId] && !children.includes(treeData.persons[cId])) children.push(treeData.persons[cId]); }); } }); return children; }
+function getParentsOf(personId) { const p = treeData.persons[personId]; if (!p || !p.famc) return { father: null, mother: null }; const fam = treeData.families[p.famc]; if (!fam) return { father: null, mother: null }; const f = treeData.persons[fam.husbandId], m = treeData.persons[fam.wifeId]; return { father: (f && osViditelna(f)) ? f : null, mother: (m && osViditelna(m)) ? m : null }; }
+function getSpousesOf(personId) { const p = treeData.persons[personId]; if (!p) return []; const results = []; (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam) { const spouseId = (fam.husbandId === personId) ? fam.wifeId : fam.husbandId; const sp = spouseId && treeData.persons[spouseId]; if (sp && osViditelna(sp)) { results.push({ familyId: fId, person: sp, marrDate: fam.marrDate }); } } }); return results; }
+function getChildrenOf(personId) { const p = treeData.persons[personId]; if (!p) return []; const children = []; (p.fams || []).forEach(fId => { const fam = treeData.families[fId]; if (fam && fam.children) { fam.children.forEach(cId => { const c = treeData.persons[cId]; if (c && osViditelna(c) && !children.includes(c)) children.push(c); }); } }); return children; }
 
 // ===== Inteligentné vyhľadávanie osoby =====
 // Bez diakritiky a bez ohľadu na veľkosť písmen; viac slov naraz (meno + priezvisko + rok...);
@@ -2121,6 +2247,7 @@ function searchPersons(query, limit = 10) {
   if (!tokens.length) return [];
   const out = [];
   Object.values(treeData.persons).forEach(p => {
+    if (!osViditelna(p)) return;
     const sc = searchScorePerson(tokens, searchBuildIndex(p));
     if (sc > 0) out.push({ p, sc });
   });
@@ -2254,7 +2381,7 @@ function addOccupationRow(title = '', city = '', dateFrom = '', dateTo = '') {
 function personPickerList(excludeId) {
   const k = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return Object.values(treeData.persons)
-    .filter(p => p.id !== excludeId)
+    .filter(p => p.id !== excludeId && (CANDIDATE_MODE ? true : !p.candidate))
     .sort((a, b) =>
       (k(a.lastName || a.birthName || '').localeCompare(k(b.lastName || b.birthName || ''))) ||
       (k(a.firstName || '').localeCompare(k(b.firstName || '')))
@@ -2620,7 +2747,7 @@ function savePersonForm(e) {
   keepItemIds(__oldItems.events, p.events, ['type', 'title', 'date', 'place']); keepItemIds(__oldItems.addresses, p.addresses, ['type', 'address', 'dateFrom', 'dateTo']); keepItemIds(__oldItems.occupations, p.occupations, ['title', 'city', 'dateFrom', 'dateTo']);
   p.photos = tempAttachedFiles.filter(isPhotoFile);   // obrázok pridaný medzi dokumenty (sken) zostáva dokumentom
   p.documents = tempAttachedFiles.filter(f => !isPhotoFile(f));
-  if (isNew) { p.x = 400 + Math.random() * 150; p.y = 250 + Math.random() * 100; treeData.persons[id] = p; }
+  if (isNew) { p.candidate = CANDIDATE_MODE; p.x = 400 + Math.random() * 150; p.y = 250 + Math.random() * 100; treeData.persons[id] = p; }
 
   const fatherId = document.getElementById('editFatherSelect').value || ""; const motherId = document.getElementById('editMotherSelect').value || "";
   p.fams = p.fams || [];
@@ -2679,9 +2806,162 @@ function savePersonForm(e) {
   });
   [...p.fams].forEach(dropFamIfEmpty); p.fams = p.fams.filter(fId => treeData.families[fId]);
 
+  // Prepojenie cez editor: ak uložená osoba (kandidát) dostala otca/matku/partnera/dieťa z rodokmeňa,
+  // celá jej vetva sa automaticky stáva súčasťou rodokmeňa a zmizne z plátna kandidátov.
+  let prepojeno = false;
+  try { prepojeno = zruKandidatovAkSuPrepojeni(id); } catch (e) {}
+  // Odpojenie od hlavného rodokmeňa: ak komponenta uloženej osoby po zmenách nemá žiadne
+  // spojenie s hlavným rodokmeňom (a neobsahuje kandidátov), celá sa vracia na plátno kandidátov.
+  let vrateneKandidati = false;
+  try { if (!isNew) vrateneKandidati = vratOdpojenychNaKandidatov(id); } catch (e) {}
+
   closePersonEditor(); autoLayoutTree(false);
-  if (isNew && canvas) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
+  if (isNew && canvas && !CANDIDATE_MODE) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
   selectPerson(p.id); updateCountsUI(); showToast(t('msgSaveOk'), "success"); autoSaveNow();
+  if (CANDIDATE_MODE) fitCandidateView();
+  if (vrateneKandidati) {
+    showToast(t('msgUnlinkedCand'), "info");
+    if (!CANDIDATE_MODE) { prepniKandidati(true); centerOnPerson(p.id); }
+  }
+  if (prepojeno) {
+    showToast(t('msgLinked'), "success");
+    if (CANDIDATE_MODE && !kandidatiPocet()) { prepniKandidati(false); centerOnPerson(p.id); }
+  }
+}
+
+// ===== PREPOJENIE KANDIDÁTSKEJ VETVY S RODOKMEŇOM =====
+// Kandidát sa naviaže na existujúcu (ne-kandidátsku) osobu ako partner, rodič alebo dieťa;
+// potom sa celej prepojenej vetve zruší príznak candidate → objaví sa v hlavnom diagrame.
+function openLinkDialog(personId) {
+  const c = treeData.persons[personId]; if (!c || !c.candidate) return;
+  document.getElementById('linkCandName').innerText = `${c.title ? c.title + ' ' : ''}${c.firstName} ${c.lastName}`.trim();
+  const sel = document.getElementById('linkTargetSelect');
+  const k = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  Object.values(treeData.persons)
+    .filter(p => !p.candidate && p.id !== c.id)
+    .sort((a, b) => k(`${a.lastName} ${a.firstName}`).localeCompare(k(`${b.lastName} ${b.firstName}`)))
+    .forEach(p => { sel.innerHTML += `<option value="${p.id}">${esc(personPickerLabel(p))}</option>`; });
+  document.getElementById('linkRelationSelect').value = 'spouse';
+  const m = document.getElementById('linkCandidateModal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeLinkDialog() {
+  const m = document.getElementById('linkCandidateModal');
+  m.classList.add('hidden'); m.classList.remove('flex');
+  document.getElementById('linkTargetSelect').innerHTML = '';
+}
+function prepojKandidata(candId, targetId, rel) {
+  const c = treeData.persons[candId], T = treeData.persons[targetId];
+  if (!c || !T || !c.candidate) return false;
+  if (rel === 'spouse') {
+    const fam = { id: generateId("F"), husbandId: (c.gender === 'F') ? T.id : c.id, wifeId: (c.gender === 'F') ? c.id : T.id, marrDate: "", children: [] };
+    treeData.families[fam.id] = fam;
+    c.fams = c.fams || []; if (!c.fams.includes(fam.id)) c.fams.push(fam.id);
+    T.fams = T.fams || []; if (!T.fams.includes(fam.id)) T.fams.push(fam.id);
+  } else if (rel === 'child') {
+    let fam = (T.fams || []).map(fId => treeData.families[fId]).find(Boolean);
+    if (!fam) { fam = { id: generateId("F"), husbandId: T.gender === 'F' ? null : T.id, wifeId: T.gender === 'F' ? T.id : null, marrDate: "", children: [] }; treeData.families[fam.id] = fam; T.fams.push(fam.id); }
+    if (c.famc && treeData.families[c.famc]) treeData.families[c.famc].children = treeData.families[c.famc].children.filter(x => x !== c.id);
+    if (!fam.children.includes(c.id)) fam.children.push(c.id);
+    c.famc = fam.id;
+  } else if (rel === 'parent') {
+    let fam = T.famc && treeData.families[T.famc];
+    if (!fam) { fam = { id: generateId("F"), husbandId: null, wifeId: null, marrDate: "", children: [T.id] }; treeData.families[fam.id] = fam; T.famc = fam.id; }
+    const slot = (c.gender === 'F') ? 'wifeId' : 'husbandId';
+    if (fam[slot]) { showToast(t('tLinkSlotFull'), "error"); return false; }
+    fam[slot] = c.id; c.fams = c.fams || []; if (!c.fams.includes(fam.id)) c.fams.push(fam.id);
+  } else { return false; }
+  // celá prepojená vetva prestáva byť kandidátom
+  const comp = new Set([c.id]); const stek = [c.id];
+  const prejdi = id2 => { if (id2 && treeData.persons[id2] && !comp.has(id2)) { comp.add(id2); stek.push(id2); } };
+  while (stek.length) {
+    const pp = treeData.persons[stek.pop()]; if (!pp) continue;
+    (pp.fams || []).forEach(fId => { const f = treeData.families[fId]; if (!f) return; [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); });
+    if (pp.famc) { const f = treeData.families[pp.famc]; if (f) { [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); } }
+  }
+  comp.forEach(id2 => { const pp = treeData.persons[id2]; if (pp && pp.candidate) pp.candidate = false; });
+  return true;
+}
+// Komponenta osoby = všetky osoby spojené rodinnými väzbami (partneri, rodičia, deti).
+function komponentaOsobSet(startId) {
+  const P = treeData.persons; const comp = new Set(); const stek = [];
+  const prejdi = id2 => { const q = id2 && P[id2]; if (q && !comp.has(id2)) { comp.add(id2); stek.push(id2); } };
+  prejdi(startId);
+  while (stek.length) {
+    const pp = P[stek.pop()]; if (!pp) continue;
+    (pp.fams || []).forEach(fId => { const f = treeData.families[fId]; if (!f) return; [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); });
+    if (pp.famc) { const f = treeData.families[pp.famc]; if (f) { [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); } }
+  }
+  return comp;
+}
+// Hlavná komponenta = najväčšia súvislá skupina ne-kandidátov (hlavný rodokmeň).
+function hlavnaKomponenta() {
+  const P = treeData.persons; const videne = new Set(); let najlepsi = new Set();
+  Object.values(P).forEach(p => {
+    if (p.candidate || videne.has(p.id)) return;
+    const comp = komponentaOsobSet(p.id); comp.forEach(id2 => videne.add(id2));
+    if (comp.size > najlepsi.size) najlepsi = comp;
+  });
+  return najlepsi;
+}
+// Oprava sirôt: každá ne-kandidátska vetva, ktorá nemá žiadne spojenie s hlavným rodokmeňom
+// (najväčšou ne-kandidátskou komponentou), sa presunie na plátno kandidátov –
+// inak by bola neviditeľná v oboch plátnach. Vracia počet presunutých osôb.
+function opravSirotov() {
+  const P = treeData.persons; const hl = hlavnaKomponenta();
+  if (hl.size === 0) return 0;
+  const videne = new Set(); let presun = 0;
+  Object.values(P).forEach(p => {
+    if (p.candidate || videne.has(p.id) || hl.has(p.id)) return;
+    const comp = komponentaOsobSet(p.id); comp.forEach(id2 => videne.add(id2));
+    if (comp.size === 0 || [...comp].some(id2 => hl.has(id2))) return;
+    comp.forEach(id2 => { const q = P[id2]; if (q && !q.candidate) { q.candidate = true; presun++; } });
+  });
+  return presun;
+}
+// Ak komponenta uloženej osoby nemá po uložení žiadne spojenie s hlavným rodokmeňom
+// a neobsahuje žiadneho kandidáta, celá sa vracia na plátno kandidátov.
+function vratOdpojenychNaKandidatov(personId) {
+  const P = treeData.persons; const comp = komponentaOsobSet(personId);
+  if ([...comp].some(id2 => P[id2] && P[id2].candidate)) return false;
+  const hl = hlavnaKomponenta();
+  if (hl.size === 0) return false;
+  if ([...comp].some(id2 => hl.has(id2))) return false;
+  let zmena = false;
+  comp.forEach(id2 => { const q = P[id2]; if (q && !q.candidate) { q.candidate = true; zmena = true; } });
+  return zmena;
+}
+// Ak sa komponenta osoby (vetva) dotkne aj ne-kandidáta (osoby z rodokmeňa),
+// celá komponenta prestáva byť kandidátom – použije sa pri uložení editoru aj pri dialógu Prepojiť.
+function zruKandidatovAkSuPrepojeni(personId) {
+  const P = treeData.persons; const start = P[personId]; if (!start) return false;
+  const comp = new Set([personId]); const stek = [personId];
+  let maNeKandidata = !start.candidate;
+  const prejdi = id2 => { const q = id2 && P[id2]; if (q && !comp.has(id2)) { comp.add(id2); stek.push(id2); if (!q.candidate) maNeKandidata = true; } };
+  while (stek.length) {
+    const pp = P[stek.pop()]; if (!pp) continue;
+    (pp.fams || []).forEach(fId => { const f = treeData.families[fId]; if (!f) return; [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); });
+    if (pp.famc) { const f = treeData.families[pp.famc]; if (f) { [f.husbandId, f.wifeId].forEach(prejdi); (f.children || []).forEach(prejdi); } }
+  }
+  if (!maNeKandidata) return false;
+  let zmena = false;
+  comp.forEach(id2 => { const q = P[id2]; if (q && q.candidate) { q.candidate = false; zmena = true; } });
+  return zmena;
+}
+
+function confirmLinkCandidate() {
+  const candId = currentSelectedPersonId;
+  const targetId = document.getElementById('linkTargetSelect').value;
+  const rel = document.getElementById('linkRelationSelect').value;
+  if (!candId || !targetId || !rel) return;
+  pushUndoSnapshot();
+  if (prepojKandidata(candId, targetId, rel)) {
+    closeLinkDialog();
+    prepniKandidati(false);
+    centerOnPerson(candId);
+    showToast(t('msgLinked'), "success");
+    autoSaveNow();
+  }
 }
 
 function deleteCurrentPerson() {
@@ -2768,6 +3048,7 @@ async function saveGedzipTreeInternal() {
       
       ged += `0 ${newId} INDI\n1 NAME ${fullN} /${p.lastName}/\n`;
       if (p.birthName) { ged += `1 NAME ${fullN} /${p.birthName}/\n2 TYPE birth\n`; }
+      if (p.candidate) ged += `1 _CAND Y\n`;
       if (p.title) ged += `1 TITL ${p.title}\n`; ged += `1 SEX ${p.gender}\n`;
       if (p.birthDate || p.birthPlace) { ged += `1 BIRT\n`; if (p.birthDate) ged += `2 DATE ${p.birthDate}\n`; if (p.birthPlace) ged += `2 PLAC ${p.birthPlace}\n`; }
       if (p.deathDate || p.deathPlace) { ged += `1 DEAT\n`; if (p.deathDate) ged += `2 DATE ${p.deathDate}\n`; if (p.deathPlace) ged += `2 PLAC ${p.deathPlace}\n`; }
@@ -3259,7 +3540,7 @@ const MERGE_I18N = {
 };
 function mt(k) { return ((MERGE_I18N[currentLang] || MERGE_I18N.sk)[k]) || MERGE_I18N.sk[k] || k; }
 
-const MERGE_PERSON_FIELDS = ['title', 'firstName', 'middleName', 'lastName', 'birthName', 'gender', 'birthDate', 'birthPlace', 'birthCountry', 'deathDate', 'deathPlace'];
+const MERGE_PERSON_FIELDS = ['title', 'firstName', 'middleName', 'lastName', 'birthName', 'gender', 'birthDate', 'birthPlace', 'birthCountry', 'deathDate', 'deathPlace', 'candidate'];
 const MERGE_TAB_LISTS = {   // automaticky zlučované záznamy z kariet editora osoby
   events: ['type', 'title', 'date', 'place'],
   addresses: ['type', 'address', 'dateFrom', 'dateTo'],
@@ -3719,6 +4000,7 @@ function loadTreeFromServer(data, session) {
   }
   treeVersion = Number(data.version);
 treeData = { fileName: data.fileName || 'rodokmen.gdz', persons, families, files: {} };
+  try { const sir = opravSirotov(); if (sir > 0) setTimeout(() => showToast(t('msgUnlinkedCand').replace('– vrátila sa', `(${sir}) – vrátili sa`), "info"), 400); } catch (e) {}
   originalTreeData = JSON.parse(JSON.stringify(treeData));
   recentEditedIds = Object.keys(persons).slice(0, 5);
   launchWorkspace();
@@ -3737,7 +4019,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 17: zdroje = URL + popis; editor má dva inputy, karta osoby zobrazuje klikateľný popis (nové okno); GEDCOM 2 NOTE, backup desc stĺpec TEST000');
+console.log('Genealogy index16c-v31 – rev. 23: celá vetva sa pri odpojení od rodokmeňa (zrušenie otca/matky/partnera) vracia na plátno kandidátov + automatická oprava „stratených“ sirôt pri načítaní dát');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -4467,7 +4749,7 @@ function otvorLokalnuZalohu() {
 
 /* ---------- Parser SQL dumpu (INSERT INTO ... VALUES (...); ---------- */
 const BKP_STLPCE = {
-  persons: ['id','title','first_name','middle_name','last_name','birth_name','gender','birth_date','birth_place','birth_country','death_date','death_place','layout_x','layout_y'],
+  persons: ['id','title','first_name','middle_name','last_name','birth_name','gender','birth_date','birth_place','birth_country','death_date','death_place','layout_x','layout_y','is_candidate'],
   families: ['id','husband_id','wife_id','marriage_date'],
   family_children: ['family_id','person_id','sort_order'],
   person_events: ['id','person_id','type','title','event_date','place','sort_order'],
@@ -4588,7 +4870,7 @@ async function spracujLokalnuZalohu(fileList) {
     const persons = {};
     db.persons.forEach(r => {
       const p = createPersonObj(r.id, r.title, r.first_name, r.last_name, r.gender, r.birth_date, r.birth_place, r.birth_country, r.death_date, r.death_place);
-      p.middleName = r.middle_name || ''; p.birthName = r.birth_name || '';
+      p.middleName = r.middle_name || ''; p.birthName = r.birth_name || ''; p.candidate = !!Number(r.is_candidate);
       p.x = Number(r.layout_x) || 0; p.y = Number(r.layout_y) || 0;
       persons[p.id] = p;
     });
@@ -4696,9 +4978,9 @@ function vygenerujSqlDump() {
   out.push(bkpRiadok('metadata', ['schema_version', '1']));
   out.push(bkpRiadok('metadata', ['file_name', treeData.fileName || 'rodokmen.gdz']));
   out.push(bkpRiadok('metadata', ['tree_version', String(treeVersion || 1)]));
-  out.push(`CREATE TABLE IF NOT EXISTS persons (\n    id            TEXT PRIMARY KEY,\n    title         TEXT NOT NULL DEFAULT '',\n    first_name    TEXT NOT NULL DEFAULT '',\n    middle_name   TEXT NOT NULL DEFAULT '',\n    last_name     TEXT NOT NULL DEFAULT '',\n    birth_name    TEXT NOT NULL DEFAULT '',\n    gender        TEXT NOT NULL DEFAULT 'U' CHECK (gender IN ('M', 'F', 'U')),\n    birth_date    TEXT NOT NULL DEFAULT '',\n    birth_place   TEXT NOT NULL DEFAULT '',\n    birth_country TEXT NOT NULL DEFAULT '',\n    death_date    TEXT NOT NULL DEFAULT '',\n    death_place   TEXT NOT NULL DEFAULT '',\n    layout_x      REAL NOT NULL DEFAULT 0,\n    layout_y      REAL NOT NULL DEFAULT 0\n);`);
+  out.push(`CREATE TABLE IF NOT EXISTS persons (\n    id            TEXT PRIMARY KEY,\n    title         TEXT NOT NULL DEFAULT '',\n    first_name    TEXT NOT NULL DEFAULT '',\n    middle_name   TEXT NOT NULL DEFAULT '',\n    last_name     TEXT NOT NULL DEFAULT '',\n    birth_name    TEXT NOT NULL DEFAULT '',\n    gender        TEXT NOT NULL DEFAULT 'U' CHECK (gender IN ('M', 'F', 'U')),\n    birth_date    TEXT NOT NULL DEFAULT '',\n    birth_place   TEXT NOT NULL DEFAULT '',\n    birth_country TEXT NOT NULL DEFAULT '',\n    death_date    TEXT NOT NULL DEFAULT '',\n    death_place   TEXT NOT NULL DEFAULT '',\n    layout_x      REAL NOT NULL DEFAULT 0,\n    layout_y      REAL NOT NULL DEFAULT 0,\n    is_candidate  INTEGER NOT NULL DEFAULT 0\n);`);
   const ps = Object.values(treeData.persons);
-  ps.forEach(p => out.push(bkpRiadok('persons', [p.id, p.title || '', p.firstName || '', p.middleName || '', p.lastName || '', p.birthName || '', p.gender || 'U', p.birthDate || '', p.birthPlace || '', p.birthCountry || '', p.deathDate || '', p.deathPlace || '', Number(p.x) || 0, Number(p.y) || 0])));
+  ps.forEach(p => out.push(bkpRiadok('persons', [p.id, p.title || '', p.firstName || '', p.middleName || '', p.lastName || '', p.birthName || '', p.gender || 'U', p.birthDate || '', p.birthPlace || '', p.birthCountry || '', p.deathDate || '', p.deathPlace || '', Number(p.x) || 0, Number(p.y) || 0, p.candidate ? 1 : 0])));
   out.push(`CREATE TABLE IF NOT EXISTS families (\n    id            TEXT PRIMARY KEY,\n    husband_id    TEXT REFERENCES persons (id) ON DELETE SET NULL,\n    wife_id       TEXT REFERENCES persons (id) ON DELETE SET NULL,\n    marriage_date TEXT NOT NULL DEFAULT '',\n    CHECK (husband_id IS NULL OR wife_id IS NULL OR husband_id <> wife_id)\n);`);
   const fs = Object.values(treeData.families);
   fs.forEach(f => out.push(bkpRiadok('families', [f.id, f.husbandId || null, f.wifeId || null, f.marrDate || ''])));
