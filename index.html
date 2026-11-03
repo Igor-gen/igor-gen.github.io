@@ -2506,6 +2506,7 @@ async function handleSpecificFilesAttach(input, targetType) {
       caption: '',
       isMain: isPhoto && !tempAttachedFiles.some(f => f.isTargetType === 'photo' && f.isMain)
     });
+    if (!isPhoto && prepared.type !== 'photo') { try { generujNahladDokumentu(tempAttachedFiles[tempAttachedFiles.length - 1]).catch(() => {}); } catch (e) {} }  // náhľad prvej strany hneď pri nahratí (cache)
   }
   input.value = "";
   renderAttachedFilesList();
@@ -2695,6 +2696,7 @@ async function galleryHandleFiles(input) {
     try { prepared = await prepareFileForUpload(file, isPh ? 'photo' : 'doc'); } catch (e) { showToast(String(e && e.message || e), 'error'); }
     if (!prepared) continue;
     galleryItems.push({ id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name: prepared.name, data: prepared.data, type: prepared.type, isTargetType: galleryType, caption: '', isMain: isPh && !galleryItems.some(f => f.isMain) });
+    if (!isPh && prepared.type !== 'photo') { try { generujNahladDokumentu(galleryItems[galleryItems.length - 1]).catch(() => {}); } catch (e) {} }  // náhľad prvej strany hneď pri nahratí (cache)
   }
   input.value = '';
   renderMediaGallery();
@@ -3008,17 +3010,148 @@ function showPhotoMosaic() {
   photos.forEach((ph, idx) => { grid.innerHTML += `<div class="flex flex-col"><div onclick="currentPhotoIndex = ${idx}; showPhotoSlider();" class="group relative aspect-square rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-indigo-400 transition transform hover:scale-[1.02]"><img src="${esc(ph.data)}" class="w-full h-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-3 flex flex-col justify-end">${ph.isMain ? `<span class="text-[9px] text-amber-400 font-bold">${t('tMainPhoto').toUpperCase()}</span>` : ''}</div></div>${ph.caption ? `<p class="mt-1.5 text-[10px] sm:text-xs text-slate-200 text-center leading-snug break-words">${esc(ph.caption)}</p>` : ''}</div>`; });
 }
 
+// ===== NÁHĽADY DOKUMENTOV (miniatury prvej strany) =====
+// Náhľad sa vygeneruje raz (pri nahratí alebo prvom zobrazení v galérii) a uloží do localStorage
+// – pri ďalšom listovaní sa už len zobrazuje hotový malý obrázok, nič sa neprerenderováva.
+const DOC_THUMB_W = 150, DOC_THUMB_H = 200;
+function thumbCacheKey(f) { return 'genThumb:' + (f.id || '') + ':' + ((f.data || '').length); }
+function obrazokNaThumb(dataUrl) {
+  return new Promise(ok => {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = DOC_THUMB_W; cv.height = DOC_THUMB_H;
+      const ctx = cv.getContext('2d'); const s = Math.max(DOC_THUMB_W / img.width, DOC_THUMB_H / img.height);
+      const dw = img.width * s, dh = img.height * s;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, DOC_THUMB_W, DOC_THUMB_H);
+      ctx.drawImage(img, (DOC_THUMB_W - dw) / 2, (DOC_THUMB_H - dh) / 2, dw, dh);
+      ok(cv.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => ok(null); img.src = dataUrl;
+  });
+}
+// pdf.js sa natiahne z CDN len pri prvom PDF náhľade (ak CDN nie je k dispozícii → fallback na iframe s celým súborom)
+let pdfjsLibPromise = null;
+function natiahniPdfJs() {
+  if (pdfjsLibPromise) return pdfjsLibPromise;
+  pdfjsLibPromise = new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; ok(window.pdfjsLib); } catch (e) { no(e); } };
+    sc.onerror = () => no(new Error('pdf.js CDN unavailable'));
+    document.head.appendChild(sc);
+  });
+  return pdfjsLibPromise;
+}
+async function pdfNaThumb(dataUrl) {
+  const lib = await natiahniPdfJs();
+  const pdf = await lib.getDocument(dataUrl).promise;
+  const page = await pdf.getPage(1);
+  const base = page.getViewport({ scale: 1 });
+  const sc = Math.min(DOC_THUMB_W / base.width, DOC_THUMB_H / base.height);
+  const vp = page.getViewport({ scale: sc });
+  const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.floor(vp.width)); cv.height = Math.max(1, Math.floor(vp.height));
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  return cv.toDataURL('image/jpeg', 0.72);
+}
+// Prevzatie dokumentu na klik: ak celý súbor nie je v pamäti (náhľadové dokumenty sa celé nesťahujú),
+// stiahne sa priamo zo S3 až teraz; data sa zároveň zacachujú v pamäti.
+async function docStiahnut(doc) {
+  if (doc.data || !doc.key || !dbConnection) return false;
+  const r = await backendFetch('/api/files', 'POST', { headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ action: 'download', keys: [doc.key] }) });
+  if (!r.ok) return false;
+  const urls = (await r.json()).urls || {}; const u = urls[doc.key]; if (!u) return false;
+  const res = await fetch(u); if (!res.ok) return false;
+  const blob = await res.blob();
+  try { const fr = new FileReader(); fr.onload = () => { doc.data = fr.result; }; fr.readAsDataURL(blob); } catch (e) {}
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = doc.name || 'subor'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+  return true;
+}
+function docStiahnutKlik(ev, docId) {
+  const pp = treeData.persons[activeMediaPersonId]; const doc = pp && (pp.documents || []).find(d => d.id === docId);
+  if (!doc) return;
+  if (doc.data) return;                                   // bežný <a download> z data URL v pamäti
+  ev.preventDefault();
+  const a = ev.currentTarget; a.style.opacity = '0.5'; a.style.pointerEvents = 'none';
+  const hotovo = () => { a.style.opacity = ''; a.style.pointerEvents = ''; };
+  docStiahnut(doc).then(ok => { if (!ok) showToast('Prevzatie dokumentu sa nepodarilo.', 'error'); }).catch(() => showToast('Prevzatie dokumentu sa nepodarilo.', 'error')).finally(hotovo);
+}
+// mammoth.js (CDN, len pri prvom DOCX): DOCX → HTML → textový náhľad prvej strany
+let mammothPromise = null;
+function natiahniMammoth() {
+  if (mammothPromise) return mammothPromise;
+  mammothPromise = new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+    sc.onload = () => ok(window.mammoth);
+    sc.onerror = () => no(new Error('mammoth CDN unavailable'));
+    document.head.appendChild(sc);
+  });
+  return mammothPromise;
+}
+async function docxNaTextPreview(dataUrl) {
+  const lib = await natiahniMammoth();
+  const arr = Uint8Array.from(atob((dataUrl.split(',')[1] || '')), c => c.charCodeAt(0));
+  const res = await lib.convertToHtml({ arrayBuffer: arr.buffer });
+  return res.value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400);
+}
+// Vygeneruje (alebo načíta z cache) náhľad dokumentu; vracia data URL náhľadu alebo null.
+async function generujNahladDokumentu(f) {
+  const typ = String(f.type || '').toLowerCase(); const data = f.data || ''; if (!data) return null;
+  try { const c = localStorage.getItem(thumbCacheKey(f)); if (c) { f.thumb = c; return c; } } catch (e) {}
+  if (typ === 'docx') {
+    try { const ct = localStorage.getItem(thumbCacheKey(f) + ':txt'); if (ct) { f.docxText = ct; return null; } } catch (e) {}
+    try { const txt = await docxNaTextPreview(data); if (txt) { f.docxText = txt; try { localStorage.setItem(thumbCacheKey(f) + ':txt', txt); } catch (e) {} } } catch (e) {}
+    return null;
+  }
+  let thumb = null;
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(typ)) thumb = await obrazokNaThumb(data);
+  else if (typ === 'pdf') { try { thumb = await pdfNaThumb(data); } catch (e) { thumb = null; } }
+  if (thumb) { f.thumb = thumb; try { localStorage.setItem(thumbCacheKey(f), thumb); } catch (e) {} }
+  return thumb;
+}
+// Náhľad prvej strany dokumentu v galérii dokumentov:
+// 1. hotový náhľad (thumb) z cache vygenerovaný pri uložení/prvom zobrazení,
+// 2. fallback: PDF cez iframe, obrázok cez img, TXT ako text, ostatné (DOCX…) = ikona.
+function docNahledHtml(doc) {
+  if (doc.thumb) return `<img src="${esc(doc.thumb)}" class="w-full h-full object-cover" alt="">`;
+  const typ = String(doc.type || '').toLowerCase(); const data = doc.data || ''; if (!data) return '';
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(typ)) return `<img src="${esc(data)}" class="w-full h-full object-cover" alt="">`;
+  if (typ === 'pdf') return `<iframe src="${esc(data)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=Fit" loading="lazy" title="pdf" class="w-full h-full border-0 pointer-events-none"></iframe>`;
+  if (typ === 'docx' && doc.docxText) return `<pre class="w-full h-full m-0 p-1.5 overflow-hidden text-left whitespace-pre-wrap bg-slate-800 text-[7px] leading-tight text-slate-200">${esc(doc.docxText)}</pre>`;
+  if (typ === 'txt') { let txt = ''; try { const b64 = (data.split(',')[1] || ''); txt = new TextDecoder().decode(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); } catch (e) {} return `<pre class="w-full h-full m-0 p-1.5 overflow-hidden text-left whitespace-pre-wrap bg-slate-800 text-[8px] leading-tight text-slate-200">${esc(txt.slice(0, 350))}</pre>`; }
+  return '';
+}
 function showDocumentsList() {
   document.getElementById('docsListView').classList.remove('hidden'); const container = document.getElementById('documentsContainer'); container.innerHTML = ""; const p = treeData.persons[activeMediaPersonId]; const docs = p.documents || [];
   if (docs.length === 0) { container.innerHTML = `<div class="text-center text-slate-400 py-12">${t('tNoDocsDisplay')}</div>`; return; }
-  docs.forEach(doc => { container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 font-bold uppercase text-[10px] sm:text-xs">${esc(doc.type || 'DOC')}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${esc(doc.data)}" download="${esc(doc.name)}" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  docs.forEach((doc, di) => { const nahled = docNahledHtml(doc); container.innerHTML += `<div class="flex items-center justify-between p-4 rounded-2xl bg-white/10 border border-white/15 text-white"><div class="flex items-center gap-3"><div id="docThumbBox_${di}" class="w-12 h-16 sm:w-14 sm:h-[4.5rem] shrink-0 rounded-xl overflow-hidden border border-amber-400/30 flex items-center justify-center ${nahled ? 'bg-white' : 'bg-amber-500/20 text-amber-400 font-bold uppercase text-[10px] sm:text-xs'}">${nahled || esc(doc.type || 'DOC')}</div><div><h4 class="text-xs sm:text-sm font-semibold break-words">${esc(doc.caption || t('tDoc'))}</h4></div></div><a href="${esc(doc.data || '#')}" download="${esc(doc.name)}" onclick="docStiahnutKlik(event, '${esc(doc.id)}')" class="px-3 sm:px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition"><i class="ph-bold ph-download-simple"></i> <span class="hidden sm:inline">${t('tDownload')}</span></a></div>`; });
+  // Doplnenie náhľadov na pozadí (raz, potom už len z cache): PDF/obrázky bez thumbu a DOCX bez textového náhľadu.
+  docs.forEach((doc, di) => {
+    const typ = String(doc.type || '').toLowerCase();
+    if (doc.thumb || doc.docxText || !['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'docx'].includes(typ)) return;
+    generujNahladDokumentu(doc).then(th => {
+      const txt = th ? null : doc.docxText; if (!th && !txt) return;
+      const box = document.getElementById('docThumbBox_' + di);
+      if (box) {
+        box.className = "w-12 h-16 sm:w-14 sm:h-[4.5rem] shrink-0 rounded-xl overflow-hidden border border-amber-400/30 flex items-center justify-center " + (th ? 'bg-white' : 'bg-slate-800');
+        box.innerHTML = th ? `<img src="${esc(th)}" class="w-full h-full object-cover" alt="">` : `<pre class="w-full h-full m-0 p-1 overflow-hidden text-left whitespace-pre-wrap text-[7px] leading-tight text-slate-200">${esc(txt)}</pre>`;
+      }
+    }).catch(() => {});
+  });
 }
 
 async function saveGedzipTree() {
   if (treeSource === 'server') {
     if (hydratePromise) { showToast(t('msgAttWait'), 'info'); try { await hydratePromise; } catch (e) {} }
     let missing = 0;
-    Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) missing++; }));
+    const pocetChybajucich = () => { let m = 0; Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) m++; })); return m; };
+    missing = pocetChybajucich();
+    if (missing > 0 && dbConnection) {
+      // náhľadové dokumenty sa bežne nesťahujú celé – pred exportom .gdz sa dotiahnu na požiadanie
+      try { showToast(t('msgAttWait'), 'info'); await hydrateFiles(dbConnection, true); } catch (e) {}
+      missing = pocetChybajucich();
+    }
     if (missing > 0) {
       showConfirm(t('msgAttMissTitle'), t('msgAttMissBody').replace('{N}', missing), () => saveGedzipTreeInternal());
       return;
@@ -3438,12 +3571,15 @@ async function uploadPendingFiles(session) {
   }
 }
 
-function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0 }; }
+function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0, thumb: (f.thumb && !f.thumbSent) ? f.thumb : '' }; }
 
 // Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
-async function hydrateFiles(session) {
+// Náhľadové typy (pdf/obrázky) s uloženým thumbnailom sa celé nesťahujú –
+// dokument sa stiahne až po kliknutí na Prevziať (full = true pri exporte .gdz).
+async function hydrateFiles(session, full = false) {
   const todo = [];
-  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f]) => { if (f.key && !f.data) todo.push(f); }));
+  const thumbTyp = f => ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'].includes(String(f.type || '').toLowerCase());
+  Object.values(treeData.persons).forEach(p => fileList(p).forEach(([f, kind]) => { if (f.key && !f.data && !(kind === 'doc' && f.thumb && thumbTyp(f) && !full)) todo.push(f); }));
   if (!todo.length) return;
   const treeRef = treeData;
   try {
@@ -3769,6 +3905,8 @@ function serverDataToTree(data) {
     const p = Object.assign(createPersonObj(raw.id), raw);
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
+    // náhľady (thumb) prichádzajúce zo servera sú už uložené – pri zápise sa znova neposielajú
+    ['photos', 'documents'].forEach(k => (Array.isArray(p[k]) ? p[k] : []).forEach(ff => { if (ff.thumb) ff.thumbSent = true; }));
     persons[p.id] = p;
   });
   const families = {};
@@ -3866,8 +4004,10 @@ function updateLastSavedUI() {
 async function putTreeData(session) {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      await putTreeDataOnce(session);
-      originalTreeData = snapshotBase(treeData);
+      try {
+        await putTreeDataOnce(session);
+        try { Object.values(treeData.persons).forEach(pp => fileList(pp).forEach(([f]) => { if (f.thumb) f.thumbSent = true; })); } catch (e) {}
+        originalTreeData = snapshotBase(treeData);
       markLastSaved();
       return;
     } catch (err) {
@@ -3988,6 +4128,8 @@ function loadTreeFromServer(data, session) {
     const p = Object.assign(createPersonObj(raw.id), raw);
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
+    // náhľady (thumb) prichádzajúce zo servera sú už uložené – pri zápise sa znova neposielajú
+    ['photos', 'documents'].forEach(k => (Array.isArray(p[k]) ? p[k] : []).forEach(ff => { if (ff.thumb) ff.thumbSent = true; }));
     persons[p.id] = p;
   });
   const families = {};
@@ -4019,7 +4161,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 23: celá vetva sa pri odpojení od rodokmeňa (zrušenie otca/matky/partnera) vracia na plátno kandidátov + automatická oprava „stratených“ sirôt pri načítaní dát');
+console.log('Genealogy index16c-v31 – rev. 26: thumbnails trvalo v Turso (person_files.thumbnail) – náhľadové dokumenty sa celé nesťahujú, prevzatie na klik; DOCX textový náhľad cez mammoth.js; vyžaduje nový api/tree.js rev. 20');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
