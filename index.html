@@ -4004,10 +4004,9 @@ function updateLastSavedUI() {
 async function putTreeData(session) {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      try {
-        await putTreeDataOnce(session);
-        try { Object.values(treeData.persons).forEach(pp => fileList(pp).forEach(([f]) => { if (f.thumb) f.thumbSent = true; })); } catch (e) {}
-        originalTreeData = snapshotBase(treeData);
+      await putTreeDataOnce(session);
+      try { Object.values(treeData.persons).forEach(pp => fileList(pp).forEach(([f]) => { if (f.thumb) f.thumbSent = true; })); } catch (e) {}
+      originalTreeData = snapshotBase(treeData);
       markLastSaved();
       return;
     } catch (err) {
@@ -4161,7 +4160,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 26: thumbnails trvalo v Turso (person_files.thumbnail) – náhľadové dokumenty sa celé nesťahujú, prevzatie na klik; DOCX textový náhľad cez mammoth.js; vyžaduje nový api/tree.js rev. 20');
+console.log('Genealogy index16c-v31 – rev. 27: oprava syntaxe v putTreeData (fix rev. 26 – aplikácia sa znova načítava); thumbnails trvalo v Turso, náhľadové dokumenty sa celé nesťahujú, prevzatie na klik; DOCX náhľad cez mammoth.js; vyžaduje api/tree.js rev. 20');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
