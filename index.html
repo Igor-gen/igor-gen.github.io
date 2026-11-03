@@ -1583,7 +1583,7 @@ function hrebenUloz(z, ctx, b, ax, r) {
   });
 }
 
-function hrebenY(z, r) { return 120 + (r - z.minR) * (LAYOUT.bh + LAYOUT.gapY); }
+function hrebenY(z, r) { return 120 + (z.dy || 0) + (r - z.minR) * (LAYOUT.bh + LAYOUT.gapY); }
 
 // Z rozmiestnených uzlov vytvorí čiary (iba kolmé úseky), bodky, štítky a hranice zóny
 function hrebenDokonci(z) {
@@ -1791,6 +1791,26 @@ function hrebenObnov() {
       });
       if (najlepsi) { const z = hrebenZostav(najlepsi.id, null, null); if (z) hrebenPridajZonu(z); }
     });
+    // Grid: kandidátske vetvy zoradené do pravidelnej mriežky (riadky × stĺpce),
+    // nie do jednej nekonečnej línie – kvôli prehľadnosti. Po rozšírení niektorej vetvy
+    // sa celá mriežka prepočíta a fitCandidateView ju opäť zrovna na plochu.
+    if (HREBEN.zony.length > 1) {
+      const COLS = Math.max(2, Math.ceil(Math.sqrt(HREBEN.zony.length)));
+      const GX = 420, GY = 260;                     // medzery medzi stĺpcami a riadkami gridu
+      let yKurzor = 0;
+      for (let i = 0; i < HREBEN.zony.length; i += COLS) {
+        const riadokZon = HREBEN.zony.slice(i, i + COLS);
+        let xKurzor = 0, maxH = 0;
+        riadokZon.forEach(z => {
+          z.dy = yKurzor;
+          z.dx = xKurzor - z.hr.minX;
+          xKurzor = z.hr.maxX + z.dx + GX;
+          maxH = Math.max(maxH, z.hr.maxY - z.hr.minY);
+        });
+        yKurzor += maxH + GY;
+      }
+      HREBEN.zony.forEach(z => hrebenDokonci(z));   // prepočíta y-súradnice a hranice zóny s novým z.dy
+    }
     HREBEN.aktualna = HREBEN.zony[0] || null;
     HREBEN.cesta = [];
     try { updateRodDiagramSelect(); } catch (e) {}
@@ -1917,7 +1937,8 @@ function hrebenPreusporiadat() {
 }
 // Tlačidlo „Návrat na hlavný diagram“: plynulo sa vráti na hlavný diagram a roztiahne ho na celú plochu.
 function hrebenNavratNaHlavny() {
-  if (CANDIDATE_MODE) { prepniKandidati(false); return; }
+  if (CANDIDATE_MODE) { prepniKandidati(false); }
+  // Vždy (aj z pod-diagramov rodu, aj z plátna kandidátov) vracia pohľad na hlavný diagram rodiny.
   if (!Object.keys(treeData.persons || {}).length) return;
   if (!HREBEN.zony.length) hrebenObnov();
   const hl = HREBEN.zony[0]; if (!hl) return;
@@ -2812,10 +2833,11 @@ function savePersonForm(e) {
   // celá jej vetva sa automaticky stáva súčasťou rodokmeňa a zmizne z plátna kandidátov.
   let prepojeno = false;
   try { prepojeno = zruKandidatovAkSuPrepojeni(id); } catch (e) {}
-  // Odpojenie od hlavného rodokmeňa: ak komponenta uloženej osoby po zmenách nemá žiadne
-  // spojenie s hlavným rodokmeňom (a neobsahuje kandidátov), celá sa vracia na plátno kandidátov.
+  // Odpojenie od hlavného rodokmeňa / sirota: ak komponenta uloženej osoby (vrátane novo založenej)
+  // nemá žiadne spojenie s hlavným rodokmeňom a neobsahuje kandidátov, celá sa vracia na plátno kandidátov.
+  // Nová osoba bez väzieb (stačí meno a priezvisko) sa teda vždy uloží ako kandidát.
   let vrateneKandidati = false;
-  try { if (!isNew) vrateneKandidati = vratOdpojenychNaKandidatov(id); } catch (e) {}
+  try { vrateneKandidati = vratOdpojenychNaKandidatov(id); } catch (e) {}
 
   closePersonEditor(); autoLayoutTree(false);
   if (isNew && canvas && !CANDIDATE_MODE) { panX = canvas.width / 2 - p.x * scale; panY = canvas.height / 2 - p.y * scale; }
@@ -4160,7 +4182,7 @@ async function submitDbForm(e) {
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v31 – rev. 27: oprava syntaxe v putTreeData (fix rev. 26 – aplikácia sa znova načítava); thumbnails trvalo v Turso, náhľadové dokumenty sa celé nesťahujú, prevzatie na klik; DOCX náhľad cez mammoth.js; vyžaduje api/tree.js rev. 20');
+console.log('Genealogy index16c-v31 – rev. 29: „Návrat na hlavný diagram“ vždy vráti pohľad na hlavný diagram rodiny (aj z kandidátov/pod-diagramov); plátno Kandidáti zoradzuje vetvy do pravidelnej mriežky namiesto jednej línie');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
