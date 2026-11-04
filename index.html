@@ -332,7 +332,7 @@
     </div>
 
     <!-- INTERNÝ CHAT RODINY: jeden riadok vpravo dole NAD CANVASOM (ako legenda vľavo dole) -->
-    <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html?v=1" title="Chat rodiny"
+    <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html?v=2" title="Chat rodiny"
       style="position:absolute;right:16px;bottom:16px;width:260px;height:40px;border:none;background:transparent;z-index:16;transition:width .2s ease,height .2s ease;display:none;"
       referrerpolicy="no-referrer"></iframe>
 
@@ -1015,7 +1015,7 @@ function setLanguage(lang) {
   currentLang = lang;
   // interný chat rodiny: prepnutie jazyka aj v samostatnej chat aplikácii
   const chatFr = document.getElementById('chatIframe');
-  if (chatFr && chatFr.contentWindow) { try { chatFr.contentWindow.postMessage({ type: 'chat-lang', lang: lang }, '*'); } catch (e) {} }
+  if (chatFr && chatFr.contentWindow) { try { chatFr.contentWindow.postMessage({ type: 'chat-lang', lang: lang }, 'https://igor-gen.github.io'); } catch (e) {} }
   document.querySelectorAll('.lang-btn').forEach(btn => {
     btn.classList.remove('border-indigo-500', 'scale-110', 'opacity-100');
     btn.classList.add('border-transparent', 'opacity-60');
@@ -6239,6 +6239,7 @@ async function vytvorPdfKnihu() {
 (function () {
   const fr = document.getElementById('chatIframe');
   if (!fr) return;
+  const CHAT_ORIGIN = 'https://igor-gen.github.io';   // musí sedieť s origin v src iframe
 
   window.initChatIframe = function () {
     if (!fr) return;
@@ -6253,7 +6254,7 @@ async function vytvorPdfKnihu() {
         url: BACKEND_URL.replace(/\/+$/, ''),
         lang: currentLang,
         userId: userId
-      }, '*');
+      }, CHAT_ORIGIN);
     } catch (e) {}
   };
   /* Chat je súčasťou rodiny na serveri: zobrazí sa, len keď je používateľ
@@ -6266,12 +6267,14 @@ async function vytvorPdfKnihu() {
   window.hideChatIframe = function () { if (fr) fr.style.display = 'none'; };
 
   window.addEventListener('message', function (e) {
-    if (!fr || e.source !== fr.contentWindow) return;
+    if (!fr || e.source !== fr.contentWindow || e.origin !== CHAT_ORIGIN) return;
     const d = e.data || {};
-    if (d.type === 'chat-token-request') {
+    if (d.type === 'chat-ready') {
+      window.initChatIframe();   // chat sa práve načítal – pošli mu init (nezávisle od poradia načítania)
+    } else if (d.type === 'chat-token-request') {
       if (window.Clerk && window.Clerk.isSignedIn && window.Clerk.session) {
         window.Clerk.session.getToken().then(function (tok) {
-          try { fr.contentWindow.postMessage({ type: 'chat-token', token: tok }, '*'); } catch (err) {}
+          try { fr.contentWindow.postMessage({ type: 'chat-token', token: tok }, CHAT_ORIGIN); } catch (err) {}
         }).catch(function () {});
       }
     } else if (d.type === 'chat-expand') {
