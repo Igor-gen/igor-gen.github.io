@@ -234,6 +234,7 @@ function L(k) { return (CHAT_I18N[lang] && CHAT_I18N[lang][k]) || CHAT_I18N.sk[k
 var apiUrl = null;      // BACKEND_URL hlavnej aplikácie
 var mojeId = null;     // clerk userId (príde z rodiča)
 var tokenCachovany = null, tokenCas = 0;
+var tokenCakal = [];
 var spravy = [];       // všetky moje správy (skupinové + moje DM)
 var pouzivatelia = []; // [{id, name}]
 var aktivna = 'vsetci';
@@ -256,10 +257,30 @@ var nazovPanelu = document.getElementById('chatNazov');
 var nazovRiadku = document.getElementById('chatNazovRiadok');
 
 /* ---------- komunikácia s rodičom (rodokmeňom) ---------- */
+/* Origin rodiča (rodokmeňa) – určí ho prehliadač, nie správa: ancestorOrigins (Chrome/Safari) alebo referrer. */
+var PARENT_ORIGIN = (function () {
+  try { if (location.ancestorOrigins && location.ancestorOrigins.length) return location.ancestorOrigins[0]; } catch (e) {}
+  try { if (document.referrer) return new URL(document.referrer).origin; } catch (e) {}
+  return null;
+})();
+function posliRodicovi(msg) {
+  try { window.parent.postMessage(msg, PARENT_ORIGIN || '*'); } catch (e) {}
+}
+
 window.addEventListener('message', function (e) {
+  // prijímaj správy len od rodiča (a z jeho origin, ak ho vieme zistiť)
+  if (e.source !== window.parent) return;
+  if (PARENT_ORIGIN && e.origin !== PARENT_ORIGIN) return;
   var d = e.data || {};
   if (d.type === 'chat-init') {
-    apiUrl = String(d.url || '').replace(/\/+$/, '');
+    var u = String(d.url || '').replace(/\/+$/, '');
+    if (!/^(https:\/\/|http:\/\/localhost[:\/])/.test(u)) return;   // len https (alebo localhost pri vývoji)
+    if (spusteny && (u !== apiUrl || (d.userId || null) !== mojeId)) {   // iný používateľ / server → začni odznova
+      if (obnovaId) { clearInterval(obnovaId); obnovaId = null; }
+      spusteny = false; spravy = []; pouzivatelia = []; neprecitane = {}; posledneId = 0; tokenCachovany = null;
+      vykresliKonverzaciu();
+    }
+    apiUrl = u;
     mojeId = d.userId || null;
     nastavJazyk(d.lang || 'sk');
     start();
@@ -267,18 +288,20 @@ window.addEventListener('message', function (e) {
     nastavJazyk(d.lang || lang);
   } else if (d.type === 'chat-token') {
     tokenCachovany = d.token; tokenCas = Date.now();
-    if (tokenCakal) { var cb = tokenCakal; tokenCakal = null; cb(d.token); }
+    var cakajuci = tokenCakal; tokenCakal = [];
+    cakajuci.forEach(function (cb) { cb(d.token); });
   }
 });
 
-var tokenCakal = null;
+// tokenCakal: zoznam čakajúcich – súbežné požiadavky sa už navzájom neprepíšu
 function ziadajToken() {
   return new Promise(function (resolve) {
     if (tokenCachovany && Date.now() - tokenCas < 50000) return resolve(tokenCachovany);
-    tokenCakal = resolve;
-    try { window.parent.postMessage({ type: 'chat-token-request' }, '*'); } catch (e) { resolve(null); }
+    tokenCakal.push(resolve);
+    posliRodicovi({ type: 'chat-token-request' });
     setTimeout(function () {
-      if (tokenCakal === resolve) { tokenCakal = null; resolve(null); }
+      var i = tokenCakal.indexOf(resolve);
+      if (i !== -1) { tokenCakal.splice(i, 1); resolve(null); }
     }, 8000);
   });
 }
@@ -462,7 +485,7 @@ function rozbal() {
   rozbaly = true;
   panel.classList.add('rozbaly');
   riadok.classList.add('rozbaly');
-  try { window.parent.postMessage({ type: 'chat-expand', value: true }, '*'); } catch (e) {}
+  posliRodicovi({ type: 'chat-expand', value: true });
   neprecitane[aktivna] = 0;
   aktualizujRiadok();
   vykresliKonverzaciu();
@@ -473,7 +496,7 @@ function zroluj() {
   rozbaly = false;
   panel.classList.remove('rozbaly');
   riadok.classList.remove('rozbaly');
-  try { window.parent.postMessage({ type: 'chat-expand', value: false }, '*'); } catch (e) {}
+  posliRodicovi({ type: 'chat-expand', value: false });
   if (casovac) { clearTimeout(casovac); casovac = null; }
   aktualizujRiadok();
 }
@@ -528,7 +551,7 @@ formular.addEventListener('submit', function (e) {
 });
 
 /* ---------- štart: 15 s refresh len nových správ ---------- */
-var spusteny = false;
+var spusteny = false, obnovaId = null;
 function start() {
   if (spusteny || !apiUrl) return;
   spusteny = true;
@@ -538,13 +561,14 @@ function start() {
   }).catch(function () {
     // pri neprihlásení rodokmeň iframe nezobrazí / skryje – bez akcie
   });
-  setInterval(function () {
+  obnovaId = setInterval(function () {
     if (document.visibilityState !== 'visible') return; // pauza v skrytej záložke
     refreshNovych().catch(function () {});
   }, 15000);
 }
 
 odosli.disabled = true;
+posliRodicovi({ type: 'chat-ready' });   // rodič odpovie chat-init (funguje aj keď sa chat načíta neskôr/z cache)
 </script>
 </body>
 </html>
