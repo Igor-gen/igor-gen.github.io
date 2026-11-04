@@ -22,31 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Tailwind CSS (statické CSS namiesto Play CDN)
-        run: |
-          mkdir -p tw-build
-          cat > tw-build/input.css <<'CSS'
-          @tailwind base;
-          @tailwind components;
-          @tailwind utilities;
-          CSS
-          cat > tw-build/tailwind.config.js <<'CFG'
-          /** @type {import('tailwindcss').Config} */
-          module.exports = {
-            content: ['index.html'],
-            theme: {
-              extend: {
-                colors: {
-                  maleBorder: '#1e40af', maleBg: '#eff6ff',
-                  femaleBorder: '#be185d', femaleBg: '#fdf2f8',
-                }
-              }
-            }
-          };
-          CFG
-          npx -y tailwindcss@3.4.17 -c tw-build/tailwind.config.js -i tw-build/input.css -o tw-build/tailwind.css --minify
-          echo "Vybuildené tailwind.css: $(wc -c < tw-build/tailwind.css) bajtov"
-
       - name: Inject backend configuration into index.html
         env:
           BACKEND_URL: ${{ vars.BACKEND_URL }}
@@ -54,21 +29,11 @@ jobs:
           test -n "$BACKEND_URL" || { echo "::error::Chýba repository variable BACKEND_URL"; exit 1; }
           mkdir site
           python3 - <<'PY'
-          import os, re
+          import os
           html = open('index.html', encoding='utf-8').read()
           placeholder = '__BACKEND_URL__'
           assert placeholder in html, placeholder + ' sa v index.html nenašiel'
           html = html.replace(placeholder, os.environ['BACKEND_URL'].strip())
-
-          # Nahrada Tailwind Play CDN statickym CSS (zdrojovy index.html v repu zostava bez zmeny):
-          # 1) <script src="https://cdn.tailwindcss.com"></script> -> <style> s vybuildenym CSS
-          # 2) inline tailwind.config blok sa odstrani (nepotrebny, Tailwind bezal len pri builde)
-          css = open('tw-build/tailwind.css', encoding='utf-8').read()
-          cdn_re = re.compile(r'[ \t]*<script src="https://cdn\.tailwindcss\.com"></script>\s*')
-          cfg_re = re.compile(r'[ \t]*<script>\s*tailwind\.config\s*=\s*\{.*?\}\s*</script>\s*', re.DOTALL)
-          assert cdn_re.search(html), 'Tailwind CDN script sa v index.html nenašiel - over zdrojový súbor'
-          html = cdn_re.sub('<style>\n' + css + '\n</style>\n', html, count=1)
-          html = cfg_re.sub('', html, count=1)
           open('site/index.html', 'w', encoding='utf-8').write(html)
           PY
 
