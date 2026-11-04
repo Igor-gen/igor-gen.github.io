@@ -3268,7 +3268,7 @@ async function saveGedzipTreeInternal() {
 
 // --- PRIHLÁSENIE CEZ CLERK A PRIPOJENIE NA DATABÁZU (Vercel backend -> Turso) ---
 // Publishable key je určený pre frontend. Secret key zostáva iba vo Vercel Environment Variables.
-const BACKEND_URL = "__BACKEND_URL__";
+const BACKEND_URL = "https://genealogy-backend.vercel.app";
 const CLERK_PUBLISHABLE_KEY = "pk_test_aW50ZW50LWJlZS0zNTQxLmNsZXJrLmFjY291bnRzLmRldiQ";
 const GENEALOGY_APP_URL = "https://igor-gen.github.io/";
 const MAX_PAYLOAD_BYTES = 4300000; // Vercel Functions: najviac 4,5 MB na telo požiadavky
@@ -4630,7 +4630,7 @@ setLanguage('sk');
 
   </div>
 </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- (odstránené duplicitné načítanie jsPDF – už je v <head>) -->
 
 <script>
 // ===================== AI INVESTIGATÍVA (Perplexity v novom okne prehliadača) =====================
