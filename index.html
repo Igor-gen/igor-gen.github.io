@@ -215,6 +215,14 @@
 
   <!-- LEFT SIDEBAR (MOBILE OFF-CANVAS) -->
   <aside id="leftSidebar" class="fixed md:relative top-0 left-0 h-full z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 w-80 max-w-[85vw] flex-shrink-0 bg-white border-r border-slate-200 flex flex-col shadow-2xl md:shadow-none">
+    <!-- Prihlásený používateľ + Odhlásiť (ľavý horný roh) -->
+    <div id="userBar" style="display:none;" class="px-4 py-2 border-b border-slate-100 bg-slate-50 items-center gap-2 text-xs">
+      <i class="ph-bold ph-user-circle text-indigo-600 text-base flex-shrink-0"></i>
+      <span id="userBarName" class="flex-1 min-w-0 truncate font-semibold text-slate-700"></span>
+      <button type="button" onclick="odhlasitPouzivatela()" data-i18n-title="btnLogoutTitle" class="flex-shrink-0 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-slate-600 font-semibold flex items-center gap-1">
+        <i class="ph-bold ph-sign-out"></i><span data-i18n="btnLogout">Odhlásiť</span>
+      </button>
+    </div>
     <div class="p-4 border-b border-slate-100 flex items-center justify-between">
       <div>
         <div class="flex items-center gap-2">
@@ -831,6 +839,9 @@ const i18n = {
     nbSaved: "Uložené",
     nbError: "Chyba pripojenia – skúsim znova",
     nbConflict: "Zmenené na inom zariadení – texty boli spojené",
+    btnContinueWork: "Pokračovať v práci – načíta rodokmeň zo servera",
+    btnLogout: "Odhlásiť",
+    btnLogoutTitle: "Odhlásiť sa a vrátiť sa na úvodnú stránku",
     invAdminOnly: "Pozvánky môže vytvárať iba administrátor.",
     invAdminFail: "Nepodarilo sa overiť administrátorské oprávnenie.",
     invPrompt: "Zadaj e-mailovú adresu osoby, ktorú chceš pozvať:",
@@ -913,6 +924,9 @@ const i18n = {
     nbSaved: "Uloženo",
     nbError: "Chyba připojení – zkusím znovu",
     nbConflict: "Změněno na jiném zařízení – texty byly spojeny",
+    btnContinueWork: "Pokračovat v práci – načte rodokmen ze serveru",
+    btnLogout: "Odhlásit",
+    btnLogoutTitle: "Odhlásit se a vrátit se na úvodní stránku",
     invAdminOnly: "Pozvánky může vytvářet pouze administrátor.",
     invAdminFail: "Nepodařilo se ověřit administrátorské oprávnění.",
     invPrompt: "Zadejte e-mailovou adresu osoby, kterou chcete pozvat:",
@@ -984,6 +998,9 @@ const i18n = {
     nbSaved: "Saved",
     nbError: "Connection error – retrying",
     nbConflict: "Changed on another device – texts merged",
+    btnContinueWork: "Continue working – loads the tree from the server",
+    btnLogout: "Log out",
+    btnLogoutTitle: "Log out and return to the start page",
     invAdminOnly: "Only an administrator can create invitations.",
     invAdminFail: "Administrator permission could not be verified.",
     invPrompt: "Enter the e-mail address of the person you want to invite:",
@@ -1055,6 +1072,9 @@ const i18n = {
     nbSaved: "Gespeichert",
     nbError: "Verbindungsfehler – neuer Versuch",
     nbConflict: "Auf anderem Gerät geändert – Texte zusammengeführt",
+    btnContinueWork: "Weiterarbeiten – lädt den Stammbaum vom Server",
+    btnLogout: "Abmelden",
+    btnLogoutTitle: "Abmelden und zur Startseite zurückkehren",
     invAdminOnly: "Einladungen kann nur ein Administrator erstellen.",
     invAdminFail: "Die Administratorberechtigung konnte nicht überprüft werden.",
     invPrompt: "Geben Sie die E-Mail-Adresse der Person ein, die Sie einladen möchten:",
@@ -3532,6 +3552,7 @@ async function ensureClerkReady() {
   await clerkLoadPromise;
   if (!clerkListenerAdded && typeof window.Clerk.addListener === 'function') {
     window.Clerk.addListener(() => {
+      updateUserBarUI();
       if (window.Clerk.isSignedIn && window.Clerk.session) {
         checkAdminRole();
         if (typeof window.initChatIframe === 'function') window.initChatIframe();
@@ -3628,7 +3649,24 @@ async function clerkAuthHeaders(extra = {}) {
   return Object.assign({}, extra, { Authorization: 'Bearer ' + token });
 }
 
+// Meno prihláseného používateľa (Clerk) v ľavom hornom rohu; pruh je viditeľný len po prihlásení.
+function updateUserBarUI() {
+  const bar = document.getElementById('userBar'); if (!bar) return;
+  const u = window.Clerk && window.Clerk.isSignedIn ? window.Clerk.user : null;
+  const meno = u ? (u.fullName || u.username || (u.primaryEmailAddress && u.primaryEmailAddress.emailAddress) || u.firstName || '') : '';
+  document.getElementById('userBarName').textContent = meno;
+  bar.style.display = meno ? 'flex' : 'none';
+}
+// Odhlásenie a návrat na úvodnú stránku (reload). Nezapísané zmeny najprv ponúkne uložiť existujúcim oknom.
+async function odhlasitPouzivatela() {
+  if (treeSource === 'server' && isTreeDirty() && !exitPromptSuppressed) { showExitSaveModal(odhlasitPouzivatela); return; }
+  exitPromptSuppressed = true;                       // pri reloade už nezobrazuj výzvu prehliadača
+  try { if (window.Clerk && window.Clerk.isSignedIn) await window.Clerk.signOut({ redirectUrl: window.location.pathname }); } catch (e) {}
+  window.location.reload();
+}
+
 function updateDbStatusUI() {
+  updateUserBarUI();
   const box = document.getElementById('sidebarDbStatus'); if (!box) return;
   // interný chat rodiny: zobrazuje sa len pri pripojení na serverovú databázu
   if (typeof window.syncChatVisibility === 'function') window.syncChatVisibility();
@@ -5691,12 +5729,8 @@ function resetDbEntryButton() {
   const saved = await autoSaveLoad();
   const data = saved && saved.tree;
   if (data && data.persons && Object.keys(data.persons).length > 0) {
-    const labels = {
-      sk: `Pokračovať v práci – načíta rodokmeň zo servera`,  cs: `Pokračovat v práci – načte rodokmen ze serveru`,
-      en: `Continue working – loads the tree from the server`,  de: `Weiterarbeiten – lädt den Stammbaum vom Server`
-    };
     const label = btn.querySelector('[data-restore-label]');
-    if (label) { label.removeAttribute('data-i18n'); label.innerText = labels[currentLang] || labels.sk; }
+    if (label) { label.setAttribute('data-i18n', 'btnContinueWork'); label.innerText = t('btnContinueWork'); }   // setLanguage() ho potom prekladá pri každej zmene jazyka
     const icon = btn.querySelector('i');
     if (icon) { icon.className = 'ph-bold ph-clock-counter-clockwise'; icon.style.color = '#7dd3fc'; }
   }
@@ -5750,7 +5784,7 @@ function aktualizujTlacZapisNaServer() {
 let exitPromptSuppressed = false;
 let exitModalOpen = false;
 
-function showExitSaveModal() {
+function showExitSaveModal(onDone) {
   if (exitModalOpen || treeSource !== 'server' || !isTreeDirty()) return;
   exitModalOpen = true;
   const ov = document.createElement('div');
@@ -5772,14 +5806,14 @@ function showExitSaveModal() {
   document.body.appendChild(ov);
   const close = () => { ov.remove(); exitModalOpen = false; };
   ov.querySelector('#exitBtnStay').onclick = close;
-  ov.querySelector('#exitBtnSkip').onclick = () => { exitPromptSuppressed = true; close(); };
+  ov.querySelector('#exitBtnSkip').onclick = () => { exitPromptSuppressed = true; close(); if (typeof onDone === 'function') onDone(); };
   ov.querySelector('#exitBtnSave').onclick = async () => {
     const btn = ov.querySelector('#exitBtnSave');
     btn.disabled = true; btn.classList.add('opacity-60');
     try {
       await saveToServer();            // vrátane prihlásenia cez Clerk a riešenia konfliktov (merge modal)
       if (isTreeDirty()) { showToast(xt('saveFail'), 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); }
-      else { showToast(xt('saved'), 'success'); close(); }
+      else { showToast(xt('saved'), 'success'); close(); if (typeof onDone === 'function') onDone(); }
     } catch (e) { showToast(xt('saveFail'), 'error'); btn.disabled = false; btn.classList.remove('opacity-60'); }
   };
 }
