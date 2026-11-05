@@ -1900,9 +1900,9 @@ function hrebenPohlad(z) {
   const sc = Math.min(Math.max(0.2, Math.min(canvas.width / (maxX - minX), canvas.height / (maxY - minY))), 1.2);
   return { scale: sc, panX: (canvas.width - (maxX - minX) * sc) / 2 - minX * sc, panY: (canvas.height - (maxY - minY) * sc) / 2 - minY * sc };
 }
-function hrebenPrejdiNa(z, okamzite) {
+function hrebenPrejdiNa(z, okamzite, ciel) {
   if (!canvas || !z) return;
-  const cl = hrebenPohlad(z);
+  const cl = ciel || hrebenPohlad(z);
   if (HREBEN.animacia) { cancelAnimationFrame(HREBEN.animacia); HREBEN.animacia = null; }
   if (okamzite) { scale = cl.scale; panX = cl.panX; panY = cl.panY; drawTree(); return; }
   const s0 = { scale, panX, panY }, t0 = performance.now(), D = 700;
@@ -2010,8 +2010,9 @@ function hrebenNavratNaHlavny() {
   hrebenPrejdiNa(hl, false);
 }
 function fitTreeToView() { if (!canvas) return; if (CANDIDATE_MODE) { if (!HREBEN.zony.length) hrebenObnov(); fitCandidateView(); return; } if (!HREBEN.aktualna) hrebenObnov(); if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true); }
-// Terčík „Vycentrovať na osobu“: prepne sa na diagram, na ktorom je osoba (ak nie je aktuálny), a vždy ho roztiahne na celú
-// plochu aj s označenou osobou.
+// Terčík „Vycentrovať na osobu“: prepne sa na diagram, na ktorom je osoba (ak nie je aktuálny),
+// vycentruje bublinu osoby do stredu plátna a priblíži pohľad aspoň o +50 % oproti
+// mierke, ktorou by sa celý diagram vošiel na plochu (čitateľná bublina aj vo veľkom rode).
 function centerOnPerson(personId) {
   const p = treeData.persons[personId]; if (!p || !canvas) return;
   let z = HREBEN.aktualna, u = z && z.uzly.find(n => n.os.id === personId);
@@ -2019,7 +2020,10 @@ function centerOnPerson(personId) {
   if (!u) { hrebenNastavKoren(personId); return; }          // osoba nie je v žiadnej zóne: stane sa koreňom
   if (z !== HREBEN.aktualna) { HREBEN.aktualna = z; HREBEN.cesta = hrebenCestaAktualnej(); }
   selectPerson(personId, false);
-  hrebenPrejdiNa(z, false);                                  // vždy roztiahne celý diagram (aj s označenou osobou) na plochu
+  const fit = hrebenPohlad(z);                               // mierka „celý diagram na plochu“
+  const sc = Math.min(Math.max(0.1, fit.scale * 1.5), 2.5); // aspoň +50 % zoom oproti nej
+  const cx = u.x + z.dx, cy = (u.y != null ? u.y : 0);       // svetový stred bubliny osoby
+  hrebenPrejdiNa(z, false, { scale: sc, panX: canvas.width / 2 - cx * sc, panY: canvas.height / 2 - cy * sc });
 }
 
 function zoomCanvas(factor, mx, my) { const prevScale = scale; scale = Math.min(Math.max(0.1, scale * factor), 2.5); if (mx !== undefined && my !== undefined && scale !== prevScale) { panX = mx - (mx - panX) * (scale / prevScale); panY = my - (my - panY) * (scale / prevScale); } drawTree(); }
