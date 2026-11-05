@@ -2279,9 +2279,12 @@ function sanitizeRichText(html) {
   return ser(div).trim();
 }
 // Čistý text z poznámky (pre GEDCOM/PDF/limity): <br> a konce odstavcov → nové riadky.
+// Nikdy nevkladá nesanitizované HTML do DOM – najprv prejde sanitizérom (bezpečné proti XSS z importu).
 function notePlain(html) {
+  const s = String(html || '');
+  const safe = NOTE_TAG_RE.test(s) ? sanitizeRichText(s).replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|ul|ol)>/gi, '\n') : esc(s);
   const d = document.createElement('div');
-  d.innerHTML = String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|ul|ol)>/gi, '\n');
+  d.innerHTML = safe;
   return d.textContent.replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 // Render poznámky: staré poznámky sú plain text (esc + zalomenia), nové môžu obsahovať formátovanie.
@@ -2289,7 +2292,7 @@ function renderNoteHtml(note) { const s = String(note || ''); return NOTE_TAG_RE
 
 // Zdieľané okno rich-text editora (riadok poznámky v editore osoby aj ceruzka na karte).
 function openNoteRichEditor(initial, onSave) {
-  const prefill = NOTE_TAG_RE.test(String(initial || '')) ? String(initial) : esc(String(initial || '')).replace(/\n/g, '<br>');
+  const prefill = NOTE_TAG_RE.test(String(initial || '')) ? sanitizeRichText(String(initial)) : esc(String(initial || '')).replace(/\n/g, '<br>');
   const ov = document.createElement('div');
   ov.className = 'fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6';
   ov.innerHTML = `
@@ -3372,7 +3375,7 @@ async function saveGedzipTreeInternal() {
           let ods = ""; if (oc.dateFrom && oc.dateTo) ods = `FROM ${oc.dateFrom} TO ${oc.dateTo}`; else if (oc.dateFrom) ods = `FROM ${oc.dateFrom}`; else if (oc.dateTo) ods = `TO ${oc.dateTo}`;
           if (ods) ged += `2 DATE ${ods}\n`;
       });
-      if (p.notes && p.notes.length > 0) { p.notes.forEach(note => { const nl = notePlain(note).split(/\r?\n/); ged += `1 NOTE ${nl[0]}\n`; nl.slice(1).forEach(l => { ged += `2 CONT ${l}\n`; }); }); }
+      if (p.notes && p.notes.length > 0) { p.notes.forEach(note => { notePlain(note).split(/\r?\n/).forEach((l, li) => { const chunks = l.match(/.{1,100}/g) || ['']; ged += `${li === 0 ? '1 NOTE' : '2 CONT'} ${chunks[0]}\n`; chunks.slice(1).forEach(c => { ged += `2 CONC ${c}\n`; }); }); }); }
 
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
@@ -6046,7 +6049,7 @@ function pdfBookPoznamkaWrap(text, innerW, indentW, nInd, font) {
 // Pripraví rámček s PRVOU poznámkou osoby (alebo null, ak osoba poznámku nemá).
 // maxLines chráni pred poznámkou dlhšou než strana – text sa potom skráti „…“.
 function pdfBookPoznamkaOsoby(p, topH) {
-  const raw = (p.notes || []).map(n => String(n == null ? '' : n).replace(/\s+/g, ' ').trim()).filter(Boolean)[0];
+  const raw = (p.notes || []).map(n => notePlain(n).replace(/\s+/g, ' ')).filter(Boolean)[0];
   if (!raw) return null;
   const N = PDF_BOOK_NOTE;
   const innerW = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X - 2 * N.PADX;
