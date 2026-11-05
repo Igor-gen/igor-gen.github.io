@@ -49,6 +49,19 @@
     .rich-notes ul { list-style: disc; padding-left: 1.35rem; margin: 0.15rem 0; }
     .rich-notes ol { list-style: decimal; padding-left: 1.35rem; margin: 0.15rem 0; }
     .rich-notes li { margin: 0.1rem 0; }
+  
+    /* Súkromný zápisník vľavo od chatu (chat: right:16px, 260 px / 380 px po rozbalení) */
+    #notebookDock{position:absolute;right:288px;bottom:16px;width:260px;height:40px;z-index:16;display:none;flex-direction:column;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 10px 15px -3px rgba(0,0,0,.12);overflow:hidden;transition:width .2s ease,height .2s ease,right .2s ease}
+    #notebookDock.nb-open{width:380px;height:min(500px,calc(100vh - 32px))}
+    #notebookDock.chat-open{right:408px}
+    @media (max-width:767px){
+      #notebookDock{right:auto;left:16px;width:40px}
+      #notebookDock .nb-label,#notebookDock #nbChevron{display:none}
+      #notebookDock.nb-open{width:calc(100vw - 32px)}
+      #notebookDock.nb-open .nb-label{display:block}
+      #notebookDock.nb-open #nbChevron{display:inline-block}
+      #notebookDock.chat-open{right:auto}
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased select-none relative">
@@ -339,6 +352,20 @@
     <iframe id="chatIframe" src="https://igor-gen.github.io/chat.html?v=2" title="Chat rodiny"
       style="position:absolute;right:16px;bottom:16px;width:260px;height:40px;border:none;background:transparent;z-index:16;transition:width .2s ease,height .2s ease;display:none;"
       referrerpolicy="no-referrer"></iframe>
+
+    <!-- ZÁPISNÍK: súkromný zápisník prihláseného používateľa, vľavo od chatu (každý vidí len svoj) -->
+    <div id="notebookDock">
+      <button type="button" id="nbBar" onclick="notebookPrepni()" class="flex items-center gap-2 px-3 h-10 flex-shrink-0 w-full text-left text-xs font-semibold text-slate-700 hover:bg-slate-50">
+        <i class="ph-bold ph-notebook text-indigo-600 text-base flex-shrink-0"></i>
+        <span class="nb-label flex-1 truncate" data-i18n="nbTitle">Zápisník</span>
+        <span id="nbStatus" class="nb-label text-[10px] font-normal text-slate-400 truncate"></span>
+        <i id="nbChevron" class="ph-bold ph-caret-up text-slate-400 flex-shrink-0"></i>
+      </button>
+      <div id="nbPanel" style="display:none;flex:1;min-height:0;flex-direction:column;" class="border-t border-slate-200">
+        <p class="px-3 pt-2 text-[10px] text-slate-400" data-i18n="nbHint">Súkromné – vidíš ich len ty</p>
+        <textarea id="nbText" disabled maxlength="100000" class="flex-1 m-3 mt-1.5 p-2 text-sm text-slate-800 border border-slate-200 rounded-xl resize-none outline-none focus:border-indigo-400 custom-scroll" data-i18n-ph="nbPlaceholder" placeholder="Súkromné poznámky k rodokmeňu…"></textarea>
+      </div>
+    </div>
 
     <!-- KANDIDÁTI: oranžové tlačidlo vpravo hore – prepína medzi hlavným diagramom a plátnom kandidátov -->
     <button id="btnCandidates" onclick="prepniKandidati(!CANDIDATE_MODE)" class="absolute top-4 right-4 z-[16] px-3.5 py-2 rounded-2xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white text-[11px] sm:text-xs font-semibold shadow-lg border border-orange-400/60 flex items-center gap-1.5 transition">
@@ -796,6 +823,14 @@ const i18n = {
     clerkNoToken: "Nepodarilo sa získať prihlasovací token Clerk.",
     clerkLoginFirst: "Najprv sa prihlás cez Clerk.",
     clerkSessionExpired: "Relácia vypršala. Prihlás sa znova.",
+    nbTitle: "Zápisník",
+    nbHint: "Súkromné – vidíš ich len ty",
+    nbPlaceholder: "Súkromné poznámky k rodokmeňu – vidíš ich len ty…",
+    nbLoading: "Načítavam…",
+    nbSaving: "Ukladám…",
+    nbSaved: "Uložené",
+    nbError: "Chyba pripojenia – skúsim znova",
+    nbConflict: "Zmenené na inom zariadení – texty boli spojené",
     invAdminOnly: "Pozvánky môže vytvárať iba administrátor.",
     invAdminFail: "Nepodarilo sa overiť administrátorské oprávnenie.",
     invPrompt: "Zadaj e-mailovú adresu osoby, ktorú chceš pozvať:",
@@ -870,6 +905,14 @@ const i18n = {
     clerkNoToken: "Nepodařilo se získat přihlašovací token Clerk.",
     clerkLoginFirst: "Nejprve se přihlaste přes Clerk.",
     clerkSessionExpired: "Relace vypršela. Přihlaste se znovu.",
+    nbTitle: "Zápisník",
+    nbHint: "Soukromé – vidíte je jen vy",
+    nbPlaceholder: "Soukromé poznámky k rodokmenu – vidíte je jen vy…",
+    nbLoading: "Načítám…",
+    nbSaving: "Ukládám…",
+    nbSaved: "Uloženo",
+    nbError: "Chyba připojení – zkusím znovu",
+    nbConflict: "Změněno na jiném zařízení – texty byly spojeny",
     invAdminOnly: "Pozvánky může vytvářet pouze administrátor.",
     invAdminFail: "Nepodařilo se ověřit administrátorské oprávnění.",
     invPrompt: "Zadejte e-mailovou adresu osoby, kterou chcete pozvat:",
@@ -933,6 +976,14 @@ const i18n = {
     clerkNoToken: "Could not obtain the Clerk sign-in token.",
     clerkLoginFirst: "Sign in with Clerk first.",
     clerkSessionExpired: "Your session has expired. Sign in again.",
+    nbTitle: "Notebook",
+    nbHint: "Private – only you can see this",
+    nbPlaceholder: "Private notes on your family tree – only you can see them…",
+    nbLoading: "Loading…",
+    nbSaving: "Saving…",
+    nbSaved: "Saved",
+    nbError: "Connection error – retrying",
+    nbConflict: "Changed on another device – texts merged",
     invAdminOnly: "Only an administrator can create invitations.",
     invAdminFail: "Administrator permission could not be verified.",
     invPrompt: "Enter the e-mail address of the person you want to invite:",
@@ -996,6 +1047,14 @@ const i18n = {
     clerkNoToken: "Das Clerk-Anmeldetoken konnte nicht abgerufen werden.",
     clerkLoginFirst: "Melden Sie sich zuerst über Clerk an.",
     clerkSessionExpired: "Die Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+    nbTitle: "Notizbuch",
+    nbHint: "Privat – nur Sie sehen dies",
+    nbPlaceholder: "Private Notizen zum Stammbaum – nur Sie sehen sie…",
+    nbLoading: "Lädt…",
+    nbSaving: "Speichert…",
+    nbSaved: "Gespeichert",
+    nbError: "Verbindungsfehler – neuer Versuch",
+    nbConflict: "Auf anderem Gerät geändert – Texte zusammengeführt",
     invAdminOnly: "Einladungen kann nur ein Administrator erstellen.",
     invAdminFail: "Die Administratorberechtigung konnte nicht überprüft werden.",
     invPrompt: "Geben Sie die E-Mail-Adresse der Person ein, die Sie einladen möchten:",
@@ -6519,8 +6578,9 @@ async function vytvorPdfKnihu() {
     if (!fr) return;
     const zobraz = !!(dbConnection && window.Clerk && window.Clerk.isSignedIn && window.Clerk.session);
     fr.style.display = zobraz ? 'block' : 'none';
+    if (typeof window.syncNotebookVisibility === 'function') window.syncNotebookVisibility();
   };
-  window.hideChatIframe = function () { if (fr) fr.style.display = 'none'; };
+  window.hideChatIframe = function () { if (fr) fr.style.display = 'none'; if (typeof window.syncNotebookVisibility === 'function') window.syncNotebookVisibility(); };
 
   window.addEventListener('message', function (e) {
     if (!fr || e.source !== fr.contentWindow || e.origin !== CHAT_ORIGIN) return;
@@ -6536,11 +6596,102 @@ async function vytvorPdfKnihu() {
     } else if (d.type === 'chat-expand') {
       if (d.value) { fr.style.width = '380px'; fr.style.height = 'min(500px, calc(100vh - 32px))'; }
       else { fr.style.width = '260px'; fr.style.height = '40px'; }
+      if (typeof window.notebookChat === 'function') window.notebookChat(!!d.value);
     }
   });
 
   fr.addEventListener('load', function () { window.initChatIframe(); });
   window.initChatIframe();
+})();
+
+/* ===== SÚKROMNÝ ZÁPISNÍK (vľavo od chatu) =====
+   Ukladá sa na server (/api/notebook) pod ID prihláseného používateľa z Clerku; server vracia vždy len jeho záznam.
+   Nepatrí do treeData: nie je súčasťou rodokmeňa, exportu ani zdieľania. */
+(function () {
+  const dock = document.getElementById('notebookDock');
+  if (!dock) return;
+  const panel = document.getElementById('nbPanel'), ta = document.getElementById('nbText'),
+        st = document.getElementById('nbStatus'), chev = document.getElementById('nbChevron');
+  let userId = null, gen = 0, nacitany = false, verzia = 0, spinavy = false, uklada = false, casovac = null;
+
+  const stav = (kluc) => { st.textContent = kluc ? t(kluc) : ''; };
+  const aktualnyId = () => (window.Clerk && window.Clerk.user ? window.Clerk.user.id : null);
+  const prihlaseny = () => !!(dbConnection && isBackendConfigured() && window.Clerk && window.Clerk.isSignedIn && window.Clerk.session);
+  const otvoreny = () => dock.classList.contains('nb-open');
+  function planuj(ms) { clearTimeout(casovac); casovac = setTimeout(uloz, ms || 1200); }
+
+  // Pri odhlásení alebo zmene používateľa sa obsah okamžite vymaže (na zdieľanom počítači ho nesmie vidieť ďalší).
+  function vymaz() {
+    gen++; clearTimeout(casovac);
+    ta.value = ''; ta.disabled = true; nacitany = false; verzia = 0; spinavy = false; uklada = false; stav('');
+  }
+  function nastavOtvorene(on) {
+    dock.classList.toggle('nb-open', on);
+    panel.style.display = on ? 'flex' : 'none';
+    chev.className = 'ph-bold ' + (on ? 'ph-caret-down' : 'ph-caret-up') + ' text-slate-400 flex-shrink-0';
+  }
+
+  async function nacitaj() {
+    const g = gen; stav('nbLoading');
+    try {
+      const r = await backendFetch('/api/notebook', 'GET', { headers: await clerkAuthHeaders() });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+      if (g !== gen) return;                       // medzitým sa zmenil používateľ
+      ta.value = String(d.content || ''); verzia = Number(d.version) || 0;
+      nacitany = true; ta.disabled = false; stav('');
+      if (otvoreny()) ta.focus();
+    } catch (e) {
+      if (g !== gen) return;
+      stav('nbError');
+      setTimeout(() => { if (g === gen && !nacitany && otvoreny()) nacitaj(); }, 5000);
+    }
+  }
+
+  async function uloz() {
+    if (!nacitany || uklada || !spinavy) return;
+    const g = gen; uklada = true; clearTimeout(casovac); spinavy = false; stav('nbSaving');
+    const text = ta.value;
+    let chyba = false;
+    try {
+      const r = await backendFetch('/api/notebook', 'PUT', {
+        headers: await clerkAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ content: text, version: verzia })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (g !== gen) return;
+      if (r.status === 409) {
+        // Zápisník medzitým zmenilo iné zariadenie: nič sa nestratí – serverový text a nový lokálny text sa spoja.
+        const server = String(d.content || ''), lokalny = ta.value;
+        if (server !== lokalny) ta.value = server + (lokalny.trim() ? '\n\n— — —\n' + lokalny : '');
+        verzia = Number(d.version) || 0; spinavy = true; stav('nbConflict');
+      } else if (!r.ok) { throw new Error(d.error || ('HTTP ' + r.status)); }
+      else { verzia = Number(d.version) || verzia; stav(spinavy ? 'nbSaving' : 'nbSaved'); }
+    } catch (e) {
+      if (g !== gen) return;
+      spinavy = true; chyba = true; stav('nbError');
+    } finally {
+      if (g === gen) { uklada = false; if (spinavy) planuj(chyba ? 5000 : 300); }
+    }
+  }
+
+  ta.addEventListener('input', () => { spinavy = true; stav('nbSaving'); planuj(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') uloz(); });
+
+  window.notebookPrepni = function (on) {
+    const otvor = on === undefined ? !otvoreny() : !!on;
+    nastavOtvorene(otvor);
+    if (otvor) { if (!nacitany) nacitaj(); else ta.focus(); }
+    else { uloz(); }
+  };
+  // Rozbalený chat sa zväčší doľava, preto sa zápisník posunie o jeho šírku.
+  window.notebookChat = function (rozbaleny) { dock.classList.toggle('chat-open', !!rozbaleny); };
+  window.syncNotebookVisibility = function () {
+    const ok = prihlaseny(), uid = ok ? aktualnyId() : null;
+    if (uid !== userId) { vymaz(); nastavOtvorene(false); userId = uid; }
+    dock.style.display = ok ? 'flex' : 'none';
+  };
+  window.syncNotebookVisibility();
 })();
 </script>
 <!-- ===== ROTUJÚCE KOLIESKO NAČÍTAVANIA (zobrazí sa až po 0,5 s) ===== -->
