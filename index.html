@@ -1444,6 +1444,31 @@ function hrebenRok(p) { const m = String(p.birthDate || '').match(/(\d{4})/); re
 // sa prejaví samostatné plátno, kde vidno len kandidátov a ich rodiny.
 let CANDIDATE_MODE = false;
 const HREBEN_ZALOHA = { koren: null, cesta: [] };
+// ===== DOMOVSKÝ KOREŇ = hlavný diagram (napr. rod Sklenčár/Szklencsár s Jánom Sklenčárom) =====
+// Koreň aktuálne zobrazeného diagramu (HREBEN.koren) sa môže dočasne zmeniť (vycentrovanie osoby mimo diagramu).
+// „Domov“ sa mení iba výslovne (tlačidlo „Zobraziť rodokmeň od tejto osoby“); inak ostáva stabilný a
+// „Návrat na hlavný diagram“ aj tlačidlo na plátne Kandidáti sa vracajú vždy naň. Kandidát nikdy nie je domov.
+HREBEN.domov = null; HREBEN.domovSubor = null;
+function hrebenDomovKluc() { return 'hrebenDomov:' + (treeData.fileName || ''); }
+function hrebenDomovPlatny(id) { const q = id && treeData.persons[id]; return !!q && !q.candidate; }
+function hrebenDomovKoren() {
+  const subor = treeData.fileName || '';
+  if (HREBEN.domovSubor !== subor) {            // iný rodokmeň → načítaj uložený domov alebo ho vypočítaj
+    HREBEN.domovSubor = subor; HREBEN.domov = null;
+    try { const ulozeny = localStorage.getItem(hrebenDomovKluc()); if (hrebenDomovPlatny(ulozeny)) HREBEN.domov = ulozeny; } catch (e) {}
+  }
+  if (!hrebenDomovPlatny(HREBEN.domov)) {
+    const pred = CANDIDATE_MODE; CANDIDATE_MODE = false;   // predvolený koreň sa hľadá vždy medzi ne-kandidátmi
+    try { hrebenPriprav(); HREBEN.domov = hrebenPredvolenyKoren(); } finally { CANDIDATE_MODE = pred; }
+  }
+  return HREBEN.domov;
+}
+function hrebenNastavDomov(id) {
+  if (!hrebenDomovPlatny(id)) return false;
+  HREBEN.domov = id; HREBEN.domovSubor = treeData.fileName || '';
+  try { localStorage.setItem(hrebenDomovKluc(), id); } catch (e) {}
+  return true;
+}
 function osViditelna(p) { return !!p && (CANDIDATE_MODE ? !!p.candidate : !p.candidate); }
 function kandidatiPocet() { return Object.values(treeData.persons || {}).filter(p => p && p.candidate).length; }
 // Celkový pohľad na plátno kandidátov: vycentruje VŠETKY zóny (každá nezávislá vetva) naraz,
@@ -1475,8 +1500,8 @@ function prepniKandidati(on) {
     HREBEN_ZALOHA.koren = HREBEN.koren; HREBEN_ZALOHA.cesta = HREBEN.cesta || [];
     HREBEN.koren = null; HREBEN.cesta = [];
   } else {
-    HREBEN.koren = (HREBEN_ZALOHA.koren && treeData.persons[HREBEN_ZALOHA.koren]) ? HREBEN_ZALOHA.koren : null;
-    HREBEN.cesta = HREBEN_ZALOHA.cesta || [];
+    HREBEN.koren = hrebenDomovKoren();   // návrat z plátna kandidátov = vždy hlavný (domovský) diagram
+    HREBEN.cesta = [];
   }
   hrebenObnov();
   if (CANDIDATE_MODE) { fitCandidateView(); }
@@ -1799,7 +1824,7 @@ function updateRodDiagramSelect() {
   const opts = [];
   const hlavna = HREBEN.zony && HREBEN.zony[0];
   if (hlavna) {
-    const koren = treeData.persons[HREBEN.koren];
+    const koren = treeData.persons[hrebenDomovKoren()];
     opts.push({ value: '__main__', label: t('rodMainOpt') + (rodNazov(koren) ? ' – ' + rodNazov(koren) : '') });
   }
   const ciele = rodCieleMapa();
@@ -1812,9 +1837,7 @@ function updateRodDiagramSelect() {
 function rodDiagramGo(val) {
   if (!val) return;
   if (val === '__main__') {
-    if (CANDIDATE_MODE) { prepniKandidati(false); return; }
-    const z = HREBEN.zony && HREBEN.zony[0];
-    if (z) { HREBEN.aktualna = z; HREBEN.cesta = hrebenCestaAktualnej(); hrebenPrejdiNa(z, false); }
+    hrebenNavratNaHlavny();
     return;
   }
   let z = HREBEN.zony.find(q => q.kluc === val);
@@ -1880,7 +1903,7 @@ function hrebenObnov() {
     try { updateRodDiagramSelect(); } catch (e) {}
     return;
   }
-  if (!HREBEN.koren || !P[HREBEN.koren]) { HREBEN.koren = hrebenPredvolenyKoren(); }
+  if (!HREBEN.koren || !P[HREBEN.koren] || P[HREBEN.koren].candidate) { HREBEN.koren = hrebenDomovKoren(); }
   const hl = hrebenZostav(HREBEN.koren, null, null); if (!hl) return;
   hrebenPridajZonu(hl); HREBEN.aktualna = hl;
   let predch = hl;
@@ -1930,8 +1953,11 @@ function hrebenKlikOdkaz(o) {
   if (o.typ === 'spat') { const cl = HREBEN.zony.find(q => q.id === z.od); if (cl) { HREBEN.aktualna = cl; HREBEN.cesta = hrebenCestaAktualnej(); hrebenPrejdiNa(cl, false); } }
   else hrebenOtvorZonu(o.ustredna, o.spat, z.id, false);
 }
-function hrebenNastavKoren(id) {
-  if (!treeData.persons[id]) return;
+function hrebenNastavKoren(id, docasne) {
+  const os = treeData.persons[id]; if (!os) return;
+  if (!!os.candidate !== CANDIDATE_MODE) prepniKandidati(!!os.candidate);   // osoba žije na druhom plátne
+  if (CANDIDATE_MODE) { centerOnPerson(id); return; }                        // kandidát sa nikdy nestane koreňom hlavného diagramu
+  if (!docasne) hrebenNastavDomov(id);                                       // výslovná voľba používateľa = nový domov
   HREBEN.koren = id; HREBEN.cesta = [];
   hrebenObnov();
   if (HREBEN.aktualna) hrebenPrejdiNa(HREBEN.aktualna, true);
@@ -2001,10 +2027,11 @@ function hrebenPreusporiadat() {
 }
 // Tlačidlo „Návrat na hlavný diagram“: plynulo sa vráti na hlavný diagram a roztiahne ho na celú plochu.
 function hrebenNavratNaHlavny() {
-  if (CANDIDATE_MODE) { prepniKandidati(false); }
-  // Vždy (aj z pod-diagramov rodu, aj z plátna kandidátov) vracia pohľad na hlavný diagram rodiny.
   if (!Object.keys(treeData.persons || {}).length) return;
-  if (!HREBEN.zony.length) hrebenObnov();
+  if (CANDIDATE_MODE) { prepniKandidati(false); }
+  // Vždy (z pod-diagramov rodu, z plátna kandidátov aj z dočasného pohľadu na osobu) späť na domovský diagram rodiny.
+  const dom = hrebenDomovKoren();
+  if (HREBEN.koren !== dom || !HREBEN.zony.length) { HREBEN.koren = dom; HREBEN.cesta = []; hrebenObnov(); }
   const hl = HREBEN.zony[0]; if (!hl) return;
   HREBEN.aktualna = hl; HREBEN.cesta = hrebenCestaAktualnej();
   hrebenPrejdiNa(hl, false);
@@ -2015,9 +2042,12 @@ function fitTreeToView() { if (!canvas) return; if (CANDIDATE_MODE) { if (!HREBE
 // mierke, ktorou by sa celý diagram vošiel na plochu (čitateľná bublina aj vo veľkom rode).
 function centerOnPerson(personId) {
   const p = treeData.persons[personId]; if (!p || !canvas) return;
+  // Kandidát sa ukáže iba na plátne Kandidáti, ne-kandidát iba na hlavnom diagrame – podľa príznaku osoby sa otvorí správne plátno.
+  if (!!p.candidate !== CANDIDATE_MODE) prepniKandidati(!!p.candidate);
   let z = HREBEN.aktualna, u = z && z.uzly.find(n => n.os.id === personId);
   if (!u) for (const zz of HREBEN.zony) { u = zz.uzly.find(n => n.os.id === personId); if (u) { z = zz; break; } }
-  if (!u) { hrebenNastavKoren(personId); return; }          // osoba nie je v žiadnej zóne: stane sa koreňom
+  if (!u && CANDIDATE_MODE) { hrebenObnov(); selectPerson(personId, false); fitCandidateView(); return; }
+  if (!u) { hrebenNastavKoren(personId, true); return; }    // osoba mimo otvorených diagramov: len dočasný pohľad, domov sa nemení
   if (z !== HREBEN.aktualna) { HREBEN.aktualna = z; HREBEN.cesta = hrebenCestaAktualnej(); }
   selectPerson(personId, false);
   const fit = hrebenPohlad(z);                               // mierka „celý diagram na plochu“
@@ -2445,7 +2475,6 @@ function searchPersons(query, limit = 10) {
   if (!tokens.length) return [];
   const out = [];
   Object.values(treeData.persons).forEach(p => {
-    if (!osViditelna(p)) return;
     const sc = searchScorePerson(tokens, searchBuildIndex(p));
     if (sc > 0) out.push({ p, sc });
   });
@@ -2463,7 +2492,7 @@ function handleSearch(query) {
   clearBtn.classList.remove('hidden'); resultsBox.classList.remove('hidden');
   const matches = searchPersons(query, 10);
   if (matches.length === 0) { resultsBox.innerHTML = `<p class="text-[11px] text-slate-400 p-2 text-center italic">${t('tNoSearch')}</p>`; return; }
-  resultsBox.innerHTML = matches.map((p, i) => `<div data-search-item="${i}" class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition text-xs border ${i === 0 ? 'border-indigo-200 bg-white' : 'border-transparent'} hover:border-slate-200"><div class="truncate cursor-pointer flex-1" onclick="selectPerson('${p.id}'); centerOnPerson('${p.id}')"><p class="font-semibold text-slate-800 truncate">${esc(p.title ? p.title + ' ' : '')}${esc(p.firstName)} ${esc(p.lastName)}${p.birthName ? ' <span class="font-normal text-slate-400">(' + esc(p.birthName) + ')</span>' : ''}</p><p class="text-[10px] text-slate-400 truncate">${esc(searchPersonLine(p))}</p></div><button onclick="centerOnPerson('${p.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><i class="ph-bold ph-crosshair text-sm"></i></button></div>`).join('');
+  resultsBox.innerHTML = matches.map((p, i) => `<div data-search-item="${i}" class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white transition text-xs border ${i === 0 ? 'border-indigo-200 bg-white' : 'border-transparent'} hover:border-slate-200"><div class="truncate cursor-pointer flex-1" onclick="selectPerson('${p.id}'); centerOnPerson('${p.id}')"><p class="font-semibold text-slate-800 truncate">${esc(p.title ? p.title + ' ' : '')}${esc(p.firstName)} ${esc(p.lastName)}${p.birthName ? ' <span class="font-normal text-slate-400">(' + esc(p.birthName) + ')</span>' : ''}${p.candidate ? ' <span class="ml-1 px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold align-middle">' + esc(t('btnCandidates')) + '</span>' : ''}</p><p class="text-[10px] text-slate-400 truncate">${esc(searchPersonLine(p))}</p></div><button onclick="centerOnPerson('${p.id}')" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><i class="ph-bold ph-crosshair text-sm"></i></button></div>`).join('');
   resultsBox.scrollTop = 0;
 }
 function handleSearchKey(e) {
@@ -2584,8 +2613,10 @@ function addOccupationRow(title = '', city = '', dateFrom = '', dateTo = '') {
 // pri zhode podľa mena (diakritika nehrá rolu), vylúči aktuálne editovanú osobu.
 function personPickerList(excludeId) {
   const k = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const editovana = excludeId && treeData.persons[excludeId];
+  const vsetci = CANDIDATE_MODE || !!(editovana && editovana.candidate);   // kandidát vidí v ponuke všetkých (aj rodokmeň, aj iných kandidátov)
   return Object.values(treeData.persons)
-    .filter(p => p.id !== excludeId && (CANDIDATE_MODE ? true : !p.candidate))
+    .filter(p => p.id !== excludeId && (vsetci ? true : !p.candidate))
     .sort((a, b) =>
       (k(a.lastName || a.birthName || '').localeCompare(k(b.lastName || b.birthName || ''))) ||
       (k(a.firstName || '').localeCompare(k(b.firstName || '')))
