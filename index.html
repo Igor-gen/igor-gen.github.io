@@ -1488,10 +1488,17 @@ function personDatesStr(p) { return (p.birthDate ? `* ${p.birthDate}` : '* ?') +
 const personWCache = new Map();
 function personBubbleW(p) {
   if (p.fiktivna) return 110;
-  const name = personNameStr(p), dates = personDatesStr(p), key = name + '\u0001' + dates;
+  const name = personNameStr(p), dates = personDatesStr(p);
+  const bName = (p.gender === 'F' && p.birthName) ? String(p.birthName).trim() : '';
+  const key = name + '\u0001' + bName + '\u0001' + dates;
   let w = personWCache.get(key);
   if (w === undefined) {
-    w = Math.ceil(Math.min(700, Math.max(190, Math.max(measureTxt(FONT_NAME, name), measureTxt(FONT_DATES, dates)) + 82)));
+    const maxTextW = Math.max(
+      measureTxt(FONT_NAME, name),
+      bName ? measureTxt(FONT_DATES, bName) : 0,
+      measureTxt(FONT_DATES, dates)
+    );
+    w = Math.ceil(Math.min(700, Math.max(190, maxTextW + 82)));
     if (personWCache.size > 5000) personWCache.clear();
     personWCache.set(key, w);
   }
@@ -2239,18 +2246,35 @@ function drawPersonBubble(p, c = ctx, noSelect = false, rola = '') {
   } else { c.fillStyle = isMale ? '#bfdbfe' : (isZena ? '#fbcfe8' : '#e2e8f0'); c.fillRect(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius, avatarRadius * 2, avatarRadius * 2); c.fillStyle = borderColor; c.font = 'bold 15px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(isMale ? '♂' : (isZena ? '♀' : '?'), avatarCenterX, avatarCenterY); }
   c.restore();
   c.beginPath(); c.arc(avatarCenterX, avatarCenterY, avatarRadius, 0, Math.PI * 2); c.lineWidth = 1.5; c.strokeStyle = borderColor; c.stroke();
- const textLeft = x + 66;
+  const textLeft = x + 66;
 
-c.textAlign = 'left';
-c.textBaseline = 'top';
+  c.textAlign = 'left';
+  c.textBaseline = 'top';
 
-c.font = 'bold 13px system-ui, sans-serif';
-c.fillStyle = '#0f172a';
-c.fillText(fullNameStr, textLeft, y + 14);
+  const jePartnerka = (rola === 'partner' && isZena);
+  const rodneMeno = jePartnerka ? String(p.birthName || '').trim() : '';
 
-c.font = '500 11px system-ui, sans-serif';
-c.fillStyle = '#475569';
-c.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
+  if (rodneMeno) {
+    c.font = 'bold 13px system-ui, sans-serif';
+    c.fillStyle = '#0f172a';
+    c.fillText(fullNameStr, textLeft, y + 10);
+
+    c.font = '500 11px system-ui, sans-serif';
+    c.fillStyle = '#334155';
+    c.fillText(rodneMeno, textLeft, y + 29);
+
+    c.font = '500 11px system-ui, sans-serif';
+    c.fillStyle = '#475569';
+    c.fillText(`${birthStr}${deathStr}`, textLeft, y + 46);
+  } else {
+    c.font = 'bold 13px system-ui, sans-serif';
+    c.fillStyle = '#0f172a';
+    c.fillText(fullNameStr, textLeft, y + 14);
+
+    c.font = '500 11px system-ui, sans-serif';
+    c.fillStyle = '#475569';
+    c.fillText(`${birthStr}${deathStr}`, textLeft, y + 34);
+  }
 }
 
 // Hlavná fotografia v hornej časti karty osoby (obdĺžnikový portrét, vyplní celý rám, bez deformácie). Volá sa aj po dodatočnom stiahnutí príloh zo servera.
@@ -4502,7 +4526,7 @@ treeData = { fileName: data.fileName || 'rodokmen.gdz', persons: sanDb.persons, 
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v48');
+console.log('Genealogy index16c-v64');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
