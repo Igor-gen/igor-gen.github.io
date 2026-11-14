@@ -468,6 +468,15 @@
         </div>
         <div id="detailNotesInfo" class="space-y-1 text-[11px] sm:text-xs text-slate-700"></div>
       </div>
+      <div class="bg-slate-50 rounded-2xl p-2.5 sm:p-3 border border-slate-100">
+        <div class="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <span class="flex items-center gap-1"><i class="ph-bold ph-book-open-text text-indigo-600"></i> <span data-i18n="sectStory">Príbeh</span></span>
+          <button type="button" onclick="editStoryOnCard(currentSelectedPersonId)" class="text-slate-400 hover:text-indigo-600 transition p-1 rounded-lg hover:bg-indigo-50" data-i18n-title="storyEditTitle" title="Upraviť príbeh osoby">
+            <i class="ph-bold ph-pencil-simple text-xs"></i>
+          </button>
+        </div>
+        <div id="detailStoryInfo" class="space-y-1 text-[11px] sm:text-xs text-slate-700 max-h-60 overflow-y-auto custom-scroll pr-1"></div>
+      </div>
 
       <div class="pt-1 grid grid-cols-2 gap-2 pb-4 md:pb-0">
         <button onclick="openMediaLightbox('photos')" class="py-2 px-2 sm:py-2.5 sm:px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-semibold text-[10px] sm:text-xs flex flex-col items-center justify-center gap-1 transition">
@@ -581,6 +590,7 @@
           <button type="button" id="tabBtnAddresses" onclick="switchEditTab('addresses')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-map-pin mr-1 hidden sm:inline"></i><span data-i18n="tabAddresses">Adresy</span></button>
           <button type="button" id="tabBtnOccupations" onclick="switchEditTab('occupations')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-briefcase mr-1 hidden sm:inline"></i><span data-i18n="tabOccupations">Povolanie</span></button>
           <button type="button" id="tabBtnNotes" onclick="switchEditTab('notes')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-text-aa mr-1 hidden sm:inline"></i><span data-i18n="tabNotes">Poznámky</span></button>
+          <button type="button" id="tabBtnStory" onclick="switchEditTab('story')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-book-open-text mr-1 hidden sm:inline"></i><span data-i18n="tabStory">Príbeh</span></button>
         </div>
 
         <div class="p-4 sm:p-6 bg-slate-50 min-h-[220px]">
@@ -632,6 +642,21 @@
             </div>
             <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabNotesDesc">Poznámky upravujte ceruzkou – otvorí sa okno s formátovaním (odstavce, tučné písmo, kurzíva, zoznamy). Zobrazujú sa na karte osoby.</p>
             <div id="notesContainer" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
+          </div>
+          <!-- STORY -->
+          <div id="editTabStoryContent" class="space-y-3 hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+              <h4 class="font-bold text-slate-700 text-[10px] sm:text-xs uppercase tracking-wider" data-i18n="tabStoryTitle">Životný príbeh osoby</h4>
+            </div>
+            <p class="text-[9px] sm:text-[10px] text-slate-400" data-i18n="tabStoryDesc">Jeden životný príbeh osoby bez obmedzenia dĺžky textu. Upravíte ho kliknutím na ceruzku (možnosť meniť typ a veľkosť písma, tučné, šikmé a podčiarknuté písmo). Vloží sa aj do PDF knihy.</p>
+            <div id="storyContainer" class="flex items-start gap-2 p-2 rounded-xl bg-white border border-slate-200 shadow-sm w-full">
+              <input type="hidden" id="editStoryInput" value="">
+              <div id="editStoryPreview" onclick="editStoryInModal()" class="rich-notes flex-1 text-xs text-slate-700 bg-slate-50 rounded-xl border border-slate-200 px-3 py-2.5 min-h-[6rem] max-h-56 overflow-y-auto custom-scroll break-words cursor-pointer"></div>
+              <div class="flex flex-col gap-1 flex-none">
+                <button type="button" onclick="editStoryInModal()" class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl" data-i18n-title="storyEditTitle" title="Upraviť príbeh osoby"><i class="ph-bold ph-pencil-simple text-base"></i></button>
+                <button type="button" onclick="clearStoryInModal()" class="p-2 text-rose-600 hover:bg-rose-50 rounded-xl" data-i18n-title="btnDelete" title="Odstrániť"><i class="ph-bold ph-trash text-base"></i></button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -868,7 +893,7 @@ const i18n = {
     btnDeletePerson: "Vymazať osobu", btnCancel: "Zrušiť", btnSavePerson: "Uložiť osobu", btnMosaic: "Zobraziť mozaiku", btnSlide: "Zobraziť prezentáciu",
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Pridať adresu", tabAddressesDesc: "Zadajte aktuálne alebo minulé adresy pobytu s dátumom od-do.", optAddrCurrent: "Aktuálne trvalé bydlisko", optAddrPerm: "Trvalé bydlisko", optAddrTemp: "Dočasná adresa", phAddress: "Ulica, Mesto, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žiadne evidované adresy", tabOccupations: "Povolanie", tabOccupationsTitle: "Povolania a zamestnanie", btnAddOccupation: "Pridať povolanie", tabOccupationsDesc: "Zadajte povolanie, mesto a obdobie (od – do). Ďalšie povolanie pridáte tlačidlom plus.", phOccupation: "Povolanie", phOccCity: "Mesto", phOccFrom: "Dátum od", phOccTo: "Dátum do", sectOccupations: "Povolanie", tNoOccupations: "Žiadne evidované povolania", tabNotes: "Poznámky", tabNotesTitle: "Osobné poznámky", btnAddNote: "Pridať poznámku", tabNotesDesc: "Poznámky upravujte ceruzkou – otvorí sa okno s formátovaním (odstavce, tučné písmo, kurzíva, zoznamy). Zobrazujú sa na karte osoby.", phNoteText: "Zadajte text poznámky...",
     tUnknown: "Neznáme", tBorn: "Narodenie:", tDied: "Úmrtie:", tLives: "Žije", tPlace: "Miesto:", tNoSpouse: "Žiadny evidovaný zväzok", tNoChildren: "Žiadne evidované deti", tNoParents: "Neznámi rodičia", tNoEvents: "Žiadne ďalšie evidované udalosti", tNoSources: "Žiadne evidované zdroje", phSourceDesc: "Popis zdroja (zobrazí sa na karte)", tFather: "Otec", tMother: "Matka", tMarr: "Sobáš:", tEvBaptism: "Krst", tEvBasic: "Základná škola", tEvHigh: "Stredná škola", tEvUni: "Vysoká škola", tEvOther: "Iná udalosť", tNoRecent: "Zatiaľ žiadne nedávne úpravy.", tNoSearch: "Nenašla sa žiadna zodpovedajúca osoba", tNewPerson: "Pridať novú osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otca / Neznámy --", tOptNoMother: "-- Bez matky / Neznáma --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvoľte dieťa --", tPhDateMarr: "Dátum sobáša", tPhEventName: "Názov udalosti", tPhEventDate: "Dátum/Rok", tPhEventPlace: "Miesto konania", tMainPhoto: "Hlavná foto", tDoc: "Dokument", tNoFiles: "Zatiaľ žiadne priložené súbory.", tMaxSources: "Maximálny počet zdrojov (25) bol dosiahnutý.", tMaxSpouses: "Maximálny povolený počet partnerov (4) bol dosiahnutý.", tFileBanned: "je spustiteľný a nemôže byť priložený.", tNoPhotoDisplay: "K tejto osobe zatiaľ neboli priložené žiadne fotografie.", tMainPhLbl: "(Hlavná fotografia)", tNoDocsDisplay: "K tejto osobe nie sú priložené žiadne dokumenty.", tSafeDoc: "Bezpečný priložený rodinný záznam", tDownload: "Stiahnuť",
-    msgLoaded: "Ukážkový rodokmeň bol načítaný s prísnym hierarchickým prepojením.", msgNew: "Nový rodokmeň bol vytvorený.", msgProcess: "Spracovávam súbor:", msgErrZip: "Archív neobsahuje hlavný súbor .ged (GEDCOM 7.0).", msgReadErr: "Chyba pri čítaní súboru:", msgReadOk: "Načítaných {X} osôb.", msgSaveOk: "Osoba bola úspešne uložená.", msgDelOk: "Osoba bola vymazaná.", msgPrepGdz: "Pripravujem GDZ archív (GEDCOM 7.0)...", msgGdzOk: "GDZ archív bol úspešne uložený.", msgGdzErr: "Chyba pri ukladaní GDZ:", msgPrepPdf: "Generujem viacstranové PDF...", msgPdfOk: "PDF bolo úspešne vygenerované!", msgPdfErr: "Chyba pri generovaní PDF:", msgPdfEmpty: "Rodokmeň je prázdny, nie je čo exportovať.", msgNoAutosave: "Nenašla sa žiadna uložená práca na obnovenie.", msgDocDownloadFail: "Prevzatie dokumentu sa nepodarilo.", pdfBookTitle: "Rodokmeň rodiny Sklenčár", pdfBookSub: "Kniha rodín podľa rodokmeňa", pdfBookToc: "O B S A H", pdfBookGenerating: "Generujem PDF knihu…", pdfBookSaved: "PDF kniha bola vytvorená a stiahnutá ({X} strán).", pdfBookFail: "Vytvorenie PDF knihy zlyhalo:", sectNotes: "Poznámky", tNoNotes: "Žiadne evidované poznámky", noteEditTitle: "Upraviť poznámku", btnSaveNote: "Uložiť", msgNoteEmpty: "Poznámka nemôže byť prázdna.", msgNoteSaved: "Poznámka bola uložená.", noteFmtB: "Tučné písmo", noteFmtI: "Kurzíva", noteFmtU: "Podčiarknuté", noteFmtS: "Prečiarknuté", noteFmtUl: "Zoznam s odrážkami", noteFmtOl: "Číslovaný zoznam", noteFmtClear: "Odstrániť formátovanie", noteRichHint: "Nový odsek vytvoríte klávesom Enter. Maximálne 2000 znakov textu.", msgNoteTooLong: "Poznámka je príliš dlhá (max 2000 znakov).",
+    msgLoaded: "Ukážkový rodokmeň bol načítaný s prísnym hierarchickým prepojením.", msgNew: "Nový rodokmeň bol vytvorený.", msgProcess: "Spracovávam súbor:", msgErrZip: "Archív neobsahuje hlavný súbor .ged (GEDCOM 7.0).", msgReadErr: "Chyba pri čítaní súboru:", msgReadOk: "Načítaných {X} osôb.", msgSaveOk: "Osoba bola úspešne uložená.", msgDelOk: "Osoba bola vymazaná.", msgPrepGdz: "Pripravujem GDZ archív (GEDCOM 7.0)...", msgGdzOk: "GDZ archív bol úspešne uložený.", msgGdzErr: "Chyba pri ukladaní GDZ:", msgPrepPdf: "Generujem viacstranové PDF...", msgPdfOk: "PDF bolo úspešne vygenerované!", msgPdfErr: "Chyba pri generovaní PDF:", msgPdfEmpty: "Rodokmeň je prázdny, nie je čo exportovať.", msgNoAutosave: "Nenašla sa žiadna uložená práca na obnovenie.", msgDocDownloadFail: "Prevzatie dokumentu sa nepodarilo.", pdfBookTitle: "Rodokmeň rodiny Sklenčár", pdfBookSub: "Kniha rodín podľa rodokmeňa", pdfBookToc: "O B S A H", pdfBookGenerating: "Generujem PDF knihu…", pdfBookSaved: "PDF kniha bola vytvorená a stiahnutá ({X} strán).", pdfBookFail: "Vytvorenie PDF knihy zlyhalo:", sectNotes: "Poznámky", tNoNotes: "Žiadne evidované poznámky", noteEditTitle: "Upraviť poznámku", btnSaveNote: "Uložiť", msgNoteEmpty: "Poznámka nemôže byť prázdna.", msgNoteSaved: "Poznámka bola uložená.", noteFmtB: "Tučné písmo", noteFmtI: "Kurzíva", noteFmtU: "Podčiarknuté", noteFmtS: "Prečiarknuté", noteFmtUl: "Zoznam s odrážkami", noteFmtOl: "Číslovaný zoznam", noteFmtClear: "Odstrániť formátovanie", noteRichHint: "Nový odsek vytvoríte klávesom Enter. Maximálne 2000 znakov textu.", msgNoteTooLong: "Poznámka je príliš dlhá (max 2000 znakov).", tabStory: "Príbeh", tabStoryTitle: "Životný príbeh osoby", tabStoryDesc: "Jeden životný príbeh osoby bez obmedzenia dĺžky textu. Upravíte ho kliknutím na ceruzku (možnosť meniť typ a veľkosť písma, tučné, šikmé a podčiarknuté písmo). Vloží sa aj do PDF knihy.", sectStory: "Príbeh", tNoStory: "Žiadny evidovaný príbeh", storyEditTitle: "Upraviť príbeh osoby", msgStorySaved: "Príbeh bol uložený.", storyFontFamily: "Typ písma", storyFontSize: "Veľkosť písma",
     confirmTitle: "Potvrdenie akcie", confirmDelPerson: "Naozaj chcete trvalo vymazať túto osobu z rodokmeňa?", confirmDelFile: "Naozaj chcete odstrániť tento súbor?", btnDelete: "Odstrániť",
     btnConnectDb: "Pripojiť databázu na serveri", btnSaveServer: "Zapísať na server (SQL)", dbModalTitleLoad: "Pripojenie databázy na serveri", dbModalTitleSave: "Zápis do databázy na serveri", lblDbUser: "Používateľ", lblDbPassword: "Heslo", phDbUser: "Meno používateľa", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávne meno alebo heslo.", msgDbSessionExpired: "Prihlásenie vypršalo, prihláste sa znova.", msgDbErrForbidden: "Server odmietol požiadavku (neplatný overovací token aplikácie).", msgDbErrRate: "Príliš veľa pokusov, skúste to neskôr.", msgDbTooLarge: "Rodokmen je príliš veľký na jednorazový zápis (limit servera je 4,5 MB). Zmenšite alebo odstráňte niektoré fotografie a dokumenty.", msgDbNotConfigured: "Aplikácia nie je nakonfigurovaná (chýba adresa backendu alebo overovací token).", dbHintLoad: "Prihláste sa menom a heslom. Po overení sa načítajú údaje z databázy a otvorí sa aplikácia.", dbHintSave: "Prihláste sa menom a heslom. Údaje sa zapíšu do databázy na serveri a nahradia všetky doterajšie dáta v databáze.", btnDbConnect: "Pripojiť", btnDbSave: "Zapísať", dbConnectedLbl: "Pripojené k serveru", msgDbFill: "Zadajte meno aj heslo.", msgDbBadUrl: "Adresa databázy nie je platná.", msgDbErrNet: "Server sa nepodarilo kontaktovať. Skontrolujte adresu, pripojenie a povolenie CORS (ak je aplikácia na https, musí byť na https aj server).", msgDbErrTimeout: "Server neodpovedal včas.", msgDbErrAuth: "Neplatný kľúč.", msgDbErrServer: "Chyba servera", msgDbErrData: "Server vrátil neplatné dáta.", msgDbLoaded: "Z databázy sa načítalo {X} osôb.", msgDbEmpty: "Databáza je prázdna – vytvorený nový rodokmeň. Uložte ho tlačidlom „Zapísať na server“.", msgFileUploading: "Nahrávam súbory na úložisko: {X} / {N}…", msgFileUploadFail: "Súbor sa nepodarilo nahrať", msgDbSaving: "Zapisujem údaje do databázy...", msgDbSaved: "Údaje boli uložené do databázy.", msgDbEmptyTree: "Rodokmeň je prázdny, zápis by vymazal údaje v databáze.", lblImportSidebar: "Otvoriť iný súbor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Zložka SQLite", btnSaveSqlite: "Uložiť zložku SQLite", menuBackup: "Otvoriť zálohu (backup)", bkpNoSql: "V adresári sa nenašiel súbor databázy (genealogy.sql).", bkpLoading: "Načítavam zálohu servera…", bkpEmpty: "Záloha neobsahuje žiadne osoby.", bkpLoaded: "Zo zálohy sa načítalo {X} osôb a {M} súborov ({D} médií sa v zálohe nenašlo).", bkpFail: "Otvorenie zálohy zlyhalo:", menuBackupSave: "Uložiť zálohu (backup)", bkpNoTree: "Najprv otvorte alebo vytvorte rodokmeň.", bkpSaving: "Ukladám zálohu servera…", bkpSaved: "Záloha bola uložená: {X} osôb, {M} súborov.", bkpSavedZip: "Záloha bola stiahnutá ako ZIP: {X} osôb, {M} súborov.", bkpSaveFail: "Uloženie zálohy zlyhalo:", bkpMissing: "Upozornenie: {N} súborov nemá načítaný obsah a do zálohy sa nedostali."
   },
@@ -942,7 +967,7 @@ const i18n = {
     aiUnknownName: "neznámé jméno",
     appDesc: "Hřebenový strom rodokmenu s podporou GEDCOM 7.0 a GEDZIP (.gdz)", dropZoneText: "Přetáhněte sem váš soubor rodokmenu nebo klikněte pro výběr", dropZoneSub: "Podporované formáty: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Vybrat soubor z počítače", btnSample: "Načíst ukázkový rodokmen", btnNew: "Vytvořit nový rodokmen", footerText: "Genealogy HTML5 Single-File • Žádná data neopouštějí váš prohlížeč", btnAddPerson: "Přidat osobu", btnSaveGdz: "Uložit rodokmen (.gdz)", btnLayout: "Přeskupit", btnMainDiagram: "Zpět na hlavní diagram", btnCandidates: "Kandidáti", btnLinkTree: "Propojit", linkDialogTitle: "Propojení kandidátské větve", linkCandidateLbl: "Kandidát:", linkSelectPerson: "Osoba z rodokmenu", linkRelation: "Vztah kandidáta k osobě", optLinkSpouse: "je partner/ka osoby", optLinkParent: "je rodičem osoby", optLinkChild: "je dítětem osoby", btnLinkConfirm: "Propojit", linkHint: "Celá kandidátská větev se po propojení přesune do hlavního diagramu a zmizí z plátna kandidátů.", msgLinked: "Kandidátská větev byla propojena s rodokmenem.", msgUnlinkedCand: "Větev byla odpojena od rodokmenu – vrátila se na plátno kandidátů.", tLinkSlotFull: "Vybraná osoba už má rodiče v této rodině.", tNoCandidates: "Zatím žádní kandidáti. Přidejte novou osobu tlačítkem „Přidat osobu“.", rodSelectPh: "Vybrat diagram rodu…", rodSelectLbl: "Přímý výběr diagramu podle rodu", rodMainOpt: "Hlavní diagram", rodFamily: "rod {N}", pickerFilterPh: "Filtrovat osobu (příjmení / rok)…", btnExportPdf: "Export do PDF", zoomView: "Lupa & Pohled:", searchPlaceholder: "Jméno, příjmení, rok, místo...", recentEdited: "Naposledy upraveno", statPersons: "Celkem osob:", statFamilies: "Rodin:", legendMale: "Muž", legendFemale: "Žena", legendHub: "Rodinný uzel", legendControls: "1x klik = Označení • 2x klik = Karta osoby • Úprava = tlačítkem Upravit", lastSavedPrefix: "Poslední uložení na server:", cardTitle: "Karta osoby", btnEdit: "Upravit", sectSpouse: "Manžel / Manželka", sectChildren: "Potomci (Děti)", sectParents: "Rodiče", sectEvents: "Další události", sectSources: "Zdroje", btnPhotos: "Fotografie", btnDocs: "Dokumenty", modBasicData: "Základní identifikační údaje", lblTitle: "Titul", phTitle: "Ing., Dr.", lblFirstName: "Jméno", lblMiddleName: "Střední jméno", lblGender: "Pohlaví", optMale: "Muž (M)", optFemale: "Žena (Ž)", optUnknown: "Neznámé", lblLastName: "Příjmení", lblBirthName: "Rodné jméno (za svobodna)", phBirthName: "Kováčová", modDatesPlaces: "Základní data a místa", lblBirthDate: "Datum narození", lblBirthPlace: "Místo narození", lblBirthCountry: "Stát narození", lblDeathDate: "Datum úmrtí (pokud nežije)", lblDeathPlace: "Místo úmrtí", phPlace: "Praha", modFamily: "Propojení rodiny", lblFather: "Otec", lblMother: "Matka", btnAddSpouse: "Přidat partnera", btnAddChild: "Přidat dítě", tabMedia: "Média a Docs", tabEvents: "Události", tabSources: "Zdroje", tabMediaTitle: "Přiložené fotografie a dokumenty", btnUploadPhoto: "Nahrát foto", btnUploadDoc: "Nahrát dokument", tabMediaDesc: "Podporované: .jpg, .png, .pdf, .docx, .txt (Vyberte rádio buttonem titulní fotku)", tabEventsTitle: "Životní události (Školy, Křest, jiné)", btnAddEvent: "Přidat událost", tabSourcesTitle: "Zdroje (URL Odkazy)", btnAddSource: "Přidat zdroj", tabSourcesDesc: "Přidejte max. 25 zdrojů: URL odkaz + popis. Na kartě osoby se zobrazí klikatelný popis, který otevře zdroj v novém okně.", btnDeletePerson: "Vymazat osobu", btnCancel: "Zrušit", btnSavePerson: "Uložit osobu", btnMosaic: "Zobrazit mozaiku", btnSlide: "Zobrazit prezentaci",
     tabAddresses: "Adresy", tabAddressesTitle: "Adresy pobytu", btnAddAddress: "Přidat adresu", tabAddressesDesc: "Zadejte aktuální nebo minulé adresy pobytu s datem od-do.", optAddrCurrent: "Aktuální trvalé bydliště", optAddrPerm: "Trvalé bydliště", optAddrTemp: "Dočasná adresa", phAddress: "Ulice, Město, PSČ...", phDateFrom: "Od (rok)", phDateTo: "Do (rok)", sectAddresses: "Adresy", tNoAddresses: "Žádné evidované adresy", tabOccupations: "Povolání", tabOccupationsTitle: "Povolání a zaměstnání", btnAddOccupation: "Přidat povolání", tabOccupationsDesc: "Zadejte povolání, město a období (od – do). Další povolání přidáte tlačítkem plus.", phOccupation: "Povolání", phOccCity: "Město", phOccFrom: "Datum od", phOccTo: "Datum do", sectOccupations: "Povolání", tNoOccupations: "Žádná evidovaná povolání", tabNotes: "Poznámky", tabNotesTitle: "Osobní poznámky", btnAddNote: "Přidat poznámku", tabNotesDesc: "Poznámky upravujte tužkou – otevře se okno s formátováním (odstavce, tučné písmo, kurzíva, seznamy). Zobrazují se na kartě osoby.", phNoteText: "Zadejte text poznámky...",
-    tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tNoSources: "Žádné evidované zdroje", phSourceDesc: "Popis zdroje (zobrazí se na kartě)", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.", msgNoAutosave: "Nenašla se žádná uložená práce k obnovení.", msgDocDownloadFail: "Převzetí dokumentu se nepodařilo.", pdfBookTitle: "Rodokmen rodiny Sklencar", pdfBookSub: "Kniha rodin podle rodokmenu", pdfBookToc: "O B S A H", pdfBookGenerating: "Generuji PDF knihu…", pdfBookSaved: "PDF kniha byla vytvořena a stažena ({X} stran).", pdfBookFail: "Vytvoření PDF knihy selhalo:", sectNotes: "Poznámky", tNoNotes: "Žádné evidované poznámky", noteEditTitle: "Upravit poznámku", btnSaveNote: "Uložit", msgNoteEmpty: "Poznámka nemůže být prázdná.", msgNoteSaved: "Poznámka byla uložena.", noteFmtB: "Tučné písmo", noteFmtI: "Kurzíva", noteFmtU: "Podtržení", noteFmtS: "Přeškrtnuté", noteFmtUl: "Seznam s odrážkami", noteFmtOl: "Číslovaný seznam", noteFmtClear: "Odebrat formátování", noteRichHint: "Nový odstavec vytvoříte klávesou Enter. Maximálně 2000 znaků textu.", msgNoteTooLong: "Poznámka je příliš dlouhá (max 2000 znaků).",
+    tUnknown: "Neznámé", tBorn: "Narození:", tDied: "Úmrtí:", tLives: "Žije", tPlace: "Místo:", tNoSpouse: "Žádný evidovaný svazek", tNoChildren: "Žádné evidované děti", tNoParents: "Neznámí rodiče", tNoEvents: "Žádné další evidované události", tNoSources: "Žádné evidované zdroje", phSourceDesc: "Popis zdroje (zobrazí se na kartě)", tFather: "Otec", tMother: "Matka", tMarr: "Sňatek:", tEvBaptism: "Křest", tEvBasic: "Základní škola", tEvHigh: "Střední škola", tEvUni: "Vysoká škola", tEvOther: "Jiná událost", tNoRecent: "Zatím žádné nedávné úpravy.", tNoSearch: "Nenašla se žádná odpovídající osoba", tNewPerson: "Přidat novou osobu", tEditPerson: "Úprava karty osoby", tOptNoFather: "-- Bez otce / Neznámý --", tOptNoMother: "-- Bez matky / Neznámá --", tOptSelSpouse: "-- Vyberte partnera --", tOptSelChild: "-- Zvolte dítě --", tPhDateMarr: "Datum sňatku", tPhEventName: "Název události", tPhEventDate: "Datum/Rok", tPhEventPlace: "Místo konání", tMainPhoto: "Hlavní foto", tDoc: "Dokument", tNoFiles: "Zatím žádné přiložené soubory.", tMaxSources: "Maximální počet zdrojů (25) byl dosažen.", tMaxSpouses: "Maximální povolený počet partnerů (4) byl dosažen.", tFileBanned: "je spustitelný a nemůže být přiložen.", tNoPhotoDisplay: "K této osobě zatím nebyly přiloženy žádné fotografie.", tMainPhLbl: "(Hlavní fotografie)", tNoDocsDisplay: "K této osobě nejsou přiloženy žádné dokumenty.", tSafeDoc: "Bezpečný přiložený rodinný záznam", tDownload: "Stáhnout", msgLoaded: "Ukázkový rodokmen byl načten s přísným hierarchickým propojením.", msgNew: "Nový rodokmen byl vytvořen.", msgProcess: "Zpracovávám soubor:", msgErrZip: "Archiv neobsahuje hlavní soubor .ged (GEDCOM 7.0).", msgReadErr: "Chyba při čtení souboru:", msgReadOk: "Načteno {X} osob.", msgSaveOk: "Osoba byla úspěšně uložena.", msgDelOk: "Osoba byla vymazána.", msgPrepGdz: "Připravuji GDZ archiv (GEDCOM 7.0)...", msgGdzOk: "GDZ archiv byl úspěšně uložen.", msgGdzErr: "Chyba při ukládání GDZ:", msgPrepPdf: "Generuji vícestránkové PDF...", msgPdfOk: "PDF bylo úspěšně vygenerováno!", msgPdfErr: "Chyba při generování PDF:", msgPdfEmpty: "Rodokmen je prázdný, není co exportovat.", msgNoAutosave: "Nenašla se žádná uložená práce k obnovení.", msgDocDownloadFail: "Převzetí dokumentu se nepodařilo.", pdfBookTitle: "Rodokmen rodiny Sklencar", pdfBookSub: "Kniha rodin podle rodokmenu", pdfBookToc: "O B S A H", pdfBookGenerating: "Generuji PDF knihu…", pdfBookSaved: "PDF kniha byla vytvořena a stažena ({X} stran).", pdfBookFail: "Vytvoření PDF knihy selhalo:", sectNotes: "Poznámky", tNoNotes: "Žádné evidované poznámky", noteEditTitle: "Upravit poznámku", btnSaveNote: "Uložit", msgNoteEmpty: "Poznámka nemůže být prázdná.", msgNoteSaved: "Poznámka byla uložena.", noteFmtB: "Tučné písmo", noteFmtI: "Kurzíva", noteFmtU: "Podtržení", noteFmtS: "Přeškrtnuté", noteFmtUl: "Seznam s odrážkami", noteFmtOl: "Číslovaný seznam", noteFmtClear: "Odebrat formátování", noteRichHint: "Nový odstavec vytvoříte klávesou Enter. Maximálně 2000 znaků textu.", msgNoteTooLong: "Poznámka je příliš dlouhá (max 2000 znaků).", tabStory: "Příběh", tabStoryTitle: "Životní příběh osoby", tabStoryDesc: "Jeden životní příběh osoby bez omezení délky textu. Upravíte jej kliknutím na tužku (možnost měnit typ a velikost písma, tučné, šikmé a podtržené písmo). Vloží se i do PDF knihy.", sectStory: "Příběh", tNoStory: "Žádný evidovaný příběh", storyEditTitle: "Upravit příběh osoby", msgStorySaved: "Příběh byl uložen.", storyFontFamily: "Typ písma", storyFontSize: "Velikost písma",
     confirmTitle: "Potvrzení akce", confirmDelPerson: "Opravdu chcete trvale smazat tuto osobu z rodokmenu?", confirmDelFile: "Opravdu chcete odstranit tento soubor?", btnDelete: "Odstranit",
     btnConnectDb: "Připojit databázi na serveru", btnSaveServer: "Zapsat na server (SQL)", dbModalTitleLoad: "Připojení databáze na serveru", dbModalTitleSave: "Zápis do databáze na serveru", lblDbUser: "Uživatel", lblDbPassword: "Heslo", phDbUser: "Jméno uživatele", phDbPassword: "Heslo", msgDbErrCreds: "Nesprávné jméno nebo heslo.", msgDbSessionExpired: "Přihlášení vypršelo, přihlaste se znovu.", msgDbErrForbidden: "Server odmítl požadavek (neplatný ověřovací token aplikace).", msgDbErrRate: "Příliš mnoho pokusů, zkuste to později.", msgDbTooLarge: "Rodokmen je příliš velký pro jednorázový zápis (limit serveru je 4,5 MB). Zmenšete nebo odstraňte některé fotografie a dokumenty.", msgDbNotConfigured: "Aplikace není nakonfigurována (chybí adresa backendu nebo ověřovací token).", dbHintLoad: "Přihlaste se jménem a heslem. Po ověření se načtou údaje z databáze a otevře se aplikace.", dbHintSave: "Přihlaste se jménem a heslem. Údaje se zapíší do databáze na serveru a nahradí všechna dosavadní data v databázi.", btnDbConnect: "Připojit", btnDbSave: "Zapsat", dbConnectedLbl: "Připojeno k serveru", msgDbFill: "Zadejte jméno i heslo.", msgDbBadUrl: "Adresa databáze není platná.", msgDbErrNet: "Se serverem se nepodařilo spojit. Zkontrolujte adresu, připojení a povolení CORS (pokud je aplikace na https, musí být na https i server).", msgDbErrTimeout: "Server neodpověděl včas.", msgDbErrAuth: "Neplatný klíč.", msgDbErrServer: "Chyba serveru", msgDbErrData: "Server vrátil neplatná data.", msgDbLoaded: "Z databáze se načetlo {X} osob.", msgDbEmpty: "Databáze je prázdná – vytvořen nový rodokmen. Uložte jej tlačítkem „Zapsat na server“.", msgFileUploading: "Nahrávám soubory do úložiště: {X} / {N}…", msgFileUploadFail: "Soubor se nepodařilo nahrát", msgDbSaving: "Zapisuji údaje do databáze...", msgDbSaved: "Údaje byly uloženy do databáze.", msgDbEmptyTree: "Rodokmen je prázdný, zápis by smazal údaje v databázi.", lblImportSidebar: "Otevřít jiný soubor", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "Složka SQLite", btnSaveSqlite: "Uložit složku SQLite", menuBackup: "Otevřít zálohu (backup)", bkpNoSql: "V adresáři se nenašel soubor databáze (genealogy.sql).", bkpLoading: "Načítám zálohu serveru…", bkpEmpty: "Záloha neobsahuje žádné osoby.", bkpLoaded: "Ze zálohy se načetlo {X} osob a {M} souborů ({D} médií se v záloze nenašlo).", bkpFail: "Otevření zálohy selhalo:", menuBackupSave: "Uložit zálohu (backup)", bkpNoTree: "Nejprve otevřete nebo vytvořte rodokmen.", bkpSaving: "Ukládám zálohu serveru…", bkpSaved: "Záloha byla uložena: {X} osob, {M} souborů.", bkpSavedZip: "Záloha byla stažena jako ZIP: {X} osob, {M} souborů.", bkpSaveFail: "Uložení zálohy selhalo:", bkpMissing: "Upozornění: {N} souborů nemá načtený obsah a do zálohy se nedostaly."
   },
@@ -1016,7 +1041,7 @@ const i18n = {
     aiUnknownName: "unknown name",
     appDesc: "Comb layout family tree supporting GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Drop your family tree file here or click to browse", dropZoneSub: "Supported formats: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Select file from computer", btnSample: "Load sample tree", btnNew: "Create new tree", footerText: "Genealogy HTML5 Single-File • No data leaves your browser", btnAddPerson: "Add Person", btnSaveGdz: "Save Tree (.gdz)", btnLayout: "Rearrange Layout", btnMainDiagram: "Back to main diagram", btnCandidates: "Candidates", btnLinkTree: "Link", linkDialogTitle: "Link candidate branch", linkCandidateLbl: "Candidate:", linkSelectPerson: "Person from the family tree", linkRelation: "Candidate's relation to the person", optLinkSpouse: "is the person's partner", optLinkParent: "is the person's parent", optLinkChild: "is the person's child", btnLinkConfirm: "Link", linkHint: "After linking, the whole candidate branch moves to the main diagram and disappears from the candidates canvas.", msgLinked: "The candidate branch has been linked to the family tree.", msgUnlinkedCand: "The branch has been unlinked from the family tree – it returned to the candidates canvas.", tLinkSlotFull: "The selected person already has a parent in this family.", tNoCandidates: "No candidates yet. Add a new person with the „Add Person“ button.", rodSelectPh: "Select family diagram…", rodSelectLbl: "Direct selection of diagram by family", rodMainOpt: "Main diagram", rodFamily: "{N} family", pickerFilterPh: "Filter person (surname / year)…", btnExportPdf: "Export to PDF", zoomView: "Zoom & View:", searchPlaceholder: "Name, surname, year, place...", recentEdited: "Recently Edited", statPersons: "Total Persons:", statFamilies: "Families:", legendMale: "Male", legendFemale: "Female", legendHub: "Family Node", legendControls: "1x click = Select • 2x click = Person card • Edit = Edit button", lastSavedPrefix: "Last saved to server:", cardTitle: "Person Details", btnEdit: "Edit", sectSpouse: "Spouse", sectChildren: "Children", sectParents: "Parents", sectEvents: "Events", sectSources: "Sources", btnPhotos: "Photos", btnDocs: "Documents", modBasicData: "Basic Information", lblTitle: "Title", phTitle: "Dr., Prof.", lblFirstName: "First Name", lblMiddleName: "Middle Name", lblGender: "Gender", optMale: "Male (M)", optFemale: "Female (F)", optUnknown: "Unknown", lblLastName: "Last Name", lblBirthName: "Birth Name (Maiden)", phBirthName: "Smith", modDatesPlaces: "Dates and Places", lblBirthDate: "Birth Date", lblBirthPlace: "Birth Place", lblBirthCountry: "Birth Country", lblDeathDate: "Death Date (if deceased)", lblDeathPlace: "Death Place", phPlace: "London", modFamily: "Family Connections", lblFather: "Father", lblMother: "Mother", btnAddSpouse: "Add Spouse", btnAddChild: "Add Child", tabMedia: "Media & Docs", tabEvents: "Events", tabSources: "Sources", tabMediaTitle: "Attached Photos and Documents", btnUploadPhoto: "Upload Photo", btnUploadDoc: "Upload Doc", tabMediaDesc: "Supported: .jpg, .png, .pdf, .docx, .txt (Select main photo via radio button)", tabEventsTitle: "Life Events (School, Baptism, etc.)", btnAddEvent: "Add Event", tabSourcesTitle: "Sources (URLs)", btnAddSource: "Add Source", tabSourcesDesc: "Add up to 25 sources: URL + description. The person card shows the clickable description, which opens the source in a new window.", btnDeletePerson: "Delete Person", btnCancel: "Cancel", btnSavePerson: "Save Person", btnMosaic: "Show Mosaic", btnSlide: "Show Slideshow",
     tabAddresses: "Addresses", tabAddressesTitle: "Residence Addresses", btnAddAddress: "Add Address", tabAddressesDesc: "Enter current or past residence addresses with dates.", optAddrCurrent: "Current Permanent", optAddrPerm: "Permanent", optAddrTemp: "Temporary", phAddress: "Street, City, Zip...", phDateFrom: "From (Year)", phDateTo: "To (Year)", sectAddresses: "Addresses", tNoAddresses: "No addresses recorded", tabOccupations: "Occupation", tabOccupationsTitle: "Occupations", btnAddOccupation: "Add Occupation", tabOccupationsDesc: "Enter occupation, city and period (from – to). Use the plus button to add another one.", phOccupation: "Occupation", phOccCity: "City", phOccFrom: "Date from", phOccTo: "Date to", sectOccupations: "Occupations", tNoOccupations: "No occupations recorded", tabNotes: "Notes", tabNotesTitle: "Personal Notes", btnAddNote: "Add Note", tabNotesDesc: "Edit notes with the pencil – it opens a formatting window (paragraphs, bold, italic, lists). They are shown on the person card.", phNoteText: "Enter note text...",
-    tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tNoSources: "No sources recorded", phSourceDesc: "Source description (shown on card)", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.", msgNoAutosave: "No saved work found to restore.", msgDocDownloadFail: "Document download failed.", pdfBookTitle: "Family Tree of the Sklencar Family", pdfBookSub: "Book of families by the family tree", pdfBookToc: "C O N T E N T S", pdfBookGenerating: "Generating PDF book…", pdfBookSaved: "PDF book created and downloaded ({X} pages).", pdfBookFail: "PDF book creation failed:", sectNotes: "Notes", tNoNotes: "No notes recorded", noteEditTitle: "Edit note", btnSaveNote: "Save", msgNoteEmpty: "The note cannot be empty.", msgNoteSaved: "Note saved.", noteFmtB: "Bold", noteFmtI: "Italic", noteFmtU: "Underline", noteFmtS: "Strikethrough", noteFmtUl: "Bulleted list", noteFmtOl: "Numbered list", noteFmtClear: "Clear formatting", noteRichHint: "Press Enter for a new paragraph. Maximum 2000 characters of text.", msgNoteTooLong: "The note is too long (max 2000 characters).",
+    tUnknown: "Unknown", tBorn: "Born:", tDied: "Died:", tLives: "Living", tPlace: "Place:", tNoSpouse: "No spouse recorded", tNoChildren: "No children recorded", tNoParents: "Unknown parents", tNoEvents: "No other events recorded", tNoSources: "No sources recorded", phSourceDesc: "Source description (shown on card)", tFather: "Father", tMother: "Mother", tMarr: "Marriage:", tEvBaptism: "Baptism", tEvBasic: "Elementary School", tEvHigh: "High School", tEvUni: "University", tEvOther: "Other Event", tNoRecent: "No recent edits yet.", tNoSearch: "No matching person found", tNewPerson: "Add New Person", tEditPerson: "Edit Person Details", tOptNoFather: "-- No father / Unknown --", tOptNoMother: "-- No mother / Unknown --", tOptSelSpouse: "-- Select Spouse --", tOptSelChild: "-- Select Child --", tPhDateMarr: "Marriage Date", tPhEventName: "Event Name", tPhEventDate: "Date/Year", tPhEventPlace: "Location", tMainPhoto: "Main Photo", tDoc: "Document", tNoFiles: "No files attached yet.", tMaxSources: "Maximum number of sources (25) reached.", tMaxSpouses: "Maximum allowed partners (4) reached.", tFileBanned: "is executable and cannot be attached.", tNoPhotoDisplay: "No photos attached to this person yet.", tMainPhLbl: "(Main Photo)", tNoDocsDisplay: "No documents attached to this person.", tSafeDoc: "Safe attached family record", tDownload: "Download", msgLoaded: "Sample tree loaded with strict hierarchical layout.", msgNew: "New tree created.", msgProcess: "Processing file:", msgErrZip: "Archive missing main .ged file (GEDCOM 7.0).", msgReadErr: "Error reading file:", msgReadOk: "Loaded {X} persons.", msgSaveOk: "Person saved successfully.", msgDelOk: "Person deleted.", msgPrepGdz: "Preparing GDZ archive (GEDCOM 7.0)...", msgGdzOk: "GDZ archive saved successfully.", msgGdzErr: "Error saving GDZ:", msgPrepPdf: "Generating multi-page PDF...", msgPdfOk: "PDF generated successfully!", msgPdfErr: "Error generating PDF:", msgPdfEmpty: "Tree is empty, nothing to export.", msgNoAutosave: "No saved work found to restore.", msgDocDownloadFail: "Document download failed.", pdfBookTitle: "Family Tree of the Sklencar Family", pdfBookSub: "Book of families by the family tree", pdfBookToc: "C O N T E N T S", pdfBookGenerating: "Generating PDF book…", pdfBookSaved: "PDF book created and downloaded ({X} pages).", pdfBookFail: "PDF book creation failed:", sectNotes: "Notes", tNoNotes: "No notes recorded", noteEditTitle: "Edit note", btnSaveNote: "Save", msgNoteEmpty: "The note cannot be empty.", msgNoteSaved: "Note saved.", noteFmtB: "Bold", noteFmtI: "Italic", noteFmtU: "Underline", noteFmtS: "Strikethrough", noteFmtUl: "Bulleted list", noteFmtOl: "Numbered list", noteFmtClear: "Clear formatting", noteRichHint: "Press Enter for a new paragraph. Maximum 2000 characters of text.", msgNoteTooLong: "The note is too long (max 2000 characters).", tabStory: "Story", tabStoryTitle: "Life Story", tabStoryDesc: "A single life story of unlimited length. Click the pencil to edit (font family, font size, bold, italic, underline). Included in the PDF book.", sectStory: "Story", tNoStory: "No story recorded", storyEditTitle: "Edit person's story", msgStorySaved: "Story saved.", storyFontFamily: "Font family", storyFontSize: "Font size",
     confirmTitle: "Confirm Action", confirmDelPerson: "Are you sure you want to permanently delete this person?", confirmDelFile: "Are you sure you want to delete this file?", btnDelete: "Delete",
     btnConnectDb: "Connect to database on server", btnSaveServer: "Write to server (SQL)", dbModalTitleLoad: "Connect to server database", dbModalTitleSave: "Write to server database", lblDbUser: "User", lblDbPassword: "Password", phDbUser: "User name", phDbPassword: "Password", msgDbErrCreds: "Incorrect user name or password.", msgDbSessionExpired: "Your session has expired, please sign in again.", msgDbErrForbidden: "The server rejected the request (invalid application verification token).", msgDbErrRate: "Too many attempts, please try again later.", msgDbTooLarge: "The tree is too large to save in one request (the server limit is 4.5 MB). Reduce or remove some photos and documents.", msgDbNotConfigured: "The app is not configured (backend address or verification token is missing).", dbHintLoad: "Sign in with your user name and password. After verification, data is loaded from the database and the app opens.", dbHintSave: "Sign in with your user name and password. Data will be written to the server database and replaces all existing data in the database.", btnDbConnect: "Connect", btnDbSave: "Write", dbConnectedLbl: "Connected to server", msgDbFill: "Enter both user name and password.", msgDbBadUrl: "The database address is not valid.", msgDbErrNet: "Could not reach the server. Check the address, your connection and CORS (if the app is on https, the server must be on https too).", msgDbErrTimeout: "The server did not respond in time.", msgDbErrAuth: "Invalid key.", msgDbErrServer: "Server error", msgDbErrData: "The server returned invalid data.", msgDbLoaded: "Loaded {X} persons from the database.", msgDbEmpty: "The database is empty – a new tree was created. Save it with the “Write to server” button.", msgFileUploading: "Uploading files to storage: {X} / {N}…", msgFileUploadFail: "File upload failed", msgDbSaving: "Writing data to the database...", msgDbSaved: "Data saved to the database.", msgDbEmptyTree: "The tree is empty; writing would erase the data in the database.", lblImportSidebar: "Open another file", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Folder", btnSaveSqlite: "Save SQLite Folder", menuBackup: "Open backup", bkpNoSql: "Database file (genealogy.sql) not found in the folder.", bkpLoading: "Loading server backup…", bkpEmpty: "The backup contains no persons.", bkpLoaded: "Loaded {X} persons and {M} files from the backup ({D} media not found).", bkpFail: "Opening the backup failed:", menuBackupSave: "Save backup", bkpNoTree: "Open or create a family tree first.", bkpSaving: "Saving server backup…", bkpSaved: "Backup saved: {X} persons, {M} files.", bkpSavedZip: "Backup downloaded as ZIP: {X} persons, {M} files.", bkpSaveFail: "Saving the backup failed:", bkpMissing: "Note: {N} files have no loaded content and were not included in the backup."
   },
@@ -1090,7 +1115,7 @@ const i18n = {
     aiUnknownName: "unbekannter Name",
     appDesc: "Kamm-Stammbaum mit Unterstützung für GEDCOM 7.0 & GEDZIP (.gdz)", dropZoneText: "Stammbaumdatei hier ablegen oder zum Durchsuchen klicken", dropZoneSub: "Unterstützte Formate: GEDZIP (.gdz), .zip, .ged", btnSelectFile: "Datei vom Computer auswählen", btnSample: "Beispiel-Stammbaum laden", btnNew: "Neuen Stammbaum erstellen", footerText: "Genealogy HTML5 Single-File • Keine Daten verlassen Ihren Browser", btnAddPerson: "Person hinzufügen", btnSaveGdz: "Stammbaum speichern (.gdz)", btnLayout: "Neu anordnen", btnMainDiagram: "Zurück zum Hauptdiagramm", btnCandidates: "Kandidaten", btnLinkTree: "Verbinden", linkDialogTitle: "Kandidaten-Zweig verbinden", linkCandidateLbl: "Kandidat:", linkSelectPerson: "Person aus dem Stammbaum", linkRelation: "Beziehung des Kandidaten zur Person", optLinkSpouse: "ist Partner/in der Person", optLinkParent: "ist Elternteil der Person", optLinkChild: "ist Kind der Person", btnLinkConfirm: "Verbinden", linkHint: "Nach dem Verbinden wandert der ganze Kandidaten-Zweig ins Hauptdiagramm und verschwindet von der Kandidatenfläche.", msgLinked: "Der Kandidaten-Zweig wurde mit dem Stammbaum verbunden.", msgUnlinkedCand: "Der Zweig wurde vom Stammbaum getrennt – er ist zurück auf der Kandidatenfläche.", tLinkSlotFull: "Die gewählte Person hat bereits ein Elternteil in dieser Familie.", tNoCandidates: "Noch keine Kandidaten. Fügen Sie eine neue Person mit „Person hinzufügen“ hinzu.", rodSelectPh: "Familien-Diagramm wählen…", rodSelectLbl: "Direkte Auswahl des Diagramms nach Familie", rodMainOpt: "Hauptdiagramm", rodFamily: "Familie {N}", pickerFilterPh: "Person filtern (Nachname / Jahr)…", btnExportPdf: "Als PDF exportieren", zoomView: "Zoom & Ansicht:", searchPlaceholder: "Name, Nachname, Jahr, Ort...", recentEdited: "Zuletzt bearbeitet", statPersons: "Personen gesamt:", statFamilies: "Familien:", legendMale: "Männlich", legendFemale: "Weiblich", legendHub: "Familienknoten", legendControls: "1x Klick = Auswählen • 2x Klick = Personenkarte • Bearbeiten = Button Bearbeiten", lastSavedPrefix: "Zuletzt auf dem Server gespeichert:", cardTitle: "Personendetails", btnEdit: "Bearbeiten", sectSpouse: "Ehepartner", sectChildren: "Kinder", sectParents: "Eltern", sectEvents: "Ereignisse", sectSources: "Quellen", btnPhotos: "Fotos", btnDocs: "Dokumente", modBasicData: "Grundlegende Informationen", lblTitle: "Titel", phTitle: "Dr., Prof.", lblFirstName: "Vorname", lblMiddleName: "Zweiter Vorname", lblGender: "Geschlecht", optMale: "Männlich (M)", optFemale: "Weiblich (F)", optUnknown: "Unbekannt", lblLastName: "Nachname", lblBirthName: "Geburtsname", phBirthName: "Müller", modDatesPlaces: "Daten und Orte", lblBirthDate: "Geburtsdatum", lblBirthPlace: "Geburtsort", lblBirthCountry: "Geburtsland", lblDeathDate: "Todesdatum (falls verstorben)", lblDeathPlace: "Sterbeort", phPlace: "Berlin", modFamily: "Familienverbindungen", lblFather: "Vater", lblMother: "Mutter", btnAddSpouse: "Partner hinzufügen", btnAddChild: "Kind hinzufügen", tabMedia: "Medien & Docs", tabEvents: "Ereignisse", tabSources: "Quellen", tabMediaTitle: "Angehängte Fotos und Dokumente", btnUploadPhoto: "Foto hochladen", btnUploadDoc: "Dok. hochladen", tabMediaDesc: "Unterstützt: .jpg, .png, .pdf, .docx, .txt (Hauptfoto per Radiobutton wählen)", tabEventsTitle: "Lebensereignisse (Schule, Taufe, etc.)", btnAddEvent: "Ereignis hinzufügen", tabSourcesTitle: "Quellen (URLs)", btnAddSource: "Quelle hinzufügen", tabSourcesDesc: "Fügen Sie bis zu 25 Quellen hinzu: URL + Beschreibung. Auf der Personenkarte erscheint die klickbare Beschreibung, die die Quelle in einem neuen Fenster öffnet.", btnDeletePerson: "Person löschen", btnCancel: "Abbrechen", btnSavePerson: "Person speichern", btnMosaic: "Mosaik anzeigen", btnSlide: "Diashow anzeigen",
     tabAddresses: "Adressen", tabAddressesTitle: "Wohnadressen", btnAddAddress: "Adresse hinzufügen", tabAddressesDesc: "Geben Sie aktuelle oder vergangene Wohnadressen mit Daten ein.", optAddrCurrent: "Aktueller Wohnsitz", optAddrPerm: "Hauptwohnsitz", optAddrTemp: "Zweitwohnsitz", phAddress: "Straße, Stadt, PLZ...", phDateFrom: "Von (Jahr)", phDateTo: "Bis (Jahr)", sectAddresses: "Adressen", tNoAddresses: "Keine Adressen erfasst", tabOccupations: "Beruf", tabOccupationsTitle: "Berufe", btnAddOccupation: "Beruf hinzufügen", tabOccupationsDesc: "Beruf, Ort und Zeitraum (von – bis) eingeben. Mit dem Plus-Button fügen Sie weitere hinzu.", phOccupation: "Beruf", phOccCity: "Ort", phOccFrom: "Datum von", phOccTo: "Datum bis", sectOccupations: "Berufe", tNoOccupations: "Keine Berufe erfasst", tabNotes: "Notizen", tabNotesTitle: "Persönliche Notizen", btnAddNote: "Notiz hinzufügen", tabNotesDesc: "Notizen mit dem Stift bearbeiten – es öffnet sich ein Fenster mit Formatierung (Absätze, Fett, Kursiv, Listen). Sie werden auf der Personenkarte angezeigt.", phNoteText: "Notiztext eingeben...",
-    tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tNoSources: "Keine Quellen erfasst", phSourceDesc: "Quellenbeschreibung (auf der Personenkarte)", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.", msgNoAutosave: "Keine gespeicherte Arbeit zum Wiederherstellen gefunden.", msgDocDownloadFail: "Dokument konnte nicht heruntergeladen werden.", pdfBookTitle: "Stammbaum der Familie Sklencar", pdfBookSub: "Buch der Familien nach dem Stammbaum", pdfBookToc: "I N H A L T", pdfBookGenerating: "PDF-Buch wird erstellt…", pdfBookSaved: "PDF-Buch erstellt und heruntergeladen ({X} Seiten).", pdfBookFail: "Erstellen des PDF-Buchs fehlgeschlagen:", sectNotes: "Notizen", tNoNotes: "Keine Notizen erfasst", noteEditTitle: "Notiz bearbeiten", btnSaveNote: "Speichern", msgNoteEmpty: "Die Notiz darf nicht leer sein.", msgNoteSaved: "Notiz gespeichert.", noteFmtB: "Fett", noteFmtI: "Kursiv", noteFmtU: "Unterstrichen", noteFmtS: "Durchgestrichen", noteFmtUl: "Aufzählung", noteFmtOl: "Nummerierte Liste", noteFmtClear: "Formatierung entfernen", noteRichHint: "Mit Enter erstellen Sie einen neuen Absatz. Maximal 2000 Textzeichen.", msgNoteTooLong: "Die Notiz ist zu lang (max. 2000 Zeichen).",
+    tUnknown: "Unbekannt", tBorn: "Geboren:", tDied: "Gestorben:", tLives: "Lebend", tPlace: "Ort:", tNoSpouse: "Kein Partner erfasst", tNoChildren: "Keine Kinder erfasst", tNoParents: "Unbekannte Eltern", tNoEvents: "Keine weiteren Ereignisse erfasst", tNoSources: "Keine Quellen erfasst", phSourceDesc: "Quellenbeschreibung (auf der Personenkarte)", tFather: "Vater", tMother: "Mutter", tMarr: "Heirat:", tEvBaptism: "Taufe", tEvBasic: "Grundschule", tEvHigh: "Gymnasium", tEvUni: "Universität", tEvOther: "Anderes Ereignis", tNoRecent: "Noch keine kürzlichen Bearbeitungen.", tNoSearch: "Keine passende Person gefunden", tNewPerson: "Neue Person hinzufügen", tEditPerson: "Personendetails bearbeiten", tOptNoFather: "-- Kein Vater / Unbekannt --", tOptNoMother: "-- Keine Mutter / Unbekannt --", tOptSelSpouse: "-- Partner auswählen --", tOptSelChild: "-- Kind auswählen --", tPhDateMarr: "Heiratsdatum", tPhEventName: "Ereignisname", tPhEventDate: "Datum/Jahr", tPhEventPlace: "Ort", tMainPhoto: "Hauptfoto", tDoc: "Dokument", tNoFiles: "Noch keine Dateien angehängt.", tMaxSources: "Maximale Anzahl an Quellen (25) erreicht.", tMaxSpouses: "Maximal erlaubte Partner (4) erreicht.", tFileBanned: "ist ausführbar und kann nicht angehängt werden.", tNoPhotoDisplay: "Dieser Person sind noch keine Fotos zugeordnet.", tMainPhLbl: "(Hauptfoto)", tNoDocsDisplay: "Dieser Person sind keine Dokumente zugeordnet.", tSafeDoc: "Sicherer angehängter Familienbeleg", tDownload: "Herunterladen", msgLoaded: "Beispiel-Stammbaum mit streng hierarchischem Layout geladen.", msgNew: "Neuer Stammbaum erstellt.", msgProcess: "Datei wird verarbeitet:", msgErrZip: "Archiv fehlt Haupt-.ged-Datei (GEDCOM 7.0).", msgReadErr: "Fehler beim Lesen der Datei:", msgReadOk: "{X} Personen geladen.", msgSaveOk: "Person erfolgreich gespeichert.", msgDelOk: "Person gelöscht.", msgPrepGdz: "Bereite GDZ-Archiv vor (GEDCOM 7.0)...", msgGdzOk: "GDZ-Archiv erfolgreich gespeichert.", msgGdzErr: "Fehler beim Speichern von GDZ:", msgPrepPdf: "Generiere mehrseitiges PDF...", msgPdfOk: "PDF erfolgreich generiert!", msgPdfErr: "Fehler beim Generieren der PDF:", msgPdfEmpty: "Stammbaum ist leer, nichts zu exportieren.", msgNoAutosave: "Keine gespeicherte Arbeit zum Wiederherstellen gefunden.", msgDocDownloadFail: "Dokument konnte nicht heruntergeladen werden.", pdfBookTitle: "Stammbaum der Familie Sklencar", pdfBookSub: "Buch der Familien nach dem Stammbaum", pdfBookToc: "I N H A L T", pdfBookGenerating: "PDF-Buch wird erstellt…", pdfBookSaved: "PDF-Buch erstellt und heruntergeladen ({X} Seiten).", pdfBookFail: "Erstellen des PDF-Buchs fehlgeschlagen:", sectNotes: "Notizen", tNoNotes: "Keine Notizen erfasst", noteEditTitle: "Notiz bearbeiten", btnSaveNote: "Speichern", msgNoteEmpty: "Die Notiz darf nicht leer sein.", msgNoteSaved: "Notiz gespeichert.", noteFmtB: "Fett", noteFmtI: "Kursiv", noteFmtU: "Unterstrichen", noteFmtS: "Durchgestrichen", noteFmtUl: "Aufzählung", noteFmtOl: "Nummerierte Liste", noteFmtClear: "Formatierung entfernen", noteRichHint: "Mit Enter erstellen Sie einen neuen Absatz. Maximal 2000 Textzeichen.", msgNoteTooLong: "Die Notiz ist zu lang (max. 2000 Zeichen).", tabStory: "Geschichte", tabStoryTitle: "Lebensgeschichte", tabStoryDesc: "Eine Lebensgeschichte ohne Längenbegrenzung. Mit dem Stift bearbeiten (Schriftart, Schriftgröße, Fett, Kursiv, Unterstrichen). Wird ins PDF-Buch übernommen.", sectStory: "Geschichte", tNoStory: "Keine Geschichte erfasst", storyEditTitle: "Geschichte bearbeiten", msgStorySaved: "Geschichte gespeichert.", storyFontFamily: "Schriftart", storyFontSize: "Schriftgröße",
     confirmTitle: "Aktion bestätigen", confirmDelPerson: "Möchten Sie diese Person wirklich dauerhaft löschen?", confirmDelFile: "Möchten Sie diese Datei wirklich löschen?", btnDelete: "Löschen",
     btnConnectDb: "Mit Datenbank auf dem Server verbinden", btnSaveServer: "Auf Server schreiben (SQL)", dbModalTitleLoad: "Mit Serverdatenbank verbinden", dbModalTitleSave: "In Serverdatenbank schreiben", lblDbUser: "Benutzer", lblDbPassword: "Passwort", phDbUser: "Benutzername", phDbPassword: "Passwort", msgDbErrCreds: "Benutzername oder Passwort ist falsch.", msgDbSessionExpired: "Die Sitzung ist abgelaufen, bitte melden Sie sich erneut an.", msgDbErrForbidden: "Der Server hat die Anfrage abgelehnt (ungültiges Verifizierungs-Token der Anwendung).", msgDbErrRate: "Zu viele Versuche, bitte später erneut versuchen.", msgDbTooLarge: "Der Stammbaum ist für einen einzelnen Schreibvorgang zu groß (Serverlimit 4,5 MB). Verkleinern oder entfernen Sie einige Fotos und Dokumente.", msgDbNotConfigured: "Die App ist nicht konfiguriert (Backend-Adresse oder Verifizierungs-Token fehlt).", dbHintLoad: "Melden Sie sich mit Benutzername und Passwort an. Nach der Überprüfung werden die Daten aus der Datenbank geladen und die App wird geöffnet.", dbHintSave: "Melden Sie sich mit Benutzername und Passwort an. Die Daten werden in die Serverdatenbank geschrieben und ersetzen alle vorhandenen Daten in der Datenbank.", btnDbConnect: "Verbinden", btnDbSave: "Schreiben", dbConnectedLbl: "Mit Server verbunden", msgDbFill: "Geben Sie Benutzername und Passwort ein.", msgDbBadUrl: "Die Datenbankadresse ist ungültig.", msgDbErrNet: "Der Server ist nicht erreichbar. Prüfen Sie Adresse, Verbindung und CORS (liegt die App auf https, muss auch der Server auf https liegen).", msgDbErrTimeout: "Der Server hat nicht rechtzeitig geantwortet.", msgDbErrAuth: "Ungültiger Schlüssel.", msgDbErrServer: "Serverfehler", msgDbErrData: "Der Server hat ungültige Daten geliefert.", msgDbLoaded: "{X} Personen aus der Datenbank geladen.", msgDbEmpty: "Die Datenbank ist leer – ein neuer Stammbaum wurde erstellt. Speichern Sie ihn mit „Auf Server schreiben“.", msgFileUploading: "Dateien werden hochgeladen: {X} / {N}…", msgFileUploadFail: "Datei konnte nicht hochgeladen werden", msgDbSaving: "Schreibe Daten in die Datenbank...", msgDbSaved: "Daten in der Datenbank gespeichert.", msgDbEmptyTree: "Der Stammbaum ist leer; Schreiben würde die Daten in der Datenbank löschen.", lblImportSidebar: "Andere Datei öffnen", btnLoadGed: "GEDCOM / GDZ", btnLoadSqlite: "SQLite Ordner", btnSaveSqlite: "SQLite Ordner speichern", menuBackup: "Backup öffnen", bkpNoSql: "Datenbankdatei (genealogy.sql) wurde im Ordner nicht gefunden.", bkpLoading: "Server-Backup wird geladen…", bkpEmpty: "Das Backup enthält keine Personen.", bkpLoaded: "{X} Personen und {M} Dateien aus dem Backup geladen ({D} Medien nicht gefunden).", bkpFail: "Öffnen des Backups fehlgeschlagen:", menuBackupSave: "Backup speichern", bkpNoTree: "Öffnen oder erstellen Sie zuerst einen Stammbaum.", bkpSaving: "Server-Backup wird gespeichert…", bkpSaved: "Backup gespeichert: {X} Personen, {M} Dateien.", bkpSavedZip: "Backup als ZIP heruntergeladen: {X} Personen, {M} Dateien.", bkpSaveFail: "Speichern des Backups fehlgeschlagen:", bkpMissing: "Hinweis: {N} Dateien haben keinen geladenen Inhalt und wurden nicht ins Backup aufgenommen."
   }
@@ -1263,7 +1288,7 @@ function createNewTree() {
 }
 
 function createPersonObj(id, title, firstName, lastName, gender, bDate, bPlace, bCountry, dDate, dPlace) {
-  return { id: id || generateId("I"), title: title || "", firstName: firstName || "", middleName: "", lastName: lastName || "", birthName: "", gender: gender || "M", birthDate: bDate || "", birthPlace: bPlace || "", birthCountry: bCountry || "Slovensko", deathDate: dDate || "", deathPlace: dPlace || "", fams: [], famc: null, events: [], sources: [], addresses: [], occupations: [], notes: [], photos: [], documents: [], x: 0, y: 0 };
+  return { id: id || generateId("I"), title: title || "", firstName: firstName || "", middleName: "", lastName: lastName || "", birthName: "", gender: gender || "M", birthDate: bDate || "", birthPlace: bPlace || "", birthCountry: bCountry || "Slovensko", deathDate: dDate || "", deathPlace: dPlace || "", fams: [], famc: null, events: [], sources: [], addresses: [], occupations: [], notes: [], story: "", photos: [], documents: [], x: 0, y: 0 };
 }
 
 function generateId(prefix) {
@@ -1335,10 +1360,12 @@ function parseGedcomString(text, fileName, attachedFiles) {
           else if (tagOrId === "OCCU") { currentEntity.occupations = currentEntity.occupations || []; currentEntity.occupations.push({ id: generateId("O"), title: value, city: "", dateFrom: "", dateTo: "" }); }
           else if (tagOrId === "RESI") { currentEntity.addresses.push({ id: generateId("A"), type: "PERM", address: "", dateFrom: "", dateTo: "" }); }
           else if (tagOrId === "NOTE") { currentEntity.notes.push(value); }
+          else if (tagOrId === "_STORY") { currentEntity.story = value; }
           else if (tagOrId === "OBJE") { currentEntity._obje = currentEntity._obje || []; currentEntity._obje.push({ file: "", main: false }); }
         } else if (level === 2) {
           if (currentSubTag === "OBJE" && currentEntity._obje && currentEntity._obje.length) { const lo = currentEntity._obje[currentEntity._obje.length - 1]; if (tagOrId === "FILE") lo.file = value; else if (tagOrId === "_PRIM") lo.main = (value.toUpperCase() === "Y"); else if (tagOrId === "TITL") lo.title = value; }
           else if (currentSubTag === "NOTE" && (tagOrId === "CONT" || tagOrId === "CONC") && currentEntity.notes.length) { currentEntity.notes[currentEntity.notes.length - 1] += (tagOrId === "CONT" ? "\n" : "") + value; }
+          else if (currentSubTag === "_STORY" && (tagOrId === "CONT" || tagOrId === "CONC")) { currentEntity.story = (currentEntity.story || "") + (tagOrId === "CONT" ? "\n" : "") + value; }
           else if (currentSubTag === "SOUR" && tagOrId === "NOTE" && currentEntity.sources.length) { const lastSrc = currentEntity.sources[currentEntity.sources.length - 1]; lastSrc.desc = ((lastSrc.desc || "") + value).trim(); }
           else if (currentSubTag === "BIRT") { if (tagOrId === "DATE") currentEntity.birthDate = value; if (tagOrId === "PLAC") currentEntity.birthPlace = value; } 
           else if (currentSubTag === "DEAT") { if (tagOrId === "DATE") currentEntity.deathDate = value; if (tagOrId === "PLAC") currentEntity.deathPlace = value; } 
@@ -2398,6 +2425,14 @@ function selectPerson(personId, openPanel = true) {
       });
     }
   }
+  const storyEl = document.getElementById('detailStoryInfo');
+  if (storyEl) {
+    if (!p.story || !notePlain(p.story)) {
+      storyEl.innerHTML = `<span class="text-slate-400 italic cursor-pointer hover:text-indigo-600" onclick="editStoryOnCard('${p.id}')">${t('tNoStory')}</span>`;
+    } else {
+      storyEl.innerHTML = `<div class="rich-notes break-words">${renderStoryHtml(p.story)}</div>`;
+    }
+  }
 
   document.getElementById('detailPhotoCount').innerText = p.photos.length; document.getElementById('detailDocCount').innerText = p.documents.length; drawTree();
   if (openPanel) openPersonPanelMobile();
@@ -2500,6 +2535,186 @@ function editNoteOnCard(personId, idx) {
     autoSaveNow();
     showToast(t('msgNoteSaved'), 'success');
   });
+}
+
+// ===== Formátovateľný PRÍBEH osoby (nekonečný text, typ a veľkosť písma, B, I, U) =====
+const STORY_ALLOWED_FONTS = {
+  'Cormorant': 'Cormorant, Georgia, serif',
+  'Georgia': 'Georgia, "Times New Roman", serif',
+  'Times New Roman': '"Times New Roman", Times, serif',
+  'Arial': 'Arial, Helvetica, sans-serif',
+  'Verdana': 'Verdana, Geneva, sans-serif',
+  'Courier New': '"Courier New", Courier, monospace'
+};
+const STORY_ALLOWED_SIZES = ['8pt','9pt','9.5pt','10pt','11pt','12pt','14pt','16pt','18pt','20pt','24pt'];
+
+function sanitizeStoryRichText(html) {
+  const div = document.createElement('div'); div.innerHTML = String(html || '');
+  const DROP = new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','IMG','A','FORM','INPUT','BUTTON','TEXTAREA','SELECT','OPTION','META','LINK','NOSCRIPT','TEMPLATE','VIDEO','AUDIO','CANVAS','MAP','AREA','BASE','FRAME','FRAMESET','TITLE','HEAD','BODY','HTML']);
+  const TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','UL','OL','LI','P','DIV','SPAN','FONT']);
+  const ser = n => {
+    let s = '';
+    n.childNodes.forEach(ch => {
+      if (ch.nodeType === 3) { s += esc(ch.nodeValue); return; }
+      if (ch.nodeType !== 1) return;
+      if (DROP.has(ch.tagName)) return;
+      if (ch.tagName === 'BR') { s += '<br>'; return; }
+      if (!TAGS.has(ch.tagName)) { s += ser(ch); return; }
+      let tg = ch.tagName.toLowerCase();
+      if (tg === 'font') tg = 'span';
+      const styles = [];
+      const st = ch.style || {};
+      const rawFace = (ch.getAttribute('face') || st.fontFamily || '').replace(/["']/g, '').split(',')[0].trim();
+      if (rawFace && STORY_ALLOWED_FONTS[rawFace]) styles.push('font-family:' + STORY_ALLOWED_FONTS[rawFace]);
+      let rawSize = (st.fontSize || '').trim();
+      if (!rawSize && ch.getAttribute('size')) {
+        const mapSz = { '1':'8pt', '2':'9.5pt', '3':'11pt', '4':'12pt', '5':'14pt', '6':'18pt', '7':'24pt' };
+        rawSize = mapSz[ch.getAttribute('size')] || '';
+      }
+      if (rawSize && STORY_ALLOWED_SIZES.includes(rawSize)) styles.push('font-size:' + rawSize);
+      if (st.fontWeight === 'bold' || Number(st.fontWeight) >= 600) styles.push('font-weight:bold');
+      if (st.fontStyle === 'italic') styles.push('font-style:italic');
+      const td = (st.textDecoration || st.textDecorationLine || '').toLowerCase();
+      if (td.includes('underline')) styles.push('text-decoration:underline');
+      const attr = styles.length ? ` style="${esc(styles.join(';'))}"` : '';
+      s += `<${tg}${attr}>${ser(ch)}</${tg}>`;
+    });
+    return s;
+  };
+  return ser(div).trim();
+}
+
+function renderStoryHtml(story) {
+  const s = String(story || '');
+  if (!s.trim()) return '';
+  return /<\/?[a-z][\s\S]*>/i.test(s) ? sanitizeStoryRichText(s) : esc(s).replace(/\n/g, '<br>');
+}
+
+function storyApplySpanStyle(area, prop, val) {
+  area.focus();
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const rng = sel.getRangeAt(0);
+  if (rng.collapsed) {
+    const span = document.createElement('span');
+    span.style[prop] = val;
+    span.innerHTML = area.innerHTML || '<br>';
+    area.innerHTML = '';
+    area.appendChild(span);
+    return;
+  }
+  const span = document.createElement('span');
+  span.style[prop] = val;
+  try {
+    span.appendChild(rng.extractContents());
+    rng.insertNode(span);
+    sel.removeAllRanges();
+    const nr = document.createRange();
+    nr.selectNodeContents(span);
+    sel.addRange(nr);
+  } catch (e) {}
+}
+
+function openStoryRichEditor(initial, onSave) {
+  const prefill = renderStoryHtml(initial);
+  const ov = document.createElement('div');
+  ov.className = 'fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6';
+  const fontOpts = Object.keys(STORY_ALLOWED_FONTS).map(f => `<option value="${esc(f)}" style="font-family:${esc(STORY_ALLOWED_FONTS[f])}">${esc(f)}</option>`).join('');
+  const sizeOpts = STORY_ALLOWED_SIZES.map(sz => `<option value="${sz}">${sz}</option>`).join('');
+  ov.innerHTML = `
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" data-story-close="1"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[92vh]">
+      <div class="p-4 sm:p-5 pb-0">
+        <h3 class="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2"><i class="ph-bold ph-book-open-text text-indigo-600"></i>${t('storyEditTitle')}</h3>
+        <div class="flex flex-wrap items-center gap-1.5 mt-3 pb-3 border-b border-slate-200">
+          <select id="storyFontSelect" title="${t('storyFontFamily')}" class="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">— ${t('storyFontFamily')} —</option>
+            ${fontOpts}
+          </select>
+          <select id="storySizeSelect" title="${t('storyFontSize')}" class="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+            <option value="">— ${t('storyFontSize')} —</option>
+            ${sizeOpts}
+          </select>
+          <span class="w-px h-6 bg-slate-200 mx-0.5"></span>
+          <button type="button" data-cmd="bold" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 font-bold text-sm" title="${t('noteFmtB')}">B</button>
+          <button type="button" data-cmd="italic" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 italic font-serif text-sm" title="${t('noteFmtI')}">I</button>
+          <button type="button" data-cmd="underline" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 underline text-sm" title="${t('noteFmtU')}">U</button>
+          <button type="button" data-cmd="strikeThrough" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 line-through text-sm" title="${t('noteFmtS')}">S</button>
+          <span class="w-px h-6 bg-slate-200 mx-0.5"></span>
+          <button type="button" data-cmd="insertUnorderedList" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 text-sm" title="${t('noteFmtUl')}"><i class="ph-bold ph-list-dashes"></i></button>
+          <button type="button" data-cmd="insertOrderedList" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 text-sm" title="${t('noteFmtOl')}"><i class="ph-bold ph-list-numbers"></i></button>
+          <span class="w-px h-6 bg-slate-200 mx-0.5"></span>
+          <button type="button" data-cmd="removeFormat" class="story-cmd w-8 h-8 rounded-lg hover:bg-slate-100 border border-slate-200 text-sm" title="${t('noteFmtClear')}"><i class="ph-bold ph-eraser"></i></button>
+        </div>
+      </div>
+      <div class="px-4 sm:px-5 py-3 flex-1 overflow-y-auto">
+        <div id="storyRichArea" contenteditable="true" class="rich-notes w-full min-h-[18rem] max-h-[55vh] overflow-y-auto custom-scroll text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 leading-relaxed">${prefill}</div>
+      </div>
+      <div class="p-4 sm:p-5 pt-0 flex justify-end gap-2">
+        <button type="button" data-story-close="1" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition">${t('btnCancel')}</button>
+        <button type="button" id="storyRichSave" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">${t('btnSaveNote')}</button>
+      </div>
+    </div>`;
+  const area = ov.querySelector('#storyRichArea');
+  const close = () => ov.remove();
+  ov.querySelectorAll('[data-story-close]').forEach(el => el.addEventListener('click', close));
+  ov.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+  ov.querySelectorAll('.story-cmd').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => { area.focus(); document.execCommand(btn.dataset.cmd, false, null); });
+  });
+  const fontSel = ov.querySelector('#storyFontSelect');
+  fontSel.addEventListener('change', () => {
+    if (fontSel.value && STORY_ALLOWED_FONTS[fontSel.value]) {
+      storyApplySpanStyle(area, 'fontFamily', STORY_ALLOWED_FONTS[fontSel.value]);
+      fontSel.value = '';
+    }
+  });
+  const sizeSel = ov.querySelector('#storySizeSelect');
+  sizeSel.addEventListener('change', () => {
+    if (sizeSel.value && STORY_ALLOWED_SIZES.includes(sizeSel.value)) {
+      storyApplySpanStyle(area, 'fontSize', sizeSel.value);
+      sizeSel.value = '';
+    }
+  });
+  document.body.appendChild(ov);
+  try { document.execCommand('styleWithCSS', false, false); } catch (err) {}
+  area.focus();
+  ov.querySelector('#storyRichSave').addEventListener('click', () => {
+    const clean = sanitizeStoryRichText(area.innerHTML);
+    const plain = notePlain(clean);
+    close();
+    onSave(plain ? clean : '');
+  });
+}
+
+function editStoryOnCard(personId) {
+  const p = treeData.persons[personId]; if (!p) return;
+  openStoryRichEditor(p.story || '', html => {
+    pushUndoSnapshot();
+    p.story = html;
+    selectPerson(personId, false);
+    autoSaveNow();
+    showToast(t('msgStorySaved'), 'success');
+  });
+}
+
+function editStoryInModal() {
+  const inp = document.getElementById('editStoryInput');
+  const prev = document.getElementById('editStoryPreview');
+  if (!inp || !prev) return;
+  openStoryRichEditor(inp.value, html => {
+    inp.value = html;
+    prev.innerHTML = html ? renderStoryHtml(html) : `<span class="text-slate-400 italic">${t('tNoStory')}</span>`;
+  });
+}
+
+function clearStoryInModal() {
+  const inp = document.getElementById('editStoryInput');
+  const prev = document.getElementById('editStoryPreview');
+  if (!inp || !prev) return;
+  inp.value = '';
+  prev.innerHTML = `<span class="text-slate-400 italic">${t('tNoStory')}</span>`;
 }
 
 function getParentsOf(personId) { const p = treeData.persons[personId]; if (!p || !p.famc) return { father: null, mother: null }; const fam = treeData.families[p.famc]; if (!fam) return { father: null, mother: null }; const f = treeData.persons[fam.husbandId], m = treeData.persons[fam.wifeId]; return { father: (f && osViditelna(f)) ? f : null, mother: (m && osViditelna(m)) ? m : null }; }
@@ -2639,7 +2854,7 @@ function updateRecentListUI() {
 
 let tempAttachedFiles = [];
 function switchEditTab(tab) {
-  const tabs = ['media', 'events', 'sources', 'addresses', 'occupations', 'notes'];
+  const tabs = ['media', 'events', 'sources', 'addresses', 'occupations', 'notes', 'story'];
   tabs.forEach(t2 => {
     const btn = document.getElementById('tabBtn' + t2.charAt(0).toUpperCase() + t2.slice(1)); const content = document.getElementById('editTab' + t2.charAt(0).toUpperCase() + t2.slice(1) + 'Content');
     if (t2 === tab) { content.style.display = 'block'; btn.classList.add('border-indigo-600', 'text-indigo-600'); btn.classList.remove('border-transparent', 'text-slate-500'); } 
@@ -2661,6 +2876,7 @@ function openPersonEditor(personId) {
   document.getElementById('sourcesContainer').innerHTML = ""; (p.sources || []).forEach(src => { const o = srcObj(src); addSourceRow(o.url, o.desc); });
   document.getElementById('addressesContainer').innerHTML = ""; (p.addresses || []).forEach(addr => addAddressRow(addr.type, addr.address, addr.dateFrom, addr.dateTo));
   document.getElementById('notesContainer').innerHTML = ""; (p.notes || []).forEach(note => addNoteRow(note));
+  const stInp = document.getElementById('editStoryInput'), stPrev = document.getElementById('editStoryPreview'); if (stInp && stPrev) { stInp.value = p.story || ""; stPrev.innerHTML = p.story ? renderStoryHtml(p.story) : `<span class="text-slate-400 italic">${t('tNoStory')}</span>`; }
   document.getElementById('occupationsContainer').innerHTML = ""; if ((p.occupations || []).length) p.occupations.forEach(oc => addOccupationRow(oc.title, oc.city, oc.dateFrom, oc.dateTo)); else addOccupationRow();
   
   tempAttachedFiles = [
@@ -3060,6 +3276,7 @@ function savePersonForm(e) {
   p.sources = []; document.querySelectorAll('.source-row').forEach(row => { const o = { url: row.querySelector('.source-url').value.trim(), desc: row.querySelector('.source-desc').value.trim() }; if (o.url) p.sources.push(o); });
   p.addresses = []; document.querySelectorAll('.address-row').forEach(row => { p.addresses.push({ id: generateId("A"), type: row.querySelector('.address-type').value, address: row.querySelector('.address-text').value.trim(), dateFrom: row.querySelector('.address-from').value.trim(), dateTo: row.querySelector('.address-to').value.trim() }); });
   p.notes = []; document.querySelectorAll('.note-row .note-input').forEach(input => { const val = input.value.trim(); if (val) p.notes.push(val); });
+  const stInp = document.getElementById('editStoryInput'); p.story = stInp ? stInp.value.trim() : (p.story || '');
   p.occupations = []; document.querySelectorAll('.occupation-row').forEach(row => { const oc = { id: generateId("O"), title: row.querySelector('.occupation-title').value.trim(), city: row.querySelector('.occupation-city').value.trim(), dateFrom: row.querySelector('.occupation-from').value.trim(), dateTo: row.querySelector('.occupation-to').value.trim() }; if (oc.title || oc.city || oc.dateFrom || oc.dateTo) p.occupations.push(oc); });
 
   keepItemIds(__oldItems.events, p.events, ['type', 'title', 'date', 'place']); keepItemIds(__oldItems.addresses, p.addresses, ['type', 'address', 'dateFrom', 'dateTo']); keepItemIds(__oldItems.occupations, p.occupations, ['title', 'city', 'dateFrom', 'dateTo']);
@@ -3525,6 +3742,7 @@ async function saveGedzipTreeInternal() {
           if (ods) ged += `2 DATE ${ods}\n`;
       });
       if (p.notes && p.notes.length > 0) { p.notes.forEach(note => { notePlain(note).split(/\r?\n/).forEach((l, li) => { const chunks = l.match(/.{1,100}/g) || ['']; ged += `${li === 0 ? '1 NOTE' : '2 CONT'} ${chunks[0]}\n`; chunks.slice(1).forEach(c => { ged += `2 CONC ${c}\n`; }); }); }); }
+      if (p.story && p.story.trim()) { p.story.split(/\r?\n/).forEach((l, li) => { const chunks = l.match(/.{1,100}/g) || ['']; ged += `${li === 0 ? '1 _STORY' : '2 CONT'} ${chunks[0]}\n`; chunks.slice(1).forEach(c => { ged += `2 CONC ${c}\n`; }); }); }
 
       if (p.famc && famIdMap[p.famc]) ged += `1 FAMC ${famIdMap[p.famc]}\n`;
       (p.fams || []).forEach(fId => { if (famIdMap[fId]) ged += `1 FAMS ${famIdMap[fId]}\n`; });
@@ -4537,7 +4755,7 @@ treeData = { fileName: data.fileName || 'rodokmen.gdz', persons: sanDb.persons, 
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v65');
+console.log('Genealogy index16c-v66');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -6209,43 +6427,97 @@ function pdfBookPoznamkaWrap(text, innerW, indentW, nInd, font) {
   return lines;
 }
 
-// Pripraví rámček s PRVOU poznámkou osoby (alebo null, ak osoba poznámku nemá).
-// maxLines chráni pred poznámkou dlhšou než strana – text sa potom skráti „…“.
+// Rozparsuje HTML príbeh (p.story) na odstavce štylizovaných tokenov pre PDF knihu (bez ozdobného prvého písmena)
+function pdfBookParseStoryParagraphs(html) {
+  const div = document.createElement('div');
+  div.innerHTML = renderStoryHtml(html);
+  const paragraphs = [[]];
+  const pushPara = () => { if (paragraphs[paragraphs.length - 1].length) paragraphs.push([]); };
+
+  function walk(node, st) {
+    if (node.nodeType === 3) {
+      const txt = node.nodeValue.replace(/\s+/g, ' ');
+      if (!txt) return;
+      const parts = txt.split(/(\s+)/);
+      parts.forEach(part => {
+        if (!part) return;
+        paragraphs[paragraphs.length - 1].push({ text: part, isSpace: /^\s+$/.test(part), ...st });
+      });
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const tg = node.tagName.toUpperCase();
+    if (tg === 'BR') { pushPara(); return; }
+    const next = { ...st };
+    if (tg === 'B' || tg === 'STRONG' || node.style.fontWeight === 'bold' || Number(node.style.fontWeight) >= 600) next.bold = true;
+    if (tg === 'I' || tg === 'EM' || node.style.fontStyle === 'italic') next.italic = true;
+    const td = (node.style.textDecoration || node.style.textDecorationLine || '').toLowerCase();
+    if (tg === 'U' || td.includes('underline')) next.underline = true;
+    if (node.style.fontFamily) next.family = node.style.fontFamily;
+    if (node.style.fontSize) {
+      const m = parseFloat(node.style.fontSize);
+      if (m > 0) next.sizePt = m;
+    }
+    const isBlock = ['P','DIV','LI','UL','OL'].includes(tg);
+    if (isBlock) pushPara();
+    if (tg === 'LI') paragraphs[paragraphs.length - 1].push({ text: '• ', isSpace: false, ...next });
+    node.childNodes.forEach(ch => walk(ch, next));
+    if (isBlock) pushPara();
+  }
+
+  walk(div, { bold: false, italic: false, underline: false, family: 'Cormorant, Georgia, serif', sizePt: PDF_BOOK_NOTE_PT });
+  return paragraphs.filter(p => p.some(tok => !tok.isSpace));
+}
+
+function pdfBookTokenFont(tok) {
+  const style = tok.italic ? 'italic ' : '';
+  const weight = tok.bold ? 'bold ' : '';
+  const sz = tok.sizePt || PDF_BOOK_NOTE_PT;
+  const fam = tok.family || 'Cormorant, Georgia, serif';
+  return `${style}${weight}${sz}pt ${fam}`;
+}
+
 function pdfBookPoznamkaOsoby(p, topH) {
-  const raw = (p.notes || []).map(n => notePlain(n).replace(/\s+/g, ' ')).filter(Boolean)[0];
-  if (!raw) return null;
+  const rawStory = String(p.story || '').trim();
+  if (!rawStory || !notePlain(rawStory)) return null;
   const N = PDF_BOOK_NOTE;
   const innerW = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X - 2 * N.PADX;
-  const m = /^[^\p{L}\p{N}]*[\p{L}\p{N}]/u.exec(raw);
-  const cap = m ? m[0] : raw.charAt(0);
-  const rest = raw.slice(cap.length).replace(/^\s+/, '');
-  pdfBookMeasureCtx.font = PDF_BOOK_CAP_FONT;
-  const mt = pdfBookMeasureCtx.measureText(cap);
-  const capW = mt.width;
-  const capSize = PDF_BOOK_NOTE_PT * 5 * 4 / 3;                                 // pt → px canvasu
-  const capAsc = mt.actualBoundingBoxAscent > 0 ? mt.actualBoundingBoxAscent : capSize * 0.68;
-  const capDesc = mt.actualBoundingBoxDescent > 0 ? mt.actualBoundingBoxDescent : 0;
-  // iniciála je vložená do ozdobného štvorca (rovnaký rámik ako pri fotografiách)
-  const S = Math.max(74, Math.min(96, capW + 40), capAsc + capDesc + 28);      // štvorec: podľa šírky písmena, 74–96 pt
-  const panelH = S, panelW = S;
-  const nInd = Math.max(2, Math.ceil((panelH + 1) / N.LINE));                   // koľko riadkov textu obteká štvorec
-  const indentW = panelW + N.CAPGAP;
-  // najviac riadkov, aby sa osoba aj s rámčekom zmestila na jednu stranu
+  const paragraphs = pdfBookParseStoryParagraphs(rawStory);
+  if (!paragraphs.length) return null;
+
+  const lines = [];
+  paragraphs.forEach(para => {
+    let curLine = [], curW = 0, curLineH = N.LINE;
+    para.forEach(tok => {
+      if (!curLine.length && tok.isSpace) return;
+      pdfBookMeasureCtx.font = pdfBookTokenFont(tok);
+      const w = pdfBookMeasureCtx.measureText(tok.text).width;
+      const lh = Math.max(N.LINE, Math.round((tok.sizePt || PDF_BOOK_NOTE_PT) * 1.38));
+      if (curLine.length && !tok.isSpace && curW + w > innerW) {
+        lines.push({ tokens: curLine, lineH: curLineH });
+        curLine = [tok]; curW = w; curLineH = lh;
+      } else {
+        curLine.push(tok); curW += w; curLineH = Math.max(curLineH, lh);
+      }
+    });
+    if (curLine.length) lines.push({ tokens: curLine, lineH: curLineH });
+  });
+
+  if (!lines.length) return null;
   const pageH = PDF_BOOK.BOTTOM - (PDF_BOOK.TOP + 62);
-  const maxLines = Math.max(nInd, Math.floor((pageH - topH - N.GAP - N.AFTER - 2 * N.PADY - N.ASC - N.DESC) / N.LINE) + 1);
-  let lines = pdfBookPoznamkaWrap(rest, innerW, indentW, nInd, PDF_BOOK_NOTE_FONT);
-  if (lines.length > maxLines) {
-    lines = lines.slice(0, maxLines);
-    let last = lines[maxLines - 1];
-    const lim = innerW - (maxLines - 1 < nInd ? indentW : 0);
-    pdfBookMeasureCtx.font = PDF_BOOK_NOTE_FONT;
-    while (last && pdfBookMeasureCtx.measureText(last + '…').width > lim) last = last.replace(/\s*\S+$/, '');
-    lines[maxLines - 1] = (last || '').trim() + '…';
+  const availH = Math.max(40, pageH - topH - N.GAP - N.AFTER - 2 * N.PADY);
+  const fitted = [];
+  let sumH = 0;
+  for (const ln of lines) {
+    if (fitted.length > 0 && sumH + ln.lineH > availH) {
+      fitted[fitted.length - 1].tokens.push({ text: '…', isSpace: false, bold: false, italic: false, underline: false, family: 'Cormorant, Georgia, serif', sizePt: PDF_BOOK_NOTE_PT });
+      break;
+    }
+    fitted.push(ln);
+    sumH += ln.lineH;
   }
-  if (!lines.length) lines = [''];
-  const rows = Math.max(lines.length, nInd);                                    // štvorec s iniciálou potrebuje aspoň nInd riadkov
-  const boxH = Math.max(2 * N.PADY + N.ASC + N.DESC + (rows - 1) * N.LINE, 2 * N.PADY + panelH);
-  return { cap, capW, capAsc, capDesc, panelW, panelH, capSize, nInd, indentW, lines, rows, boxH };
+  const boxH = 2 * N.PADY + sumH + 4;
+  return { richLines: fitted, boxH };
 }
 
 // ---- rozvrhnutie (layout) knihy: rodiny → strany → bloky ----
@@ -6413,10 +6685,26 @@ function pdfBookDrawPoznamka(ctx, it, C) {
   ctx.strokeStyle = C; ctx.lineWidth = 0.6;
   pdfBookRoundRectPath(ctx, bx, by, bw, pz.boxH, N.R); ctx.stroke();
   ctx.restore();
-  const tx0 = bx + N.PADX, b0 = by + N.PADY + N.ASC;
-  pdfBookDrawOzdobnaIniciala(ctx, tx0, by + N.PADY, pz, C);
-  ctx.font = PDF_BOOK_NOTE_FONT; ctx.fillStyle = '#55663f'; ctx.textAlign = 'left';
-  pz.lines.forEach((ln, i) => ctx.fillText(ln, tx0 + (i < pz.nInd ? pz.indentW : 0), b0 + i * N.LINE));
+  const tx0 = bx + N.PADX;
+  let curY = by + N.PADY;
+  ctx.fillStyle = '#2c3a22'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  (pz.richLines || []).forEach(ln => {
+    curY += ln.lineH * 0.78;
+    let cx = tx0;
+    ln.tokens.forEach(tok => {
+      ctx.font = pdfBookTokenFont(tok);
+      ctx.fillText(tok.text, cx, curY);
+      const w = ctx.measureText(tok.text).width;
+      if (tok.underline && !tok.isSpace) {
+        ctx.save();
+        ctx.strokeStyle = '#2c3a22'; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(cx, curY + 1.5); ctx.lineTo(cx + w, curY + 1.5); ctx.stroke();
+        ctx.restore();
+      }
+      cx += w;
+    });
+    curY += ln.lineH * 0.22;
+  });
 }
 
 function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
