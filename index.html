@@ -3695,6 +3695,7 @@ async function saveGedzipTree() {
 }
 
 async function saveGedzipTreeInternal() {
+  loaderZaciatok(t('msgPrepGdz'));
   showToast(t('msgPrepGdz'), "info");
   try {
     const zip = new JSZip(); const orderedPersonIds = []; const visitedPersons = new Set();
@@ -3776,6 +3777,7 @@ async function saveGedzipTreeInternal() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(downloadUrl);
     showToast(t('msgGdzOk'), "success");
   } catch (err) { showToast(t('msgGdzErr') + " " + err.message, "error"); }
+  finally { loaderKoniec(); }
 }
 
 
@@ -3974,10 +3976,11 @@ async function runDbAction(mode) {
       checkAdminRole();
     } else {
       await putTreeData(session);
-
-      dbConnection = session;
-      updateDbStatusUI();
+      const freshData = await fetchTreeData(session);
+      loadTreeFromServer(freshData, session);
+      checkAdminRole();
       showToast(t('msgDbSaved'), 'success');
+      aktualizujTlacZapisNaServer();
     }
   } catch (err) {
     if (err && err.sessionExpired) {
@@ -4011,11 +4014,16 @@ function setDbBusy(b) { dbBusy = b; }
 
 async function backendFetch(path, method, opts = {}) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), opts.timeout || 30000);
+  const showLdr = !opts.silentLoader && typeof window.loaderZaciatok === 'function';
+  if (showLdr) window.loaderZaciatok();
   try {
     return await fetch((opts.absolute ? path : BACKEND_URL.replace(/\/+$/, '') + path), { method, headers: opts.headers || {}, body: opts.body, signal: ctrl.signal, cache: 'no-store' });
   } catch (e) {
     throw new Error((e.name === 'AbortError' ? t('msgDbErrTimeout') : t('msgDbErrNet')) + ' [' + (opts.absolute ? new URL(path).origin : BACKEND_URL.replace(/\/+$/, '') + path) + ']');
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+    if (showLdr && typeof window.loaderKoniec === 'function') window.loaderKoniec();
+  }
 }
 
 async function backendError(res, authMsgKey) {
@@ -4665,13 +4673,23 @@ async function saveToServer() {
   if (treeSource !== 'server') { showToast(t('msgLocalNoServer'), 'error'); return; }
   if (!dbConnection) { openDbModal('save'); return; }
   if (dbBusy) return;
-  dbBusy = true; showToast(t('msgDbSaving'), 'info');
-  try { await putTreeData(dbConnection); showToast(t('msgDbSaved'), 'success'); aktualizujTlacZapisNaServer(); }
-  catch (err) {
-    if (err.sessionExpired) { dbConnection = null; updateDbStatusUI(); openDbModal('save'); showDbError(err.message); }
-    else showToast(err.message, 'error');
+  dbBusy = true;
+  loaderZaciatok(t('msgDbSaving'));
+  showToast(t('msgDbSaving'), 'info');
+  try {
+    await putTreeData(dbConnection);
+    loaderZaciatok(t('nbLoading'));
+    const freshData = await fetchTreeData(dbConnection);
+    loadTreeFromServer(freshData, dbConnection);
+    showToast(t('msgDbSaved'), 'success');
+    aktualizujTlacZapisNaServer();
+  } catch (err) {
+    if (err && err.sessionExpired) { dbConnection = null; updateDbStatusUI(); openDbModal('save'); showDbError(err.message); }
+    else showToast(err && err.message ? err.message : t('msgLoginFailed'), 'error');
+  } finally {
+    dbBusy = false;
+    loaderKoniec();
   }
-  finally { dbBusy = false; }
 }
 
 /* ===================== Bezpečnosť: prečistenie ID zo servera / zálohy =====================
@@ -4755,7 +4773,7 @@ treeData = { fileName: data.fileName || 'rodokmen.gdz', persons: sanDb.persons, 
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v66');
+console.log('Genealogy index16c-v67');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5080,6 +5098,7 @@ function fanSetGens(v) {
 async function saveFanChartPdf() {
   if (!window.jspdf || !window.jspdf.jsPDF) { showToast(t('fanNoPdf'), 'error'); return; }
   const svgEl = document.getElementById('fanSvg'); if (!svgEl || !FAN.rootId) return;
+  loaderZaciatok(t('msgPrepPdf'));
   try {
     const ext = FAN.extent, pad = 30, top = 28;
     const extW = Math.max(ext, FAN.extentB || 0), below = FAN.extentB || FAN.r0;
@@ -5117,6 +5136,7 @@ async function saveFanChartPdf() {
     pdf.save('vejarovy-graf.pdf');
     showToast(t('msgPdfOk'), 'success');
   } catch (err) { showToast(t('msgPdfErr') + ' ' + err.message, 'error'); }
+  finally { loaderKoniec(); }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -7051,33 +7071,90 @@ async function vytvorPdfKnihu() {
   window.syncNotebookVisibility();
 })();
 </script>
-<!-- ===== ROTUJÚCE KOLIESKO NAČÍTAVANIA (zobrazí sa až po 0,5 s) ===== -->
-<div id="appLoader" aria-hidden="true" style="position:fixed;inset:0;z-index:200;background:rgba(13,19,26,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;">
-  <div style="text-align:center;">
-    <svg width="56" height="56" viewBox="0 0 24 24" style="animation:appLoaderRot 1s linear infinite;transform-origin:center;">
-      <circle cx="12" cy="12" r="9" fill="none" stroke="#d8cbb2" stroke-width="2" opacity="0.35"/>
-      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="#c9a96e" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <div id="appLoaderText" style="margin-top:10px;color:#f5e6c8;font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;font-weight:600;">Načítavam…</div>
+<!-- ===== MODERNÉ ROTUJÚCE KOLIESKO – PRESÝPACIE HODINY V STREDE OKNA ===== -->
+<div id="appLoader" aria-hidden="true" style="position:fixed;inset:0;z-index:200;background:rgba(13,19,26,.52);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 36px;border-radius:24px;background:linear-gradient(180deg,rgba(30,41,59,0.88),rgba(15,23,42,0.92));border:1px solid rgba(148,163,184,0.22);box-shadow:0 25px 60px rgba(0,0,0,0.55),inset 0 0 32px rgba(56,189,248,0.08);">
+    <div style="position:relative;width:84px;height:84px;display:flex;align-items:center;justify-content:center;">
+      <!-- Vonkajší svietiaci prstenec (točiace sa koliesko) -->
+      <svg width="84" height="84" viewBox="0 0 84 84" style="position:absolute;inset:0;animation:appLoaderRing 1.35s linear infinite;">
+        <defs>
+          <linearGradient id="ldrGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#38bdf8"/>
+            <stop offset="55%" stop-color="#818cf8"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.15"/>
+          </linearGradient>
+        </defs>
+        <circle cx="42" cy="42" r="37" fill="none" stroke="rgba(148,163,184,0.16)" stroke-width="4.5"/>
+        <circle cx="42" cy="42" r="37" fill="none" stroke="url(#ldrGrad)" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="165 75"/>
+      </svg>
+      <!-- Moderné presýpacie hodiny v strede (s animáciou presýpania a plynulého preklopenia) -->
+      <svg width="44" height="44" viewBox="0 0 48 48" style="animation:appLoaderHourglass 2.4s cubic-bezier(0.65,0,0.35,1) infinite;filter:drop-shadow(0 0 10px rgba(56,189,248,0.45));">
+        <!-- Horná a dolná lišta -->
+        <rect x="11" y="6" width="26" height="3.2" rx="1.6" fill="#e2e8f0"/>
+        <rect x="11" y="38.8" width="26" height="3.2" rx="1.6" fill="#e2e8f0"/>
+        <!-- Sklenené telo presýpacích hodín -->
+        <path d="M14 9.2 H34 V14 C34 19.5 26.8 22.2 25.2 24 C26.8 25.8 34 28.5 34 34 V38.8 H14 V34 C14 28.5 21.2 25.8 22.8 24 C21.2 22.2 14 19.5 14 14 Z" fill="rgba(56,189,248,0.10)" stroke="#bae6fd" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Piesok v hornej banke -->
+        <path d="M16.8 14.5 H31.2 C30.4 18.2 26.2 20.6 24 22.4 C21.8 20.6 17.6 18.2 16.8 14.5 Z" fill="#fbbf24" style="animation:appLoaderSandTop 2.4s ease-in-out infinite;transform-origin:24px 22px;"/>
+        <!-- Prúd padajúceho piesku -->
+        <line x1="24" y1="22.5" x2="24" y2="36.5" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.5 2.5" style="animation:appLoaderSandStream 0.35s linear infinite;"/>
+        <!-- Piesok v dolnej banke -->
+        <path d="M16.5 37.2 H31.5 C30.8 33.2 27.5 30.2 24 30.2 C20.5 30.2 17.2 33.2 16.5 37.2 Z" fill="#f59e0b" style="animation:appLoaderSandBot 2.4s ease-in-out infinite;transform-origin:24px 37.2px;"/>
+      </svg>
+    </div>
+    <div id="appLoaderText" style="margin-top:14px;color:#f1f5f9;font-family:'Montserrat','Segoe UI',system-ui,sans-serif;font-size:13px;font-weight:600;letter-spacing:0.03em;text-align:center;">Načítavam…</div>
   </div>
 </div>
-<style>@keyframes appLoaderRot { to { transform: rotate(360deg); } } #appLoader.zobrazeny { display: flex; }</style>
+<style>
+  @keyframes appLoaderRing { to { transform: rotate(360deg); } }
+  @keyframes appLoaderHourglass {
+    0%, 72% { transform: rotate(0deg); }
+    100% { transform: rotate(180deg); }
+  }
+  @keyframes appLoaderSandTop {
+    0% { transform: scaleY(1); opacity: 0.95; }
+    70% { transform: scaleY(0.18); opacity: 0.45; }
+    100% { transform: scaleY(0.18); opacity: 0.25; }
+  }
+  @keyframes appLoaderSandBot {
+    0% { transform: scaleY(0.2); opacity: 0.45; }
+    70% { transform: scaleY(1); opacity: 0.98; }
+    100% { transform: scaleY(1); opacity: 0.98; }
+  }
+  @keyframes appLoaderSandStream {
+    from { stroke-dashoffset: 5; }
+    to { stroke-dashoffset: 0; }
+  }
+  #appLoader.zobrazeny { display: flex; }
+</style>
 <script>
 (function () {
-  var timer = null;
-  /* Zobrazí koliesko až vtedy, ak operácia trvá dlhšie než 0,5 s. */
+  var activeCount = 0;
+  var hideTimer = null;
+  /* Zobrazí točiace sa koliesko – presýpacie hodiny v strede okna okamžite pri čakaní na odozvu. */
   window.loaderZaciatok = function (text) {
-    if (text) { var el = document.getElementById('appLoaderText'); if (el) el.textContent = text; }
-    if (timer) return;
-    timer = setTimeout(function () { document.getElementById('appLoader').classList.add('zobrazeny'); }, 500);
+    var el = document.getElementById('appLoaderText');
+    if (el) el.textContent = text || (typeof t === 'function' ? t('nbLoading') : 'Načítavam…');
+    activeCount++;
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    var ldr = document.getElementById('appLoader');
+    if (ldr) ldr.classList.add('zobrazeny');
   };
-  window.loaderKoniec = function () {
-    if (timer) { clearTimeout(timer); timer = null; }
-    document.getElementById('appLoader').classList.remove('zobrazeny');
+  window.loaderKoniec = function (force) {
+    if (force) activeCount = 0;
+    else activeCount = Math.max(0, activeCount - 1);
+    if (activeCount === 0) {
+      hideTimer = setTimeout(function () {
+        if (activeCount === 0) {
+          var ldr = document.getElementById('appLoader');
+          if (ldr) ldr.classList.remove('zobrazeny');
+        }
+      }, 120);
+    }
   };
-  loaderZaciatok(); // počiatočné načítanie stránky – koliesko sa ukáže, ak trvá > 0,5 s
-  window.addEventListener('load', function () { loaderKoniec(); });
-  setTimeout(function () { loaderKoniec(); }, 15000); // bezpečnostná poistka
+  loaderZaciatok(); // počiatočné načítanie stránky
+  window.addEventListener('load', function () { loaderKoniec(true); });
+  setTimeout(function () { loaderKoniec(true); }, 15000); // bezpečnostná poistka
 })();
 </script>
 
