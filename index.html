@@ -583,7 +583,7 @@
 
       <!-- TABS -->
       <div class="mt-auto border-t-4 border-slate-100">
-        <div class="flex border-b border-slate-200 px-4 sm:px-6 pt-3 gap-4 sm:gap-6 bg-slate-50 overflow-x-auto custom-scroll">
+        <div class="grid grid-cols-4 gap-x-2 gap-y-1.5 border-b border-slate-200 px-4 sm:px-6 pt-2.5 pb-2 bg-slate-50">
           <button type="button" id="tabBtnMedia" onclick="switchEditTab('media')" class="pb-2 border-b-2 border-indigo-600 font-bold text-indigo-600 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-images mr-1 hidden sm:inline"></i><span data-i18n="tabMedia">Médiá a Docs</span></button>
           <button type="button" id="tabBtnEvents" onclick="switchEditTab('events')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-calendar-blank mr-1 hidden sm:inline"></i><span data-i18n="tabEvents">Udalosti</span></button>
           <button type="button" id="tabBtnSources" onclick="switchEditTab('sources')" class="pb-2 border-b-2 border-transparent font-bold text-slate-500 hover:text-slate-700 uppercase tracking-wider transition-colors whitespace-nowrap text-[10px] sm:text-xs"><i class="ph-bold ph-link mr-1 hidden sm:inline"></i><span data-i18n="tabSources">Zdroje</span></button>
@@ -2427,7 +2427,7 @@ function selectPerson(personId, openPanel = true) {
   }
   const storyEl = document.getElementById('detailStoryInfo');
   if (storyEl) {
-    if (!p.story || !notePlain(p.story)) {
+    if (!p.story || !storyPlain(p.story)) {
       storyEl.innerHTML = `<span class="text-slate-400 italic cursor-pointer hover:text-indigo-600" onclick="editStoryOnCard('${p.id}')">${t('tNoStory')}</span>`;
     } else {
       storyEl.innerHTML = `<div class="rich-notes break-words">${renderStoryHtml(p.story)}</div>`;
@@ -2590,12 +2590,14 @@ function renderStoryHtml(story) {
   return /<\/?[a-z][\s\S]*>/i.test(s) ? sanitizeStoryRichText(s) : esc(s).replace(/\n/g, '<br>');
 }
 
-function storyApplySpanStyle(area, prop, val) {
+function storyApplySpanStyle(area, prop, val, savedRange) {
   area.focus();
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
-  const rng = sel.getRangeAt(0);
-  if (rng.collapsed) {
+  if (savedRange && sel) {
+    try { sel.removeAllRanges(); sel.addRange(savedRange); } catch (e) {}
+  }
+  if (!sel || !sel.rangeCount || sel.getRangeAt(0).collapsed) {
+    // Ak nie je označený konkrétny úsek, aplikuj štýl na celý text v editore
     const span = document.createElement('span');
     span.style[prop] = val;
     span.innerHTML = area.innerHTML || '<br>';
@@ -2603,15 +2605,25 @@ function storyApplySpanStyle(area, prop, val) {
     area.appendChild(span);
     return;
   }
-  const span = document.createElement('span');
-  span.style[prop] = val;
   try {
-    span.appendChild(rng.extractContents());
-    rng.insertNode(span);
-    sel.removeAllRanges();
-    const nr = document.createRange();
-    nr.selectNodeContents(span);
-    sel.addRange(nr);
+    document.execCommand('styleWithCSS', false, false);
+    if (prop === 'fontFamily') {
+      document.execCommand('fontName', false, val);
+      area.querySelectorAll('font[face]').forEach(el => {
+        const sp = document.createElement('span');
+        sp.style.fontFamily = val;
+        sp.innerHTML = el.innerHTML;
+        el.replaceWith(sp);
+      });
+    } else if (prop === 'fontSize') {
+      document.execCommand('fontSize', false, '7');
+      area.querySelectorAll('font[size="7"], span[style*="xxx-large"]').forEach(el => {
+        const sp = document.createElement('span');
+        sp.style.fontSize = val;
+        sp.innerHTML = el.innerHTML;
+        el.replaceWith(sp);
+      });
+    }
   } catch (e) {}
 }
 
@@ -2663,17 +2675,29 @@ function openStoryRichEditor(initial, onSave) {
     btn.addEventListener('mousedown', e => e.preventDefault());
     btn.addEventListener('click', () => { area.focus(); document.execCommand(btn.dataset.cmd, false, null); });
   });
+  let savedRange = null;
+  const saveSel = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && area.contains(sel.anchorNode)) {
+      savedRange = sel.getRangeAt(0).cloneRange();
+    }
+  };
+  area.addEventListener('mouseup', saveSel);
+  area.addEventListener('keyup', saveSel);
+  area.addEventListener('touchend', saveSel);
   const fontSel = ov.querySelector('#storyFontSelect');
   fontSel.addEventListener('change', () => {
     if (fontSel.value && STORY_ALLOWED_FONTS[fontSel.value]) {
-      storyApplySpanStyle(area, 'fontFamily', STORY_ALLOWED_FONTS[fontSel.value]);
+      storyApplySpanStyle(area, 'fontFamily', STORY_ALLOWED_FONTS[fontSel.value], savedRange);
+      saveSel();
       fontSel.value = '';
     }
   });
   const sizeSel = ov.querySelector('#storySizeSelect');
   sizeSel.addEventListener('change', () => {
     if (sizeSel.value && STORY_ALLOWED_SIZES.includes(sizeSel.value)) {
-      storyApplySpanStyle(area, 'fontSize', sizeSel.value);
+      storyApplySpanStyle(area, 'fontSize', sizeSel.value, savedRange);
+      saveSel();
       sizeSel.value = '';
     }
   });
@@ -2682,7 +2706,8 @@ function openStoryRichEditor(initial, onSave) {
   area.focus();
   ov.querySelector('#storyRichSave').addEventListener('click', () => {
     const clean = sanitizeStoryRichText(area.innerHTML);
-    const plain = notePlain(clean);
+    const d = document.createElement('div'); d.innerHTML = clean;
+    const plain = (d.textContent || '').replace(/\s+/g, ' ').trim();
     close();
     onSave(plain ? clean : '');
   });
@@ -2706,6 +2731,13 @@ function editStoryInModal() {
   openStoryRichEditor(inp.value, html => {
     inp.value = html;
     prev.innerHTML = html ? renderStoryHtml(html) : `<span class="text-slate-400 italic">${t('tNoStory')}</span>`;
+    const pid = document.getElementById('editPersonId') && document.getElementById('editPersonId').value;
+    if (pid && treeData.persons[pid]) {
+      treeData.persons[pid].story = html;
+      if (currentSelectedPersonId === pid) selectPerson(pid, false);
+      autoSaveNow();
+      showToast(t('msgStorySaved'), 'success');
+    }
   });
 }
 
@@ -2715,6 +2747,12 @@ function clearStoryInModal() {
   if (!inp || !prev) return;
   inp.value = '';
   prev.innerHTML = `<span class="text-slate-400 italic">${t('tNoStory')}</span>`;
+  const pid = document.getElementById('editPersonId') && document.getElementById('editPersonId').value;
+  if (pid && treeData.persons[pid]) {
+    treeData.persons[pid].story = '';
+    if (currentSelectedPersonId === pid) selectPerson(pid, false);
+    autoSaveNow();
+  }
 }
 
 function getParentsOf(personId) { const p = treeData.persons[personId]; if (!p || !p.famc) return { father: null, mother: null }; const fam = treeData.families[p.famc]; if (!fam) return { father: null, mother: null }; const f = treeData.persons[fam.husbandId], m = treeData.persons[fam.wifeId]; return { father: (f && osViditelna(f)) ? f : null, mother: (m && osViditelna(m)) ? m : null }; }
@@ -4131,6 +4169,37 @@ async function uploadPendingFiles(session) {
   }
 }
 
+
+const STORY_NOTE_PREFIX = '__STORY__:';
+function packNotesWithStory(notes, story) {
+  const cleanNotes = (notes || []).filter(n => !String(n || '').startsWith(STORY_NOTE_PREFIX));
+  const s = String(story || '').trim();
+  if (!s) return cleanNotes;
+  const chunks = [];
+  for (let i = 0; i < s.length; i += 220) {
+    chunks.push(STORY_NOTE_PREFIX + s.slice(i, i + 220));
+  }
+  return cleanNotes.concat(chunks);
+}
+function unpackNotesAndStory(rawNotes, rawStory) {
+  const notes = [];
+  const storyChunks = [];
+  (rawNotes || []).forEach(n => {
+    const str = String(n || '');
+    if (str.startsWith(STORY_NOTE_PREFIX)) storyChunks.push(str.slice(STORY_NOTE_PREFIX.length));
+    else notes.push(str);
+  });
+  const story = storyChunks.length ? storyChunks.join('') : String(rawStory || '');
+  return { notes, story };
+}
+function storyPlain(html) {
+  const s = String(html || '');
+  if (!s.trim()) return '';
+  const d = document.createElement('div');
+  d.innerHTML = renderStoryHtml(s).replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|ul|ol)>/gi, '\n');
+  return (d.textContent || '').replace(/\u00a0/g, ' ').trim();
+}
+
 function slimFile(f) { return { id: f.id, name: f.name, type: f.type, isMain: !!f.isMain, caption: f.caption || '', key: f.key, mime: f.mime || '', size: f.size || 0, thumb: (f.thumb && !f.thumbSent) ? f.thumb : '' }; }
 
 // Po načítaní z databázy stiahne obsah súborov (po 4 naraz) a priebežne prekresľuje strom.
@@ -4369,6 +4438,7 @@ function mergePersons(ctx, bMap, mMap, tMap) {
     Object.keys(MERGE_TAB_LISTS).forEach(k => { r[k] = mergeTabItems(ctx, b[k], m[k], t[k], MERGE_TAB_LISTS[k]); });
     r.sources = mergeSetSources(ctx, b.sources, m.sources, t.sources);
     r.notes = mergeSet(ctx, b.notes, m.notes, t.notes);
+    if (mv(m.story) !== mv(t.story) && mv(m.story) !== mv(b.story)) { r.story = mv(m.story); ctx.auto++; } else { r.story = mv(t.story); }
     out[id] = r;
   });
   return out;
@@ -4464,6 +4534,7 @@ function serverDataToTree(data) {
     if (!raw || !raw.id) return;
     const p = Object.assign(createPersonObj(raw.id), raw);
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
+    const __unp = unpackNotesAndStory(p.notes, p.story); p.notes = __unp.notes; p.story = __unp.story;
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
     // náhľady (thumb) prichádzajúce zo servera sú už uložené – pri zápise sa znova neposielajú
     ['photos', 'documents'].forEach(k => (Array.isArray(p[k]) ? p[k] : []).forEach(ff => { if (ff.thumb) ff.thumbSent = true; }));
@@ -4598,6 +4669,8 @@ async function putTreeDataOnce(session) {
 
   const slim = persons.map((p) =>
     Object.assign({}, p, {
+      notes: packNotesWithStory(p.notes, p.story),
+      story: p.story || '',
       photos: (p.photos || []).map(slimFile),
       documents: (p.documents || []).map(slimFile)
     })
@@ -4743,6 +4816,7 @@ function loadTreeFromServer(data, session) {
     if (!raw || !raw.id) return;
     const p = Object.assign(createPersonObj(raw.id), raw);
     ['fams', 'events', 'sources', 'addresses', 'occupations', 'notes', 'photos', 'documents'].forEach(k => { if (!Array.isArray(p[k])) p[k] = []; });
+    const __unp = unpackNotesAndStory(p.notes, p.story); p.notes = __unp.notes; p.story = __unp.story;
     p.famc = p.famc || null; p.gender = p.gender || 'M'; p.x = Number(p.x) || 0; p.y = Number(p.y) || 0;
     // náhľady (thumb) prichádzajúce zo servera sú už uložené – pri zápise sa znova neposielajú
     ['photos', 'documents'].forEach(k => (Array.isArray(p[k]) ? p[k] : []).forEach(ff => { if (ff.thumb) ff.thumbSent = true; }));
@@ -4773,7 +4847,7 @@ treeData = { fileName: data.fileName || 'rodokmen.gdz', persons: sanDb.persons, 
 
 // Clerk is initialized when the page has finished loading; openDbModal also checks readiness.
 // Známka verzie – na rýchle overenie, že beží aktuálny súbor (F12 → Console)
-console.log('Genealogy index16c-v67');
+console.log('Genealogy index16c-v68');
 window.addEventListener('load', () => {
   ensureClerkReady().then(() => checkAdminRole()).catch(err => console.error('Clerk initialization failed:', err));
 });
@@ -5655,6 +5729,7 @@ async function spracujLokalnuZalohu(fileList) {
     // 5) povolania, poznámky, udalosti, zdroje, adresy
     db.person_occupations.forEach(r => { const p = persons[r.person_id]; if (p) p.occupations.push({ id: r.id, title: r.title || '', city: r.city || '', dateFrom: r.date_from || '', dateTo: r.date_to || '' }); });
     db.person_notes.forEach(r => { const p = persons[r.person_id]; if (p && r.note_text) p.notes.push(String(r.note_text)); });
+    Object.values(persons).forEach(p => { const u = unpackNotesAndStory(p.notes, p.story); p.notes = u.notes; p.story = u.story; });
     db.person_events.forEach(r => { const p = persons[r.person_id]; if (p) p.events.push({ id: r.id, type: r.type || 'EVEN', title: r.title || '', date: r.event_date || '', place: r.place || '' }); });
     db.person_sources.forEach(r => { const p = persons[r.person_id]; if (p && r.url) { let desc = r.desc == null ? '' : String(r.desc); if (r.sort_order == null && /^\d+$/.test(desc.trim())) desc = ''; p.sources.push({ url: String(r.url), desc }); } });
     db.person_addresses.forEach(r => { const p = persons[r.person_id]; if (p) p.addresses.push({ id: r.id, type: r.type || 'PERM', address: r.address || '', dateFrom: r.date_from || '', dateTo: r.date_to || '' }); });
@@ -5763,7 +5838,7 @@ function vygenerujSqlDump() {
   ps.forEach(p => (p.occupations || []).forEach((o, i) => out.push(bkpRiadok('person_occupations', [o.id || generateId('O'), p.id, o.title || '', o.city || '', o.dateFrom || '', o.dateTo || '', i]))));
   out.push(`CREATE TABLE IF NOT EXISTS person_notes (\n    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n    person_id  TEXT    NOT NULL REFERENCES persons (id) ON DELETE CASCADE,\n    note_text  TEXT    NOT NULL CHECK (length(note_text) <= 250),\n    sort_order INTEGER NOT NULL DEFAULT 0\n);`);
   let noteId = 0;
-  ps.forEach(p => (p.notes || []).forEach((n, i) => { noteId++; out.push(bkpRiadok('person_notes', [noteId, p.id, String(n).slice(0, 250), i])); }));
+  ps.forEach(p => packNotesWithStory(p.notes, p.story).forEach((n, i) => { noteId++; out.push(bkpRiadok('person_notes', [noteId, p.id, String(n).slice(0, 250), i])); }));
   out.push(`CREATE TABLE IF NOT EXISTS person_files (\n    id         TEXT PRIMARY KEY,\n    person_id  TEXT    NOT NULL REFERENCES persons (id) ON DELETE CASCADE,\n    kind       TEXT    NOT NULL CHECK (kind IN ('photo', 'doc')),\n    name       TEXT    NOT NULL,\n    ext        TEXT    NOT NULL DEFAULT '',\n    mime_type  TEXT    NOT NULL DEFAULT 'application/octet-stream',\n    is_main    INTEGER NOT NULL DEFAULT 0 CHECK (is_main IN (0, 1)),\n    content    BLOB    NOT NULL,\n    sort_order INTEGER NOT NULL DEFAULT 0, storage_key TEXT NOT NULL DEFAULT '', size_bytes INTEGER NOT NULL DEFAULT 0, caption TEXT NOT NULL DEFAULT '',\n    CHECK (is_main = 0 OR kind = 'photo')\n);`);
   let missing = 0;
   ps.forEach(p => {
@@ -6473,6 +6548,7 @@ function pdfBookParseStoryParagraphs(html) {
     if (tg === 'I' || tg === 'EM' || node.style.fontStyle === 'italic') next.italic = true;
     const td = (node.style.textDecoration || node.style.textDecorationLine || '').toLowerCase();
     if (tg === 'U' || td.includes('underline')) next.underline = true;
+    if (tg === 'S' || tg === 'STRIKE' || td.includes('line-through')) next.strike = true;
     if (node.style.fontFamily) next.family = node.style.fontFamily;
     if (node.style.fontSize) {
       const m = parseFloat(node.style.fontSize);
@@ -6485,7 +6561,7 @@ function pdfBookParseStoryParagraphs(html) {
     if (isBlock) pushPara();
   }
 
-  walk(div, { bold: false, italic: false, underline: false, family: 'Cormorant, Georgia, serif', sizePt: PDF_BOOK_NOTE_PT });
+  walk(div, { bold: false, italic: false, underline: false, strike: false, family: 'Cormorant, Georgia, serif', sizePt: PDF_BOOK_NOTE_PT });
   return paragraphs.filter(p => p.some(tok => !tok.isSpace));
 }
 
@@ -6497,13 +6573,14 @@ function pdfBookTokenFont(tok) {
   return `${style}${weight}${sz}pt ${fam}`;
 }
 
-function pdfBookPoznamkaOsoby(p, topH) {
+// Zostaví všetky zalomené riadky príbehu osoby (p.story) pre samostatný rámček pod fotografiou a údajmi
+function pdfBookStoryAllLines(p) {
   const rawStory = String(p.story || '').trim();
-  if (!rawStory || !notePlain(rawStory)) return null;
+  if (!rawStory || !storyPlain(rawStory)) return [];
   const N = PDF_BOOK_NOTE;
   const innerW = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X - 2 * N.PADX;
   const paragraphs = pdfBookParseStoryParagraphs(rawStory);
-  if (!paragraphs.length) return null;
+  if (!paragraphs.length) return [];
 
   const lines = [];
   paragraphs.forEach(para => {
@@ -6522,29 +6599,41 @@ function pdfBookPoznamkaOsoby(p, topH) {
     });
     if (curLine.length) lines.push({ tokens: curLine, lineH: curLineH });
   });
-
-  if (!lines.length) return null;
-  const pageH = PDF_BOOK.BOTTOM - (PDF_BOOK.TOP + 62);
-  const availH = Math.max(40, pageH - topH - N.GAP - N.AFTER - 2 * N.PADY);
-  const fitted = [];
-  let sumH = 0;
-  for (const ln of lines) {
-    if (fitted.length > 0 && sumH + ln.lineH > availH) {
-      fitted[fitted.length - 1].tokens.push({ text: '…', isSpace: false, bold: false, italic: false, underline: false, family: 'Cormorant, Georgia, serif', sizePt: PDF_BOOK_NOTE_PT });
-      break;
-    }
-    fitted.push(ln);
-    sumH += ln.lineH;
-  }
-  const boxH = 2 * N.PADY + sumH + 4;
-  return { richLines: fitted, boxH };
+  return lines;
 }
 
-// ---- rozvrhnutie (layout) knihy: rodiny → strany → bloky ----
+function pdfBookStoryBoxFromLines(linesSlice) {
+  if (!linesSlice || !linesSlice.length) return null;
+  const sumH = linesSlice.reduce((s, ln) => s + ln.lineH, 0);
+  return { richLines: linesSlice, boxH: 2 * PDF_BOOK_NOTE.PADY + sumH + 4 };
+}
+
+function pdfBookPoznamkaOsoby(p, topH) {
+  const lines = pdfBookStoryAllLines(p);
+  return pdfBookStoryBoxFromLines(lines);
+}
+
+// Počet strán obsahu (TOC): 1. strana max 44 rodín (2 stĺpce po 22), každá ďalšia strana max 68 rodín (2 stĺpce po 34)
+const PDF_BOOK_TOC_P1_MAX = 44;
+const PDF_BOOK_TOC_PN_MAX = 68;
+function pdfBookSplitToc(toc) {
+  if (!toc || !toc.length) return [[]];
+  const pages = [toc.slice(0, PDF_BOOK_TOC_P1_MAX)];
+  for (let i = PDF_BOOK_TOC_P1_MAX; i < toc.length; i += PDF_BOOK_TOC_PN_MAX) {
+    pages.push(toc.slice(i, i + PDF_BOOK_TOC_PN_MAX));
+  }
+  return pages;
+}
+
+// ---- rozvrhnutie (layout) knihy: rodiny → strany → bloky (s podporou viacstranového obsahu a dlhých príbehov) ----
 function pdfBookLayout(famPages) {
-  const L = { pages: [], famPages: new Map(), famNazvy: new Map(), pageNum: 1 }; // strana 1 = titulná
+  const zoznamRodin = pdfBookRodinyZoznam();
+  const tocPagesCount = zoznamRodin.length <= PDF_BOOK_TOC_P1_MAX ? 1 : 1 + Math.ceil((zoznamRodin.length - PDF_BOOK_TOC_P1_MAX) / PDF_BOOK_TOC_PN_MAX);
+  const L = { pages: [], famPages: new Map(), famNazvy: new Map(), pageNum: tocPagesCount, tocPagesCount };
+  const N = PDF_BOOK_NOTE;
   const newPage = () => { L.pageNum++; const pg = { num: L.pageNum, items: [], nazov: null }; L.pages.push(pg); return pg; };
-  pdfBookRodinyZoznam().forEach(rec => {
+
+  zoznamRodin.forEach(rec => {
     const fam = rec.fam;
     const P = treeData.persons;
     const muz = (fam.husbandId && P[fam.husbandId]) || null;
@@ -6554,23 +6643,59 @@ function pdfBookLayout(famPages) {
     const clenovia = [muz, zena].filter(Boolean).concat(deti);
     const blocks = clenovia.map(p => {
       const jePartner = (muz && p.id === muz.id) || (zena && p.id === zena.id);
-      const riadky = pdfBookWrapRiadky(pdfBookRiadky(p, L.famPages));
-      const odstavce = pdfBookOdstavceOsoby(p, jePartner, fam, L.famPages);
+      const riadky = pdfBookWrapRiadky(pdfBookRiadky(p, famPages || L.famPages));
+      const odstavce = pdfBookOdstavceOsoby(p, jePartner, fam, famPages || L.famPages);
       const topH = pdfBookTopVyska(riadky, odstavce);
-      const pozn = pdfBookPoznamkaOsoby(p, topH);
-      return { p, riadky, odstavce, topH, pozn, h: pdfBookBlockVyska(topH, pozn) };
+      const storyLines = pdfBookStoryAllLines(p);
+      const fullPozn = pdfBookStoryBoxFromLines(storyLines);
+      return { p, riadky, odstavce, topH, storyLines, pozn: fullPozn, h: pdfBookBlockVyska(topH, fullPozn) };
     });
-    // predvýpočet počtu strán kapitoly (kvôli odkazom „Rodina … – strana X“)
-    let pages = 1, y = PDF_BOOK.TOP + 62;
-    blocks.forEach(b => { if (y + b.h > PDF_BOOK.BOTTOM) { pages++; y = PDF_BOOK.TOP; } y += b.h; });
+
     L.famPages.set(fam.id, L.pageNum + 1);
     L.famNazvy.set(fam.id, rec.nazov);
     let pg = newPage(); pg.nazov = rec.nazov;
     let yy = PDF_BOOK.TOP + 62;
+
     blocks.forEach(b => {
-      if (yy + b.h > PDF_BOOK.BOTTOM) { pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP; }
-      pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky, odstavce: b.odstavce, topH: b.topH, pozn: b.pozn });
-      yy += b.h;
+      if (!b.storyLines.length) {
+        if (yy + b.topH > PDF_BOOK.BOTTOM) { pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP; }
+        pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky, odstavce: b.odstavce, topH: b.topH, pozn: null });
+        yy += b.topH;
+        return;
+      }
+      // Osoba má príbeh: ak sa celá (foto + údaje + rámček príbehu) zmestí na novú stranu, ale nie do zvyšku aktuálnej, daj ju na novú stranu
+      const fullH = b.h;
+      const freshPageAvail = PDF_BOOK.BOTTOM - PDF_BOOK.TOP;
+      const minStartH = b.topH + N.GAP + 2 * N.PADY + 2 * N.LINE + N.AFTER;
+      if (yy + fullH > PDF_BOOK.BOTTOM && (fullH <= freshPageAvail || yy + minStartH > PDF_BOOK.BOTTOM)) {
+        pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP;
+      }
+      // Koľko riadkov príbehu sa zmestí do rámčeka priamo pod fotografiu a základné údaje na tejto strane
+      let availStoryH = PDF_BOOK.BOTTOM - (yy + b.topH + N.GAP) - N.AFTER - 2 * N.PADY - 4;
+      let idx = 0, firstSlice = [], sumH = 0;
+      while (idx < b.storyLines.length) {
+        const ln = b.storyLines[idx];
+        if (firstSlice.length > 0 && sumH + ln.lineH > availStoryH) break;
+        firstSlice.push(ln); sumH += ln.lineH; idx++;
+      }
+      const firstPozn = pdfBookStoryBoxFromLines(firstSlice);
+      pg.items.push({ kind: 'person', y: yy, p: b.p, riadky: b.riadky, odstavce: b.odstavce, topH: b.topH, pozn: firstPozn });
+      yy += pdfBookBlockVyska(b.topH, firstPozn);
+
+      // Ak je príbeh veľmi dlhý a pokračuje na ďalšej strane, vykresli pokračovanie rámčeka príbehu na ďalšej strane
+      while (idx < b.storyLines.length) {
+        pg = newPage(); pg.nazov = null; yy = PDF_BOOK.TOP;
+        const contAvailH = PDF_BOOK.BOTTOM - yy - N.AFTER - 2 * N.PADY - 4;
+        const contSlice = []; let cSumH = 0;
+        while (idx < b.storyLines.length) {
+          const ln = b.storyLines[idx];
+          if (contSlice.length > 0 && cSumH + ln.lineH > contAvailH) break;
+          contSlice.push(ln); cSumH += ln.lineH; idx++;
+        }
+        const contPozn = pdfBookStoryBoxFromLines(contSlice);
+        pg.items.push({ kind: 'story_cont', y: yy, pozn: contPozn });
+        yy += contPozn.boxH + N.AFTER;
+      }
     });
   });
   return L;
@@ -6700,9 +6825,11 @@ function pdfBookDrawOzdobnaIniciala(ctx, x, y, pz, C) {
 function pdfBookDrawPoznamka(ctx, it, C) {
   const pz = it.pozn, N = PDF_BOOK_NOTE;
   const bx = PDF_BOOK.MARGIN_X, bw = PDF_BOOK.W - 2 * PDF_BOOK.MARGIN_X;
-  const by = it.y + it.topH + N.GAP;
+  const by = it.y + (it.topH || 0) + (it.topH ? N.GAP : 0);
   ctx.save();
-  ctx.strokeStyle = C; ctx.lineWidth = 0.6;
+  ctx.fillStyle = '#fafbf8';
+  pdfBookRoundRectPath(ctx, bx, by, bw, pz.boxH, N.R); ctx.fill();
+  ctx.strokeStyle = C; ctx.lineWidth = 0.7;
   pdfBookRoundRectPath(ctx, bx, by, bw, pz.boxH, N.R); ctx.stroke();
   ctx.restore();
   const tx0 = bx + N.PADX;
@@ -6721,6 +6848,13 @@ function pdfBookDrawPoznamka(ctx, it, C) {
         ctx.beginPath(); ctx.moveTo(cx, curY + 1.5); ctx.lineTo(cx + w, curY + 1.5); ctx.stroke();
         ctx.restore();
       }
+      if (tok.strike && !tok.isSpace) {
+        ctx.save();
+        ctx.strokeStyle = '#2c3a22'; ctx.lineWidth = 0.6;
+        const sy = curY - (tok.sizePt || PDF_BOOK_NOTE_PT) * 0.3;
+        ctx.beginPath(); ctx.moveTo(cx, sy); ctx.lineTo(cx + w, sy); ctx.stroke();
+        ctx.restore();
+      }
       cx += w;
     });
     curY += ln.lineH * 0.22;
@@ -6737,25 +6871,34 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
   ctx.textBaseline = 'alphabetic';
 
   if (pg.isTitle) {
-    // Titulná strana knihy
-    ctx.font = PDF_BOOK_HEAD_FONT; ctx.fillStyle = C; ctx.textAlign = 'center';
-    ctx.fillText(t('pdfBookTitle'), PDF_BOOK.W / 2, 205); ctx.textAlign = 'left';
-    ctx.font = 'italic 12pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
-    ctx.fillText(t('pdfBookSub'), PDF_BOOK.W / 2, 232); ctx.textAlign = 'left';
-    if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 220) / 2, 248, 220, 44);
-    // Obsah: zoznam rodín so stranami
-    ctx.font = '600 15pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
-    ctx.fillText(t('pdfBookToc'), PDF_BOOK.W / 2, 330); ctx.textAlign = 'left';
-    const polozky = pg.toc; // [{nazov, page}]
-    const dvaStlpce = polozky.length > 30;
+    const isFirst = pg.isTocFirst !== false;
+    if (isFirst) {
+      // 1. titulná strana knihy + začiatok obsahu
+      ctx.font = PDF_BOOK_HEAD_FONT; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText(t('pdfBookTitle'), PDF_BOOK.W / 2, 205); ctx.textAlign = 'left';
+      ctx.font = 'italic 12pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText(t('pdfBookSub'), PDF_BOOK.W / 2, 232); ctx.textAlign = 'left';
+      if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 220) / 2, 248, 220, 44);
+      ctx.font = '600 15pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText(t('pdfBookToc'), PDF_BOOK.W / 2, 330); ctx.textAlign = 'left';
+    } else {
+      // Pokračovanie obsahu na ďalšej strane (strana 2+)
+      ctx.font = '600 15pt Cormorant, Georgia, serif'; ctx.fillStyle = C; ctx.textAlign = 'center';
+      ctx.fillText(t('pdfBookToc'), PDF_BOOK.W / 2, PDF_BOOK.TOP + 12); ctx.textAlign = 'left';
+      if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 180) / 2, PDF_BOOK.TOP + 22, 180, 36);
+    }
+    const polozky = pg.toc || []; // [{nazov, page}]
+    const max1Col = isFirst ? 22 : 34;
+    const dvaStlpce = polozky.length > max1Col;
     const colX = dvaStlpce ? [MX + 10, PDF_BOOK.W / 2 + 20] : [MX + 30];
     const colMax = pdfBookTocMaxW(dvaStlpce);
     const naStlpec = dvaStlpce ? Math.ceil(polozky.length / 2) : polozky.length;
-    const gap = dvaStlpce ? 17 : (polozky.length > 22 ? 17 : (polozky.length > 14 ? 20 : 24));
-    let y = 360;
+    const gap = dvaStlpce ? 17 : (polozky.length > 18 ? 17 : 20);
+    const startY = isFirst ? 360 : (PDF_BOOK.TOP + 76);
+    let y = startY;
     polozky.forEach((r, i) => {
       const col = dvaStlpce ? (i >= naStlpec ? 1 : 0) : 0;
-      if (dvaStlpce && i === naStlpec) y = 360;
+      if (dvaStlpce && i === naStlpec) y = startY;
       const x0 = colX[col];
       ctx.font = '11.5pt Cormorant, Georgia, serif'; ctx.fillStyle = C;
       ctx.fillText(r.nazov, x0, y);
@@ -6763,7 +6906,7 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
       ctx.font = '10.5pt Cormorant, Georgia, serif';
       const pw = ctx.measureText('str. ' + r.page).width;
       ctx.strokeStyle = C; ctx.lineWidth = 0.4; ctx.setLineDash([1.5, 2.5]);
-      ctx.beginPath(); ctx.moveTo(x0 + tw + 6, y - 3); ctx.lineTo(x0 + colMax - pw - 4, y - 3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x0 + tw + 6, y - 3); ctx.lineTo(Math.max(x0 + tw + 10, x0 + colMax - pw - 4), y - 3); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillText('str. ' + r.page, x0 + colMax - pw, y);
       y += gap;
@@ -6776,6 +6919,10 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
       if (dividerCv) ctx.drawImage(dividerCv, (PDF_BOOK.W - 180) / 2, PDF_BOOK.TOP + 18, 180, 36);
     }
     pg.items.forEach(it => {
+      if (it.kind === 'story_cont') {
+        if (it.pozn) pdfBookDrawPoznamka(ctx, { y: it.y, topH: 0, pozn: it.pozn }, C);
+        return;
+      }
       if (it.kind !== 'person') return;
       const p = it.p, ry = it.y, x = MX;
       const phW = 60, phH = 78;
@@ -6794,7 +6941,7 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
       }
       ctx.restore();
       pdfBookDrawPhotoFrame(ctx, x, ry, phW, phH);
-      // meno + údaje vpravo od portrétu
+      // meno + základné údaje napravo od fotografie
       let ty = ry + 14; const tx = x + phW + 14;
       ctx.font = PDF_BOOK_NAME_FONT; ctx.fillStyle = C;
       let meno = pdfBookMeno(p);
@@ -6809,7 +6956,7 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
           ty += 13;
         });
       });
-      // samostatné odseky vedľa fotografie: odkaz na rodinu partnera
+      // samostatné odseky napravo od fotografie: odkaz na rodinu partnera
       (it.odstavce || []).forEach(od => {
         ctx.font = PDF_BOOK_ODSTAVEC_FONT;
         od.lines.forEach(ln => {
@@ -6819,7 +6966,7 @@ function pdfBookDrawPage(pg, cv, imgs, frameCv, dividerCv) {
         });
         ty += 4;
       });
-      // prvá poznámka: tenký zaoblený rámček na celú šírku pod fotografiou a údajmi osoby
+      // príbeh osoby: v samostatnom rámčeku pod fotografiou a základnými údajmi
       if (it.pozn) pdfBookDrawPoznamka(ctx, it, C);
     });
   }
@@ -6860,7 +7007,6 @@ async function vytvorPdfKnihu() {
     L = pdfBookLayout(L.famPages);
     const famPages = L.famPages;
     L = pdfBookLayout(famPages);
-    const famNazvy = L.famNazvy;
 
     // prednačítanie hlavných fotografií
     const imgs = new Map();
@@ -6876,12 +7022,13 @@ async function vytvorPdfKnihu() {
     }));
     await Promise.all(promises);
 
-    // obsah: rodiny zoradené presne ako v knihe
+    // obsah: rodiny zoradené presne ako v knihe, rozdelené na strany obsahu
     const toc = [];
     pdfBookRodinyZoznam().forEach(rec => {
       const pg = famPages.get(rec.fam.id);
       if (pg) toc.push({ nazov: rec.nazov, page: pg });
     });
+    const tocPages = pdfBookSplitToc(toc);
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true });
@@ -6896,8 +7043,10 @@ async function vytvorPdfKnihu() {
       pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PDF_BOOK.W, PDF_BOOK.H, undefined, 'FAST');
     };
 
-    // titulná strana (strana 1)
-    await renderPage({ num: 1, isTitle: true, toc });
+    // titulná strana (strana 1) + prípadné ďalšie strany obsahu (strana 2+)
+    for (let i = 0; i < tocPages.length; i++) {
+      await renderPage({ num: i + 1, isTitle: true, isTocFirst: i === 0, toc: tocPages[i] });
+    }
     // strany rodín
     for (const pg of L.pages) await renderPage(pg);
 
@@ -6911,7 +7060,7 @@ async function vytvorPdfKnihu() {
 
     // uloženie: stiahnutie .pdf na lokálny disk
     pdf.save('Rodokmen-rodiny-Sklencar.pdf');
-    showToast(t('pdfBookSaved').replace('{X}', (L.pages.length + 1)), 'success');
+    showToast(t('pdfBookSaved').replace('{X}', L.pageNum), 'success');
   } catch (err) {
     console.error(err);
     showToast(t('pdfBookFail') + ' ' + (err && err.message ? err.message : ''), 'error');
