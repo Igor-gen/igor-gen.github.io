@@ -7368,6 +7368,37 @@ function docxBookPlainStory(html) {
   return (div.innerText || div.textContent || '').replace(/\u00a0/g, ' ').trim();
 }
 
+// Zmenší fotografiu na tlačovú kvalitu 300 DPI, zachová pomer strán a
+// znovu ju zakóduje. Predpripravený raster obmedzí artefakty pri škálovaní vo Worde.
+async function docxBookFitImage(bytes, maxWidth = 105, maxHeight = 136) {
+  if (!bytes) return null;
+  const blob = new Blob([bytes]);
+  let source = null, width = 0, height = 0;
+  if (typeof createImageBitmap === 'function') {
+    source = await createImageBitmap(blob); width = source.width; height = source.height;
+  } else {
+    const url = URL.createObjectURL(blob);
+    try {
+      source = await new Promise((resolve, reject) => {
+        const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = url;
+      });
+      width = source.naturalWidth; height = source.naturalHeight;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  if (!width || !height) return { data: bytes, width: maxWidth, height: maxHeight };
+  const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+  const outW = Math.max(1, Math.round(width * scale * 300 / 72));
+  const outH = Math.max(1, Math.round(height * scale * 300 / 72));
+  const canvas = document.createElement('canvas'); canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) { if (source.close) source.close(); return { data: bytes, width: maxWidth, height: maxHeight }; }
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, outW, outH); ctx.drawImage(source, 0, 0, outW, outH);
+  if (source.close) source.close();
+  const encoded = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.96));
+  if (!encoded) return { data: bytes, width: Math.round(width * scale * 100) / 100, height: Math.round(height * scale * 100) / 100 };
+  return { data: new Uint8Array(await encoded.arrayBuffer()), width: Math.round(width * scale * 100) / 100, height: Math.round(height * scale * 100) / 100 };
+}
+
 function vytvorDocxKnihu() {
   try { closeFileMenu(); } catch (e) {}
   if (!Object.keys(treeData.persons || {}).length) { showToast(t('bkpNoTree'), 'error'); return; }
@@ -7411,10 +7442,10 @@ async function generujDocxKnihu(vybraneRodySet = null) {
   try {
     const D = await docxBookLoadLibrary();
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun, AlignmentType, HeadingLevel, BorderStyle, WidthType, Footer, PageNumber } = D;
-    const green = '3B4E29', dark = '2C3A22', muted = '718064';
+    const green = '3B4E29', frameGreen = 'D8DCD4', dark = '2C3A22', muted = '718064';
     const children = [];
     const para = (text, opts = {}) => new Paragraph({ children: [new TextRun({ text: String(text || ''), font: 'Cormorant Garamond', ...opts.run })], ...opts.paragraph });
-    children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 2600, after: 180 }, children: [new TextRun({ text: t('pdfBookTitle') || 'Rodinná kronika', bold: true, italics: true, size: 40, color: green, font: 'Cormorant Garamond' })] }));
+    children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 2600, after: 180 }, children: [new TextRun({ text: t('pdfBookTitle') || 'Rodinná kronika', bold: true, italics: true, size:  forty = 40, color: green, font: 'Cormorant Garamond' })] }));
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [new TextRun({ text: t('pdfBookSub') || 'Rodinný rodokmeň', italics: true, size: 26, color: green, font: 'Cormorant Garamond' })] }));
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 450, after: 300 }, children: [new TextRun({ text: '❧  ❦  ❧', size: 28, color: green })] }));
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_1, spacing: { before: 350, after: 260 }, children: [new TextRun({ text: t('pdfBookToc') || 'Obsah', color: green, font: 'Cormorant Garamond' })] }));
@@ -7436,7 +7467,7 @@ async function generujDocxKnihu(vybraneRodySet = null) {
         if (mainPhoto && mainPhoto.data) {
           const bytes = await docxBookImageBytes(mainPhoto.data);
           if (bytes) {
-            try { photoRun = new ImageRun({ data: bytes, transformation: { width: 105, height: 136 } }); }
+            try { const fit = await docxBookFitImage(bytes, 105, 136); photoRun = new ImageRun({ data: fit && fit.data ? fit.data : bytes, transformation: fit ? { width: fit.width, height: fit.height } : { width: 105, height: 136 } }); }
             catch (e) { photoRun = null; }
           }
         }
@@ -7447,17 +7478,27 @@ async function generujDocxKnihu(vybraneRodySet = null) {
         const noBorders = { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } };
         const leftCell = new TableCell({ width: { size: 24, type: WidthType.PERCENTAGE }, verticalAlign: 'top', margins: { top: 80, bottom: 100, left: 80, right: 180 }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: photoRun ? [photoRun] : [new TextRun({ text: ' ', size: 10 })] })] });
         const rightCell = new TableCell({ width: { size: 76, type: WidthType.PERCENTAGE }, verticalAlign: 'top', margins: { top: 40, bottom: 100, left: 120, right: 80 }, children: infoParas });
-        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: [2200, 7000], borders: noBorders, rows: [new TableRow({ children: [leftCell, rightCell] })] }));
+        children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: [2200, 7000], borders: noBorders, rows: [new TableRow({ cantSplit: true, children: [leftCell, rightCell] })] }));
         const story = String(person.story || '').trim();
         if (story && storyPlain(story)) {
           const rich = pdfBookParseStoryParagraphs(story);
           const richParas = rich.map(tokens => new Paragraph({ spacing: { before: 70, after: 90, line: 290 }, indent: { left: 180, right: 120 }, children: tokens.map(tok => new TextRun({ text: tok.text, bold: !!tok.bold, italics: !!tok.italic, underline: tok.underline ? {} : undefined, strike: !!tok.strike, size: Math.round((tok.sizePt || 9.5) * 2), color: dark, font: 'Cormorant Garamond' })) }));
-          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: { ...noBorders, top: { style: BorderStyle.SINGLE, size: 5, color: green }, bottom: { style: BorderStyle.SINGLE, size: 5, color: green }, left: { style: BorderStyle.SINGLE, size: 5, color: green }, right: { style: BorderStyle.SINGLE, size: 5, color: green } }, rows: [new TableRow({ children: [new TableCell({ margins: { top: 130, bottom: 130, left: 180, right: 180 }, children: richParas.length ? richParas : [para(docxBookPlainStory(story))] })] })] }));
+          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: { ...noBorders, top: { style: BorderStyle.SINGLE, size: 4, color: frameGreen }, bottom: { style: BorderStyle.SINGLE, size: 4, color: frameGreen }, left: { style: BorderStyle.SINGLE, size: 4, color: frameGreen }, right: { style: BorderStyle.SINGLE, size: 4, color: frameGreen } }, rows: [new TableRow({ cantSplit: true, children: [new TableCell({ margins: { top: 130, bottom: 130, left: 180, right: 180 }, children: richParas.length ? richParas : [para(docxBookPlainStory(story))] })] })] }));
         }
         children.push(new Paragraph({ spacing: { after: 180 }, children: [new TextRun({ text: ' ', size: 5 })] }));
       }
     }
-    const doc = new Document({ creator: 'Genealogy', title: t('pdfBookTitle') || 'Rodinná kronika', description: 'Editovateľná rodinná kniha', styles: { default: { document: { run: { font: 'Cormorant Garamond', size: 22, color: dark }, paragraph: { spacing: { after: 80 } } } }, paragraphStyles: [{ id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', run: { font: 'Cormorant Garamond', bold: true, color: green, size: 32 }, paragraph: { spacing: { before: 220, after: 160 }, outlineLevel: 0 } }] }, sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1050, right: 1050, bottom: 1050, left: 1050 } } }, footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '— ', color: muted }), new TextRun({ children: [PageNumber.CURRENT] }), new TextRun({ text: ' —', color: muted })] })] }) }, children }] });
+    const doc = new Document({ creator: 'Genealogy', title: t('pdfBookTitle') || 'Rodinná kronika', description: 'Editovateľná rodinná kniha', styles: { default: { document: { run: { font: 'Cormorant Garamond', size: 22, color: dark }, paragraph: { spacing: { after: 80 } } } }, paragraphStyles: [{ id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', run: { font: 'Cormorant Garamond', bold: true, color: green, size: 32 }, paragraph: { spacing: { before: 220, after: 160 }, outlineLevel: 0 } }] }, sections: [{ properties: { page: {
+        size: { width: 11906, height: 16838 },
+        margin: { top: 1250, right: 1250, bottom: 1250, left: 1250 },
+        borders: {
+          pageBorders: { display: 'allPages', offsetFrom: 'page', zOrder: 'back' },
+          pageBorderTop: { style: 'doubleWave', size: 5, space: 16, color: frameGreen },
+          pageBorderBottom: { style: 'doubleWave', size: 5, space: 16, color: frameGreen },
+          pageBorderLeft: { style: 'double', size: 5, space: 16, color: frameGreen },
+          pageBorderRight: { style: 'double', size: 5, space: 16, color: frameGreen }
+        }
+      } }, footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '— ', color: muted }), new TextRun({ children: [PageNumber.CURRENT] }), new TextRun({ text: ' —', color: muted })] })] }) }, children }] });
     const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href = url; a.download = 'Rodinna-kronika-editovatelna.docx'; document.body.appendChild(a); a.click(); a.remove();
